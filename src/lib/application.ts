@@ -76,9 +76,9 @@ export const businessSchema = z
     description: req("Business description", 2000),
   })
   .superRefine((d, ctx) => {
-    if (d.type === "Other" && !d.type_other?.trim())
+    if (d["type"] === "Other" && !d.type_other?.trim())
       ctx.addIssue({ code: "custom", path: ["type_other"], message: "Please specify the business type" });
-    if (d.category === "Others" && !d.category_other?.trim())
+    if (d["category"] === "Others" && !d.category_other?.trim())
       ctx.addIssue({ code: "custom", path: ["category_other"], message: "Please specify the category" });
   });
 
@@ -95,10 +95,10 @@ export const brandSchema = z
   .superRefine((d, ctx) => {
     const count = SOCIALS.filter((s) => (d as Record<string, unknown>)[s.key] && String((d as Record<string, unknown>)[s.key]).trim()).length;
     if (count < 2) ctx.addIssue({ code: "custom", path: ["socials"], message: "Please provide at least 2 social media accounts" });
-    if (d.owns_brand === "yes") {
+    if (d["owns_brand"] === "yes") {
       if (!d.brand_name?.trim()) ctx.addIssue({ code: "custom", path: ["brand_name"], message: "Brand name is required" });
       if (!d.brand_category?.trim()) ctx.addIssue({ code: "custom", path: ["brand_category"], message: "Brand category is required" });
-      if (d.brand_category === "Others" && !d.brand_category_other?.trim())
+      if (d["brand_category"] === "Others" && !d.brand_category_other?.trim())
         ctx.addIssue({ code: "custom", path: ["brand_category_other"], message: "Please specify the brand category" });
       if (!d.brand_description?.trim()) ctx.addIssue({ code: "custom", path: ["brand_description"], message: "Brand description is required" });
     }
@@ -111,7 +111,7 @@ export const registrationSchema = z
     reg_name: opt(),
   })
   .superRefine((d, ctx) => {
-    if (d.registered === "yes") {
+    if (d["registered"] === "yes") {
       if (!d.reg_number?.trim()) ctx.addIssue({ code: "custom", path: ["reg_number"], message: "Registration number is required" });
       if (!d.reg_name?.trim()) ctx.addIssue({ code: "custom", path: ["reg_name"], message: "Registered business name is required" });
     }
@@ -151,25 +151,25 @@ export function summaryRows(step: 1 | 2 | 3 | 4, d: Section): [string, string][]
   if (step === 2)
     return [
       ["Business name", v("name")],
-      ["Business type", d.type === "Other" ? `Other — ${v("type_other")}` : v("type")],
-      ["Category", d.category === "Others" ? `Others — ${v("category_other")}` : v("category")],
+      ["Business type", d["type"] === "Other" ? `Other — ${v("type_other")}` : v("type")],
+      ["Category", d["category"] === "Others" ? `Others — ${v("category_other")}` : v("category")],
       ["Business phone", v("phone")], ["Business email", v("email")], ["Address", v("address")],
       ["City", v("city")], ["State", v("state")], ["Country", v("country")], ["Website", v("website")],
       ["Years in business", v("years")], ["Employees", v("employees")], ["Description", v("description")],
     ];
   if (step === 3) {
     const rows: [string, string][] = [["Store name", v("store_name")]];
-    SOCIALS.forEach((s) => d[s.key] && rows.push([s.label, d[s.key]]));
-    rows.push(["Owns a brand", d.owns_brand === "yes" ? "Yes" : d.owns_brand === "no" ? "No" : "—"]);
-    if (d.owns_brand === "yes")
+    SOCIALS.forEach((s) => { const val = d[s.key]; if (val) rows.push([s.label, val]); });
+    rows.push(["Owns a brand", d["owns_brand"] === "yes" ? "Yes" : d["owns_brand"] === "no" ? "No" : "—"]);
+    if (d["owns_brand"] === "yes")
       rows.push(
         ["Brand name", v("brand_name")],
-        ["Brand category", d.brand_category === "Others" ? `Others — ${v("brand_category_other")}` : v("brand_category")],
+        ["Brand category", d["brand_category"] === "Others" ? `Others — ${v("brand_category_other")}` : v("brand_category")],
         ["Brand description", v("brand_description")],
       );
     return rows;
   }
-  const rows: [string, string][] = [["Registered", d.registered === "yes" ? "Yes" : d.registered === "no" ? "No" : "—"]];
-  if (d.registered === "yes") rows.push(["Registration number", v("reg_number")], ["Registered name", v("reg_name")]);
+  const rows: [string, string][] = [["Registered", d["registered"] === "yes" ? "Yes" : d["registered"] === "no" ? "No" : "—"]];
+  if (d["registered"] === "yes") rows.push(["Registration number", v("reg_number")], ["Registered name", v("reg_name")]);
   return rows;
 }

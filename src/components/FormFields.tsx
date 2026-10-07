@@ -43,7 +43,7 @@ export function TextField(p: Base & { value: string; onChange: (v: string) => vo
 export function SelectField(p: Base & { value: string; onChange: (v: string) => void; options: readonly string[]; placeholder?: string }) {
   return (
     <Wrap {...p}>
-      <Select value={p.value || undefined} onValueChange={p.onChange}>
+      <Select value={p.value} onValueChange={p.onChange}>
         <SelectTrigger id={p.name} className={cn("w-full", p.error && "border-destructive")}>
           <SelectValue placeholder={p.placeholder ?? "Select…"} />
         </SelectTrigger>
@@ -63,10 +63,10 @@ export function YesNoField(p: Base & { value: string; onChange: (v: string) => v
   return (
     <Wrap {...p}>
       <RadioGroup value={p.value} onValueChange={p.onChange} className="flex gap-3">
-        {[
+        {([
           ["yes", "Yes"],
           ["no", "No"],
-        ].map(([v, l]) => (
+        ] as const).map(([v, l]) => (
           <label
             key={v}
             className={cn(

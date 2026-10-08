@@ -23,11 +23,11 @@ export function SiteHeader() {
   }, []);
 
   return (
-    <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+    <header className="border-b bg-background/90 backdrop-blur sticky top-0 z-30">
+      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-3 px-6 sm:px-10">
         <Link to="/" className="flex items-center gap-2">
-          <span className="font-display text-lg font-bold tracking-tight">DDLX</span>
-          <span className="hidden text-sm text-muted-foreground sm:inline">Seller Center</span>
+          <span className="font-display text-2xl font-bold">DDLX<span className="text-accent">.</span></span>
+          <span className="ml-3 border-l pl-4 text-[10px] font-semibold uppercase text-muted-foreground sm:text-xs">Vendor</span>
         </Link>
         <nav className="flex items-center gap-2">
           {isAdmin && (

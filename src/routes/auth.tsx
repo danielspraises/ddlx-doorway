@@ -75,16 +75,16 @@ function AuthPage() {
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <main className="auth-layout mx-auto grid max-w-7xl gap-12 px-6 py-12 sm:px-10 lg:grid-cols-2 lg:gap-24 lg:py-16">
+      <main className="auth-layout mx-auto grid max-w-[1440px] gap-10 px-4 py-8 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)] lg:gap-20 lg:px-12 lg:py-14">
         <section className="auth-art relative overflow-hidden border-b lg:border-b-0 lg:border-r">
-          <p className="eyebrow text-accent">DDLX VENDOR</p>
-          <h2 className="relative z-10 mt-5 text-4xl font-semibold leading-tight sm:text-5xl">Your brand.<br />The next chapter.</h2>
+          <p className="eyebrow text-accent">DDLX SELLER PLATFORM</p>
+          <h2 className="relative z-10 mt-5 max-w-xl text-4xl font-semibold leading-[1.02] sm:text-6xl">Everything your store needs, after approval.</h2>
           <VendorScene subdued />
-          <p className="absolute bottom-5 left-0 text-xs text-muted-foreground">INDEPENDENT BRANDS. ONE DESTINATION.</p>
+          <p className="absolute bottom-5 left-0 text-xs font-semibold text-muted-foreground">BRAND · PRODUCTS · ORDERS · GROWTH</p>
         </section>
         <section className="mx-auto w-full max-w-md lg:pt-5">
         <p className="eyebrow mb-4 text-accent">{mode === "signup" ? "JOIN THE COMMUNITY" : "YOUR VENDOR ACCOUNT"}</p>
-        <h1 className="text-3xl font-semibold">{mode === "signup" ? "Create your account" : "Welcome back"}<span className="text-accent">.</span></h1>
+        <h1 className="text-3xl font-semibold sm:text-4xl">{mode === "signup" ? "Create your account" : "Welcome back"}<span className="text-accent">.</span></h1>
         <p className="mt-2 text-muted-foreground">
           {mode === "signup" ? "Your journey with DDLX starts here." : "Good to see you again."}
         </p>

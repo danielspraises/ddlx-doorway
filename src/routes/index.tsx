@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, ArrowRight, Check, MoveUpRight } from "lucide-react";
+import { ArrowUpRight, ArrowRight, Check, Package, Store, BarChart3, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/SiteHeader";
 import { VendorScene } from "@/components/VendorScene";
@@ -23,30 +23,30 @@ function Index() {
     <main>
       <section className="vendor-hero relative overflow-hidden border-b">
         <VendorScene />
-        <div className="hero-watermark" aria-hidden="true">DDLX</div>
-        <div className="relative z-10 mx-auto max-w-7xl px-6 pt-14 sm:px-10 lg:pt-20">
-          <p className="eyebrow flex items-center gap-2 text-muted-foreground"><span className="h-2 w-2 rounded-full bg-accent" /> THE DDLX VENDOR COMMUNITY</p>
-          <h1 className="mt-7 max-w-xl text-5xl font-semibold leading-[1.12] sm:text-6xl lg:text-7xl">Become a<br />DDLX Seller<span className="text-accent">.</span></h1>
-          <p className="mt-6 max-w-sm text-base leading-7 text-muted-foreground">Your brand. The next chapter.<br />Bring your clothing, footwear and accessories to DDLX Apparel.</p>
-          <div className="mt-8 flex flex-wrap items-center gap-4">
-            <Button asChild size="lg" className="h-12 gap-6 rounded-md px-6"><Link to="/apply">Start application <ArrowUpRight className="size-4" /></Link></Button>
-            <Button asChild variant="ghost" className="gap-2"><Link to="/auth">Continue application <ArrowRight className="size-4" /></Link></Button>
+        <div className="hero-grid" aria-hidden="true" />
+        <div className="relative z-10 mx-auto max-w-[1440px] px-4 pt-12 sm:px-8 sm:pt-20 lg:px-12 lg:pt-24">
+          <p className="eyebrow flex items-center gap-2 text-muted-foreground"><span className="h-2 w-2 rounded-full bg-accent" /> DDLX SELLER PLATFORM</p>
+          <h1 className="mt-6 max-w-3xl text-5xl font-semibold leading-[0.98] sm:text-7xl lg:text-[88px]">Build your brand.<br />Run your store<span className="text-accent">.</span></h1>
+          <p className="mt-6 max-w-md text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">Apply to sell, then manage products, inventory, orders and growth from one focused workspace.</p>
+          <div className="mt-8 flex flex-col items-stretch gap-3 min-[420px]:flex-row min-[420px]:items-center">
+            <Button asChild size="lg" className="h-12 justify-between gap-8 rounded-md px-5"><Link to="/apply">Start application <ArrowUpRight className="size-4" /></Link></Button>
+            <Button asChild variant="ghost" className="h-12 justify-between gap-3 min-[420px]:justify-center"><Link to="/auth">Continue application <ArrowRight className="size-4" /></Link></Button>
           </div>
-          <div className="mt-7 flex items-center gap-2 text-xs text-muted-foreground"><Check className="size-3 text-accent" /> Clothing <span className="mx-2">/</span> Footwear <span className="mx-2">/</span> Accessories</div>
+          <div className="mt-7 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground"><Check className="size-3 text-accent" /> Clothing <span>/</span> Footwear <span>/</span> Accessories</div>
         </div>
-        <div className="hero-caption absolute bottom-9 right-10 z-10 hidden items-center gap-4 text-xs text-muted-foreground md:flex"><span className="h-px w-12 bg-border" /> MADE FOR YOUR NEXT CHAPTER <MoveUpRight className="size-4" /></div>
+        <div className="hero-caption absolute bottom-9 right-12 z-10 hidden items-center gap-4 text-xs font-semibold text-muted-foreground lg:flex"><span className="h-px w-12 bg-border" /> MADE FOR INDEPENDENT COMMERCE</div>
       </section>
-      <section className="border-b bg-secondary/40">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-5 px-6 py-7 sm:px-10">
-          <p className="eyebrow text-muted-foreground">INDEPENDENT BRANDS. ONE DESTINATION.</p>
-          <div className="flex flex-wrap gap-7 text-sm font-medium"><span>Fashion</span><span className="text-accent">✳</span><span>Culture</span><span className="text-accent">✳</span><span>Commerce</span></div>
+      <section className="border-b bg-primary text-primary-foreground">
+        <div className="mx-auto grid max-w-[1440px] gap-6 px-4 py-7 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-8 lg:px-12">
+          <p className="eyebrow">FROM APPLICATION TO EVERYDAY OPERATIONS</p>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm font-medium sm:flex sm:gap-7"><span className="flex items-center gap-2"><Store className="size-4 text-accent" /> Store</span><span className="flex items-center gap-2"><Package className="size-4 text-accent" /> Inventory</span><span className="flex items-center gap-2"><BarChart3 className="size-4 text-accent" /> Insights</span><span className="flex items-center gap-2"><WalletCards className="size-4 text-accent" /> Payouts</span></div>
         </div>
       </section>
-      <section className="mx-auto max-w-7xl px-6 py-16 sm:px-10">
-        <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow text-accent">YOUR APPLICATION</p><h2 className="mt-3 text-3xl font-semibold">A new beginning, in five steps.</h2></div><span className="text-sm text-muted-foreground">From introduction to review.</span></div>
-        <ol className="mt-10 grid gap-6 sm:grid-cols-3 lg:grid-cols-5">{STEPS.map((s) => <li key={s.n} className="border-t pt-5"><span className="font-display text-sm text-accent">0{s.n}</span><h3 className="mt-4 text-sm font-semibold">{s.title}</h3></li>)}</ol>
+      <section className="mx-auto max-w-[1440px] px-4 py-16 sm:px-8 sm:py-24 lg:px-12">
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"><div><p className="eyebrow text-accent">YOUR APPLICATION</p><h2 className="mt-4 max-w-2xl text-3xl font-semibold sm:text-5xl">Five clear steps to your DDLX store.</h2></div><span className="text-sm text-muted-foreground">Progress saves as you go.</span></div>
+        <ol className="mt-12 grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-3 lg:grid-cols-5">{STEPS.map((s) => <li key={s.n} className="min-h-40 bg-background p-5 sm:p-6"><span className="font-display text-sm text-accent">0{s.n}</span><h3 className="mt-12 text-sm font-semibold">{s.title}</h3></li>)}</ol>
       </section>
     </main>
-    <footer className="border-t"><div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-7 text-xs text-muted-foreground sm:px-10"><span className="font-display font-semibold text-foreground">DDLX APPAREL</span><a href="https://ddlxapparel.com" className="flex items-center gap-2">Visit the marketplace <ArrowUpRight className="size-3" /></a></div></footer>
+    <footer className="border-t"><div className="mx-auto grid max-w-[1440px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-7 text-xs text-muted-foreground sm:px-8 lg:px-12"><span className="truncate font-display font-semibold text-foreground">DDLX APPAREL</span><a href="https://ddlxapparel.com" className="flex shrink-0 items-center gap-2">Marketplace <ArrowUpRight className="size-3" /></a></div></footer>
   </div>;
 }

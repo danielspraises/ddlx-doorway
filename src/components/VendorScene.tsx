@@ -22,10 +22,10 @@ export function VendorScene({ subdued = false }: { subdued?: boolean }) {
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setClearColor(0, 0);
       element.appendChild(renderer.domElement);
-      renderer.domElement.setAttribute("aria-label", "Animated mint DDLX tote bag and fashion accessories");
+      renderer.domElement.setAttribute("aria-label", "Animated DDLX tote bag and fashion accessories");
       const group = new THREE.Group();
       scene.add(group);
-      const mint = new THREE.MeshStandardMaterial({ color: color("--scene-mint"), roughness: 0.45, metalness: 0.08 });
+      const mint = new THREE.MeshStandardMaterial({ color: color("--scene-mint"), roughness: 0.32, metalness: 0.12 });
       const dark = new THREE.MeshStandardMaterial({ color: color("--scene-ink"), roughness: 0.6 });
       const metal = new THREE.MeshStandardMaterial({ color: color("--scene-metal"), roughness: 0.2, metalness: 0.8 });
       const shape = new THREE.Shape();
@@ -49,11 +49,12 @@ export function VendorScene({ subdued = false }: { subdued?: boolean }) {
         const label = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.75), new THREE.MeshBasicMaterial({ map: texture, transparent: true }));
         label.position.set(0, -0.15, 0.34); group.add(label);
       }
-      const tag = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.68, 0.04), dark);
+      const tagMaterial = new THREE.MeshStandardMaterial({ color: color("--scene-accent"), roughness: 0.35 });
+      const tag = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.68, 0.04), tagMaterial);
       tag.position.set(0.85, 0.82, 0.45); tag.rotation.z = -0.25; group.add(tag);
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.12, 24, 64), metal);
       ring.position.set(-1.85, -0.4, 0.8); ring.rotation.set(0.45, 0.35, 0); scene.add(ring);
-      scene.add(new THREE.HemisphereLight(color("--scene-light"), color("--scene-mint"), 2.6));
+      scene.add(new THREE.HemisphereLight(color("--scene-light"), color("--scene-ambient"), 2.6));
       const light = new THREE.DirectionalLight(color("--scene-light"), 4); light.position.set(3, 5, 5); scene.add(light);
       const fill = new THREE.DirectionalLight(color("--scene-light"), 2); fill.position.set(-4, 2, -2); scene.add(fill);
       const pointer = { x: 0, y: 0 };

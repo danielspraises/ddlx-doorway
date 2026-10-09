@@ -1,0 +1,30 @@
+# DDLX Vendor Platform
+
+## Goal
+Turn `vendor.ddlxapparel.com` into a clean, modern seller platform: first for application and approval, then for day-to-day store management after approval.
+
+## Phase 1 — New visual direction
+- Replace the green/mint styling with a white-led, high-contrast fashion-commerce system inspired by AICM’s clarity and whitespace, without copying its branding.
+- Redesign the public home, sign-in, shared navigation, and 3D fashion scene as one consistent experience.
+- Make navigation, typography, forms, and calls to action work cleanly across phones, tablets, and desktops.
+
+## Phase 2 — Seller application
+- Build the five saved sessions: Personal, Business, Brand & Store, Business Registration, and Review & Submit.
+- Apply the supplied conditional fields and validation rules, including two required social channels and editable review sections.
+- Save progress after each session, support corrections, and show clear submitted, under-review, approved, or rejected states.
+
+## Phase 3 — Review workspace
+- Build the staff application list and detailed review screen.
+- Support comments, correction requests, approval, and rejection with a clear audit trail.
+- Use `notify@ddlxapparel.com` for application notifications when the email connection is available.
+
+## Phase 4 — Seller Center
+- After approval, open a seller workspace for overview, brand profile, store settings, products, inventory, orders, customers, analytics, payouts, notifications, and account settings.
+- Keep application and verification status visible without bringing back a separate generic dashboard.
+- Prepare approved seller data for secure creation and synchronization with the main WordPress marketplace.
+
+## Technical details
+- Continue using the existing secure account system and cloud data store.
+- Keep the 3D scene browser-only and use shared semantic design tokens for consistent theming.
+- Build store features as focused pages within one responsive seller shell, then connect WordPress through authenticated server endpoints.
+- Deliver in phases so the application flow can be completed and tested before marketplace synchronization.

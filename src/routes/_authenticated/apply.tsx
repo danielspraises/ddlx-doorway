@@ -53,7 +53,7 @@ function Apply() {
     }
     setSaving(true);
     try {
-      const email = sections.personal.email?.trim().toLowerCase() || null;
+      const email = sections.personal["email"]?.trim().toLowerCase() || null;
       if (email) {
         const { data: taken, error } = await supabase.rpc("application_email_taken", { _email: email });
         if (error) throw error;
@@ -64,8 +64,17 @@ function Apply() {
       const request = application
         ? supabase.from("seller_applications").update({ ...payload, ...(submit ? { status: "submitted" as const } : {}) }).eq("id", application.id)
         : supabase.from("seller_applications").insert({ ...payload, user_id: user.id });
-      const { data, error } = await request.select().single();
+      const { data: savedData, error } = await request.select().single();
       if (error) throw error;
+      let data = savedData;
+      if (submit && !application) {
+        const result = await supabase.from("seller_applications").update({ status: "submitted" }).eq("id", savedData.id).select().single();
+        if (result.error) {
+          queryClient.setQueryData(applicationQuery(user.id).queryKey, savedData);
+          throw result.error;
+        }
+        data = result.data;
+      }
       queryClient.setQueryData(applicationQuery(user.id).queryKey, data);
       setSaved(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
       setErrors({});
@@ -79,10 +88,10 @@ function Apply() {
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4"><div className="min-w-0"><p className="eyebrow text-accent">BECOME A DDLX SELLER</p><h1 className="mt-3 text-3xl font-semibold sm:text-5xl">My application</h1></div><span className="mt-2 flex shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground"><span className="h-2 w-2 rounded-full bg-accent" />{STATUS_LABEL[application?.status ?? "draft"]}</span></div>
     {application?.admin_comment && <div className="mt-8 border-l-2 border-accent bg-secondary px-5 py-4"><h2 className="font-semibold">Review feedback</h2><p className="mt-2 whitespace-pre-wrap text-sm">{application.admin_comment}</p></div>}
     {!editable ? <div className="mt-12"><div className="flex items-start gap-4 border-y py-8">{application?.status === "approved" ? <CheckCircle2 className="size-8 shrink-0 text-success" /> : <Clock3 className="size-8 shrink-0 text-accent" />}<div><h2 className="text-2xl font-semibold">{application?.status === "approved" ? "Your application is approved" : application?.status === "rejected" ? "Application not approved" : "Your application is under review"}</h2><p className="mt-2 text-muted-foreground">{application?.status === "approved" ? "Stage 1 is complete. Verification is the next stage before your store opens." : application?.status === "rejected" ? "Please see the review feedback above." : "Your details have been saved. Any updates or correction requests will appear here."}</p><p className="mt-4 break-all text-xs text-muted-foreground">Application reference: {application?.id}</p></div></div><div className="mt-8"><ApplicationSummary sections={sections} /></div></div> : <>
-      <ol className="mt-10 grid grid-cols-5 gap-1 sm:gap-3" aria-label="Application progress">{STEPS.map(s => <li key={s.n} className="min-w-0"><Button variant="ghost" onClick={() => go(s.n)} aria-current={step === s.n ? "step" : undefined} className={cn("h-full w-full flex-col items-start justify-start gap-3 whitespace-normal rounded-none border-t-2 px-1 py-4 text-left sm:px-2", step === s.n ? "border-accent text-foreground" : "border-border text-muted-foreground")}><span className="font-display text-2xl">0{s.n}</span><span className="hidden text-sm sm:block">{s.title}</span></Button></li>)}</ol>
+      <ol className="mt-10 grid grid-cols-5 gap-1 sm:gap-3" aria-label="Application progress">{STEPS.map(s => <li key={s.n} className="min-w-0"><Button variant="ghost" disabled={saving} aria-label={s.title} onClick={() => go(s.n)} aria-current={step === s.n ? "step" : undefined} className={cn("h-full w-full flex-col items-start justify-start gap-3 whitespace-normal rounded-none border-t-2 px-1 py-4 text-left sm:px-2", step === s.n ? "border-accent text-foreground" : "border-border text-muted-foreground")}><span className="font-display text-2xl">0{s.n}</span><span className="hidden text-sm sm:block">{s.title}</span></Button></li>)}</ol>
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_240px] lg:gap-14">
         <section className="min-w-0"><div className="mb-8"><p className="text-sm text-muted-foreground">Step {step} of 5</p><h2 className="mt-2 text-2xl font-semibold sm:text-3xl">{current.title}</h2></div>
-          {step < 5 ? <ApplicationSection key={step} step={step} data={sections[current.key as keyof ApplicationSections]} errors={errors} onChange={(name, value) => { setSections(prev => ({ ...prev, [current.key]: { ...prev[current.key as keyof ApplicationSections], [name]: value } })); setErrors(prev => ({ ...prev, [name]: "" })); }} /> : <><ApplicationSummary sections={sections} onEdit={go} /><div className="space-y-4 border-t pt-6">{DECLARATIONS.map((text, index) => <label key={text} className="flex cursor-pointer items-start gap-3 text-sm leading-6"><Checkbox className="mt-1" checked={declarations[String(index)] === "yes"} onCheckedChange={checked => setDeclarations(prev => ({ ...prev, [String(index)]: checked === true ? "yes" : "no" }))} />{text}</label>)}{errors.declaration && <p role="alert" className="text-sm text-destructive">{errors.declaration}</p>}</div></>}
+          {step < 5 ? <ApplicationSection key={step} step={step} data={sections[current.key as keyof ApplicationSections]} errors={errors} onChange={(name, value) => { setSections(prev => ({ ...prev, [current.key]: { ...prev[current.key as keyof ApplicationSections], [name]: value } })); setErrors(prev => ({ ...prev, [name]: "" })); }} /> : <><ApplicationSummary sections={sections} onEdit={go} /><div className="space-y-4 border-t pt-6">{DECLARATIONS.map((text, index) => <label key={text} className="flex cursor-pointer items-start gap-3 text-sm leading-6"><Checkbox className="mt-1" checked={declarations[String(index)] === "yes"} onCheckedChange={checked => setDeclarations(prev => ({ ...prev, [String(index)]: checked === true ? "yes" : "no" }))} />{text}</label>)}{errors["declaration"] && <p role="alert" className="text-sm text-destructive">{errors["declaration"]}</p>}</div></>}
           <div className="mt-10 grid gap-3 border-t pt-6 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
             <Button variant="ghost" disabled={step === 1 || saving} onClick={() => go(step - 1)}><ArrowLeft className="size-4" /> Back</Button>
             <Button variant="outline" disabled={saving} onClick={() => save(false)}><Save className="size-4" />{saving ? "Saving…" : "Save progress"}</Button>

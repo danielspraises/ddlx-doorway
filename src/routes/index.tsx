@@ -3,7 +3,7 @@ import { ArrowUpRight, ArrowRight, Check, Package, Store, BarChart3, WalletCards
 import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/SiteHeader";
 import { VendorScene } from "@/components/VendorScene";
-import { STEPS } from "@/lib/application";
+import { ApplicationSteps } from "@/components/ApplicationSteps";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -44,7 +44,7 @@ function Index() {
       </section>
       <section className="mx-auto max-w-[1440px] px-4 py-16 sm:px-8 sm:py-24 lg:px-12">
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"><div><p className="eyebrow text-accent">YOUR APPLICATION</p><h2 className="mt-4 max-w-2xl text-3xl font-semibold sm:text-5xl">Five clear steps to your DDLX store.</h2></div><span className="text-sm text-muted-foreground">Progress saves as you go.</span></div>
-        <ol className="mt-12 grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-3 lg:grid-cols-5">{STEPS.map((s) => <li key={s.n} className="min-h-40 bg-background p-5 sm:p-6"><span className="font-display text-sm text-accent">0{s.n}</span><h3 className="mt-12 text-sm font-semibold">{s.title}</h3></li>)}</ol>
+        <ApplicationSteps />
       </section>
     </main>
     <footer className="border-t"><div className="mx-auto grid max-w-[1440px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-7 text-xs text-muted-foreground sm:px-8 lg:px-12"><span className="truncate font-display font-semibold text-foreground">DDLX APPAREL</span><a href="https://ddlxapparel.com" className="flex shrink-0 items-center gap-2">Marketplace <ArrowUpRight className="size-3" /></a></div></footer>

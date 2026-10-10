@@ -103,6 +103,15 @@
 .scene-fallback span { font-size: 14px; }
 .auth-art { min-height: 640px; }
 .auth-art .vendor-scene { top: 135px; width: 100%; height: 420px; right: 0; }
+.application-step { transition: transform 220ms ease, background-color 220ms ease, border-color 220ms ease; }
+.application-step:hover { transform: translateY(-5px); }
+.step-detail { animation: step-reveal 280ms ease both; }
+@keyframes step-reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .application-step { transition: none; }
+  .application-step:hover { transform: none; }
+  .step-detail { animation: none; }
+}
 @media (max-width: 1023px) {
   .vendor-hero { min-height: 650px; }
   .auth-art { min-height: 340px; }

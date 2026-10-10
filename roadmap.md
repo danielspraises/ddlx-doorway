@@ -3,6 +3,7 @@
 - [x] Verify rendering and existing navigation.
 - [x] Explain email limitation and domain connection status; no domain connected or email sending configured.
 # Seller management platform
+- [ ] Enlarge and animate the public application steps with interactive details.
 - [x] Redesign public and sign-in pages using the AICM reference direction with stronger responsiveness.
 - [ ] Build Stage 1 five-step seller application with saved progress, review, and submission.
 - [ ] Build application review and correction workflow.

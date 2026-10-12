@@ -71,6 +71,62 @@ export type Database = {
         }
         Relationships: []
       }
+      seller_verifications: {
+        Row: {
+          admin_comment: string | null
+          application_id: string
+          created_at: string
+          current_step: number
+          details: Json
+          documents: Json
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["application_status"]
+          submitted_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_comment?: string | null
+          application_id: string
+          created_at?: string
+          current_step?: number
+          details?: Json
+          documents?: Json
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["application_status"]
+          submitted_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_comment?: string | null
+          application_id?: string
+          created_at?: string
+          current_step?: number
+          details?: Json
+          documents?: Json
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["application_status"]
+          submitted_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_verifications_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: true
+            referencedRelation: "seller_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string

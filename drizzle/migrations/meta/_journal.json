@@ -8,6 +8,13 @@
       "when": 1791410097063,
       "tag": "0000_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791819548802,
+      "tag": "0001_seller_verification_and_verified_admin",
+      "breakpoints": true
     }
   ]
 }

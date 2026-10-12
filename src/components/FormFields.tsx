@@ -14,7 +14,7 @@ type Base = {
   name: string;
   label: string;
   required?: boolean;
-  error?: string;
+  error?: string | undefined;
   hint?: string;
   className?: string;
 };

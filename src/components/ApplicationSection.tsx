@@ -1,12 +1,16 @@
-import { TextField, SelectField, YesNoField } from "@/components/FormFields";
-import { BUSINESS_TYPES, CATEGORIES, COUNTRIES, ID_TYPES, NIGERIAN_STATES, ROLES, SOCIALS, type Section } from "@/lib/application";
+import { TextField, SelectField, SearchSelectField, YesNoField } from "@/components/FormFields";
+import { BUSINESS_TYPES, CATEGORIES, ID_TYPES, ROLES, SOCIALS, type Section } from "@/lib/application";
+import { ALL_COUNTRIES, regionsForCountry } from "@/lib/locations";
 
 type Props = { step: number; data: Section; errors: Section; onChange: (name: string, value: string) => void };
 export function ApplicationSection({ step, data, errors, onChange }: Props) {
   const field = (name: string, label: string, required = true, type = "text", multiline = false) => <TextField key={name} name={name} label={label} required={required} type={type} multiline={multiline} value={data[name] ?? ""} onChange={v => onChange(name, v)} error={errors[name] ?? ""} className={multiline ? "sm:col-span-2" : ""} />;
   const select = (name: string, label: string, options: readonly string[]) => <SelectField key={name} name={name} label={label} required options={options} value={data[name] ?? ""} onChange={v => onChange(name, v)} error={errors[name] ?? ""} />;
   const yesNo = (name: string, label: string) => <YesNoField name={name} label={label} required value={data[name] ?? ""} onChange={v => onChange(name, v)} error={errors[name] ?? ""} className="sm:col-span-2" />;
-  const address = (label: string) => <>{field("address", label, true, "text", true)}{field("city", "City")}{data["country"] === "Nigeria" ? select("state", "State", NIGERIAN_STATES) : field("state", "State / Region")}{select("country", "Country", COUNTRIES)}</>;
+  const address = (label: string) => {
+    const regions = regionsForCountry(data["country"] ?? "");
+    return <>{field("address", label, true, "text", true)}{field("city", "City")}<SearchSelectField name="country" label="Country" required options={ALL_COUNTRIES} value={data["country"] ?? ""} onChange={value => { if (value !== data["country"]) { onChange("country", value); onChange("state", ""); } }} error={errors["country"]} />{regions.length ? <SearchSelectField name="state" label="State / Region" required options={regions} value={data["state"] ?? ""} onChange={value => onChange("state", value)} error={errors["state"]} /> : <TextField name="state" label="State / Region" required value={data["state"] ?? ""} onChange={value => onChange("state", value)} error={errors["state"]} hint="Enter your region, district, or municipality." />}</>;
+  };
   return <div className="grid gap-x-6 gap-y-6 sm:grid-cols-2">
     {step === 1 && <>
       {field("first_name", "First name")}{field("last_name", "Last name")}{field("other_names", "Other name(s)", false)}{field("email", "Email address", true, "email")}{field("phone", "Phone number", true, "tel")}{select("role", "Applicant’s role", ROLES)}

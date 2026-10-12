@@ -1,4 +1,8 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -80,4 +84,12 @@ export function YesNoField(p: Base & { value: string; onChange: (v: string) => v
       </RadioGroup>
     </Wrap>
   );
+}
+
+export function SearchSelectField(p: Base & { value: string; onChange: (v: string) => void; options: readonly string[] }) {
+  const [open, setOpen] = useState(false);
+  return <Wrap {...p}><Popover open={open} onOpenChange={setOpen}>
+    <PopoverTrigger asChild><Button id={p.name} variant="outline" role="combobox" aria-expanded={open} aria-controls={`${p.name}-options`} className={cn("h-auto min-h-10 w-full justify-between whitespace-normal text-left font-normal", p.error && "border-destructive")}><span className="min-w-0">{p.value || "Select…"}</span><ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" /></Button></PopoverTrigger>
+    <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0"><Command><CommandInput placeholder={`Search ${p.label.toLowerCase()}…`} aria-label={`Search ${p.label.toLowerCase()}`} /><CommandList id={`${p.name}-options`}><CommandEmpty>No matches found.</CommandEmpty><CommandGroup>{p.options.map(option => <CommandItem key={option} value={option} onSelect={() => { p.onChange(option); setOpen(false); }}><Check className={cn("size-4", p.value === option ? "opacity-100" : "opacity-0")} />{option}</CommandItem>)}</CommandGroup></CommandList></Command></PopoverContent>
+  </Popover></Wrap>;
 }

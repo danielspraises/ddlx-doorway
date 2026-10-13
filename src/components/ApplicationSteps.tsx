@@ -21,8 +21,8 @@ export function ApplicationSteps() {
   return <>
     <ol className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
       {STEPS.map((step, index) => <li key={step.n} className="min-w-0">
-        <Button variant="outline" aria-pressed={active === index} onClick={() => setActive(index)} className={cn("application-step group h-full min-h-44 w-full flex-col items-start justify-between whitespace-normal rounded-md border-2 p-5 text-left text-foreground hover:text-foreground sm:min-h-52 sm:p-6", active === index ? "border-primary bg-secondary hover:bg-secondary" : "border-border bg-background hover:border-primary hover:bg-secondary")}>
-          <span className="flex w-full items-center justify-between"><span className="font-display text-4xl font-medium text-foreground">0{step.n}</span><ArrowRight className={cn("size-5 transition-transform", active === index ? "-rotate-45" : "group-hover:-rotate-45")} /></span>
+        <Button variant="outline" aria-pressed={active === index} onClick={() => setActive(index)} className="workflow-tab application-step group h-full min-h-44 w-full flex-col items-start justify-between whitespace-normal rounded-md border-2 p-5 text-left sm:min-h-52 sm:p-6">
+          <span className="flex w-full items-center justify-between"><span className="font-display text-4xl font-medium">0{step.n}</span><ArrowRight className={cn("size-5 transition-transform", active === index ? "-rotate-45" : "group-hover:-rotate-45")} /></span>
           <span className="mt-7 font-display text-2xl font-medium leading-tight">{step.title}</span>
         </Button>
       </li>)}

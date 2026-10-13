@@ -1,4 +1,6 @@
 # Vendor site refresh
+- [ ] Fix in-page document previews, apply requested card/tab colours, and link approved applications to verification.
+- [ ] Build verified-seller product creation, editing, images and inventory tools; verify saved changes.
 - [x] Refresh public and sign-in pages with modern styling and live 3D animation.
 - [x] Verify rendering and existing navigation.
 - [x] Explain email limitation and domain connection status; no domain connected or email sending configured.

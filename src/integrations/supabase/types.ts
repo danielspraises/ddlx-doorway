@@ -71,6 +71,57 @@ export type Database = {
         }
         Relationships: []
       }
+      seller_products: {
+        Row: {
+          category: string
+          created_at: string
+          currency: string
+          description: string
+          id: string
+          images: string[]
+          low_stock_threshold: number
+          name: string
+          price: number
+          sku: string
+          status: string
+          stock: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          currency?: string
+          description?: string
+          id?: string
+          images?: string[]
+          low_stock_threshold?: number
+          name: string
+          price?: number
+          sku: string
+          status?: string
+          stock?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          currency?: string
+          description?: string
+          id?: string
+          images?: string[]
+          low_stock_threshold?: number
+          name?: string
+          price?: number
+          sku?: string
+          status?: string
+          stock?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       seller_verifications: {
         Row: {
           admin_comment: string | null
@@ -158,6 +209,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_verified_seller: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user"

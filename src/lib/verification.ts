@@ -38,9 +38,11 @@ export function verificationErrors(step: number, details: Section, documents: Se
   if (step === 8 && details["declaration"] !== "yes") return { confirm: "Confirm the verification declaration." };
   return {};
 }
-export async function openVerificationFile(path: string) {
-  const { data, error } = await supabase.storage.from("seller-verification").createSignedUrl(path, 120);
+export async function downloadVerificationFile(path: string) {
+  const { data, error } = await supabase.storage.from("seller-verification").download(path);
   if (error) throw error;
-  return data.signedUrl;
+  const extension = path.split(".").pop()?.toLowerCase();
+  const type = data.type || (extension === "pdf" ? "application/pdf" : extension === "png" ? "image/png" : extension === "webp" ? "image/webp" : "image/jpeg");
+  return data.type === type ? data : new Blob([data], { type });
 }
 export { section };

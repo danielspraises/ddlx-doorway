@@ -38,7 +38,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
-  const recovering = useRef(typeof window !== "undefined" && /type=recovery/.test(window.location.hash + window.location.search));
+  const recovering = useRef(typeof window !== "undefined" && /type=recovery|reset=1/.test(window.location.hash + window.location.search));
 
   useEffect(() => {
     if (recovering.current) setMode("recover");
@@ -58,7 +58,7 @@ function AuthPage() {
       const parsed = emailSchema.safeParse({ email });
       if (!parsed.success) { toast.error(parsed.error.issues[0]?.message ?? "Enter a valid email"); return; }
       setBusy(true);
-      const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, { redirectTo: `${window.location.origin}/auth` });
+      const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, { redirectTo: `${window.location.origin}/auth?reset=1` });
       setBusy(false);
       if (error) toast.error(error.message);
       else toast.success("If that email has an account, a reset link is on its way.");

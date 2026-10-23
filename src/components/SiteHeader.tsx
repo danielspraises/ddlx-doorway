@@ -27,9 +27,9 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur-xl">
       <div className="mx-auto grid h-16 max-w-[1440px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 sm:flex sm:h-20 sm:px-8 lg:px-12">
-        <Link to="/" className="flex min-w-0 items-center gap-3" aria-label="DDLX Vendor home">
-          <span className="shrink-0 font-display text-xl font-bold sm:text-2xl">DDLX<span className="text-accent">/</span></span>
-          <span className="truncate border-l pl-3 text-[10px] font-semibold uppercase text-muted-foreground sm:pl-4 sm:text-xs">Vendor</span>
+        <Link to="/" className="flex min-w-0 items-center gap-3" aria-label="Verola home">
+          <span className="shrink-0 font-display text-xl font-bold sm:text-2xl">Verola<span className="text-accent">/</span></span>
+          <span className="truncate border-l pl-3 text-[10px] font-semibold uppercase text-muted-foreground sm:pl-4 sm:text-xs">for DDLX</span>
         </Link>
         <a href="https://ddlxapparel.com" className="ml-auto hidden items-center gap-2 text-xs font-semibold sm:flex">Marketplace <ArrowUpRight className="size-3.5" /></a>
         <nav className="flex shrink-0 items-center gap-1 sm:gap-2">

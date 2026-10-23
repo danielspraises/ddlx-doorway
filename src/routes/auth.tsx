@@ -14,9 +14,9 @@ import { ArrowUpRight, ArrowRight, Eye, EyeOff, ShieldCheck } from "lucide-react
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — DDLX Seller Center" },
+      { title: "Sign in — Verola" },
       { name: "description", content: "Sign in or create an account to start your DDLX seller application." },
-      { property: "og:title", content: "Sign in — DDLX Seller Center" },
+      { property: "og:title", content: "Sign in — Verola" },
       { property: "og:description", content: "Sign in to continue your DDLX seller application." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -102,7 +102,7 @@ function AuthPage() {
       <SiteHeader />
       <main className="auth-layout mx-auto grid max-w-[1440px] gap-10 px-4 py-8 sm:px-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)] lg:gap-20 lg:px-12 lg:py-14">
         <section className="auth-art relative overflow-hidden border-b lg:border-b-0 lg:border-r">
-          <p className="eyebrow text-accent">DDLX SELLER PLATFORM</p>
+          <p className="eyebrow text-accent">VEROLA SELLER PLATFORM</p>
           <h2 className="relative z-10 mt-5 max-w-xl text-4xl font-semibold leading-[1.02] sm:text-6xl">Everything your store needs, after approval.</h2>
           <VendorScene subdued />
           <p className="absolute bottom-5 left-0 text-xs font-semibold text-muted-foreground">BRAND · PRODUCTS · ORDERS · GROWTH</p>
@@ -111,7 +111,7 @@ function AuthPage() {
         <p className="eyebrow mb-4 text-accent">{mode === "signup" ? "JOIN THE COMMUNITY" : mode === "forgot" || mode === "recover" ? "ACCOUNT RECOVERY" : "YOUR VENDOR ACCOUNT"}</p>
         <h1 className="text-3xl font-semibold sm:text-4xl">{mode === "signup" ? "Create your account" : mode === "forgot" ? "Reset your password" : mode === "recover" ? "Choose a new password" : "Welcome back"}<span className="text-accent">.</span></h1>
         <p className="mt-2 text-muted-foreground">
-          {mode === "signup" ? "Your journey with DDLX starts here." : mode === "forgot" ? "Enter your email and we will send you a reset link." : mode === "recover" ? "Enter a new password for your account." : "Good to see you again."}
+          {mode === "signup" ? "Your journey with Verola starts here." : mode === "forgot" ? "Enter your email and we will send you a reset link." : mode === "recover" ? "Enter a new password for your account." : "Good to see you again."}
         </p>
         <div className="mt-8">
           <form onSubmit={submit} className="space-y-4">
@@ -142,7 +142,7 @@ function AuthPage() {
         <Button variant="link" className="mt-5 h-auto w-full whitespace-normal text-sm" onClick={() => { setConfirmPassword(""); setShowPassword(false); setMode(mode === "signup" ? "signin" : mode === "signin" ? "signup" : "signin"); }}>
           {mode === "signup" ? "Already have an account? Sign in" : mode === "signin" ? "New here? Create an account" : "Back to sign in"}<ArrowRight className="size-3" />
         </Button>
-        <p className="mt-10 flex items-center justify-center gap-2 border-t pt-6 text-xs text-muted-foreground"><ShieldCheck className="size-4" /> DDLX Apparel · Vendor community</p>
+        <p className="mt-10 flex items-center justify-center gap-2 border-t pt-6 text-xs text-muted-foreground"><ShieldCheck className="size-4" /> Verola · DDLX vendor community</p>
         </section>
       </main>
     </div>

@@ -17,7 +17,7 @@ import { VerificationReview } from "@/components/VerificationReview";
 import { verificationReviewsQuery } from "@/lib/verification";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  head: () => ({ meta: [{ title: "Review applications — DDLX Seller Center" }, { name: "description", content: "Review applications on DDLX Seller Center." }, { property: "og:title", content: "Review applications — DDLX" }, { property: "og:description", content: "Review applications on DDLX Seller Center." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
+  head: () => ({ meta: [{ title: "Review applications — Verola" }, { name: "description", content: "Review applications on Verola." }, { property: "og:title", content: "Review applications — DDLX" }, { property: "og:description", content: "Review applications on Verola." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   beforeLoad: ({ context }) => {
     if (!context.user.isAdmin) throw redirect({ to: "/apply" });
   },

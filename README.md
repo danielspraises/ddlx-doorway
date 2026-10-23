@@ -1,4 +1,4 @@
-# Ddlx Doorway
+# Verola
 
 You are a programmer, developer, web designer.
 
@@ -114,6 +114,9 @@ npm run db:admin -- admin@ddlxapparel.com "YourStrongPassword1!"
 # 6. Run the app
 npm run dev
 ```
+
+The Docker database listens on port **5433** (not 5432) so it cannot clash with a PostgreSQL you already
+have installed. If you made `.env` from an older copy of `.env.example`, replace its `DATABASE_URL` line with the one in the current `.env.example`.
 
 Open the address that `npm run dev` prints, then sign in at `/auth`.
 

@@ -15,7 +15,7 @@ import { saveApplication } from "@/lib/applications.functions";
 const DECLARATIONS = ["I confirm that the information provided is accurate.", "I agree to the Seller Terms.", "I agree to the Privacy Policy.", "I agree to the Seller and Marketplace policies."];
 
 export const Route = createFileRoute("/_authenticated/apply")({
-  head: () => ({ meta: [{ title: "My application — DDLX Seller Center" }, { name: "description", content: "My application on DDLX Seller Center." }, { property: "og:title", content: "My application — DDLX" }, { property: "og:description", content: "My application on DDLX Seller Center." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
+  head: () => ({ meta: [{ title: "My application — Verola" }, { name: "description", content: "My application on Verola." }, { property: "og:title", content: "My application — DDLX" }, { property: "og:description", content: "My application on Verola." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   loader: ({ context }) => context.queryClient.ensureQueryData(applicationQuery(context.user.id)),
   component: Apply,
 });

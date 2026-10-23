@@ -7,7 +7,7 @@ import { ApplicationSteps } from "@/components/ApplicationSteps";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
-    { title: "Become a DDLX Seller — DDLX Vendor" },
+    { title: "Become a DDLX Seller — Verola" },
     { name: "description", content: "Bring your clothing, footwear and accessories to DDLX Apparel. Start your seller application." },
     { property: "og:title", content: "Become a DDLX Seller" },
     { property: "og:description", content: "Your brand. The next chapter. Apply to join DDLX Apparel." },
@@ -25,7 +25,7 @@ function Index() {
         <VendorScene />
         <div className="hero-grid" aria-hidden="true" />
         <div className="relative z-10 mx-auto max-w-[1440px] px-4 pt-12 sm:px-8 sm:pt-20 lg:px-12 lg:pt-24">
-          <p className="eyebrow flex items-center gap-2 text-muted-foreground"><span className="h-2 w-2 rounded-full bg-accent" /> DDLX SELLER PLATFORM</p>
+          <p className="eyebrow flex items-center gap-2 text-muted-foreground"><span className="h-2 w-2 rounded-full bg-accent" /> VEROLA SELLER PLATFORM</p>
           <h1 className="mt-6 max-w-3xl text-5xl font-semibold leading-[0.98] sm:text-7xl lg:text-[88px]">Build your brand.<br />Run your store<span className="text-accent">.</span></h1>
           <p className="mt-6 max-w-md text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">Apply to sell, then manage products, inventory, orders and growth from one focused workspace.</p>
           <div className="mt-8 flex flex-col items-stretch gap-3 min-[420px]:flex-row min-[420px]:items-center">

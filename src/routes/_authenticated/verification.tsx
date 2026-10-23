@@ -16,7 +16,7 @@ import { STATUS_LABEL, SOCIALS, type Section } from "@/lib/application";
 import { saveVerification, uploadVerificationDocument } from "@/lib/verification.functions";
 
 export const Route = createFileRoute("/_authenticated/verification")({
-  head: () => ({ meta: [{ title: "Seller verification — DDLX Vendor" }, { name: "description", content: "Complete identity, business and address verification for your DDLX store." }, { property: "og:title", content: "Seller verification — DDLX Vendor" }, { property: "og:description", content: "Your next step to becoming an approved DDLX seller." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
+  head: () => ({ meta: [{ title: "Seller verification — Verola" }, { name: "description", content: "Complete identity, business and address verification for your DDLX store." }, { property: "og:title", content: "Seller verification — Verola" }, { property: "og:description", content: "Your next step to becoming an approved DDLX seller." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   loader: async ({ context }) => { await Promise.all([context.queryClient.ensureQueryData(applicationQuery(context.user.id)), context.queryClient.ensureQueryData(verificationQuery(context.user.id))]); },
   component: Verification,
 });

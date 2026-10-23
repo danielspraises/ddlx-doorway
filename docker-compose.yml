@@ -1,15 +1,17 @@
 # Local PostgreSQL for development: docker compose up -d
+# Uses port 5433 so it never clashes with a PostgreSQL already installed on your computer (port 5432).
+name: verola
 services:
   db:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ddlx
-      POSTGRES_PASSWORD: ddlx_dev_password
-      POSTGRES_DB: ddlx
+      POSTGRES_USER: verola
+      POSTGRES_PASSWORD: verola_dev_password
+      POSTGRES_DB: verola
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
-      - ddlx_pgdata:/var/lib/postgresql/data
+      - verola_pgdata:/var/lib/postgresql/data
 volumes:
-  ddlx_pgdata:
+  verola_pgdata:

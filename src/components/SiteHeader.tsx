@@ -24,9 +24,6 @@ export function SiteHeader() {
       });
   }, []);
 
-  return () => data.subscription.unsubscribe();
-  }, []);
-
   return (
     <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur-xl">
       <div className="mx-auto grid h-16 max-w-[1440px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 sm:flex sm:h-20 sm:px-8 lg:px-12">

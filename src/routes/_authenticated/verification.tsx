@@ -11,9 +11,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { TextField } from "@/components/FormFields";
 import { VerificationSummary } from "@/components/VerificationSummary";
 import { applicationQuery, section } from "@/lib/application-data";
-import { VERIFICATION_STEPS, verificationQuery, verificationErrors } from "@/lib/verification";
+import { VERIFICATION_STEPS, verificationQuery, verificationErrors, fileToBase64 } from "@/lib/verification";
 import { STATUS_LABEL, SOCIALS, type Section } from "@/lib/application";
-import { supabase } from "@/integrations/supabase/client";
+import { saveVerification, uploadVerificationDocument } from "@/lib/verification.functions";
 
 export const Route = createFileRoute("/_authenticated/verification")({
   head: () => ({ meta: [{ title: "Seller verification — DDLX Vendor" }, { name: "description", content: "Complete identity, business and address verification for your DDLX store." }, { property: "og:title", content: "Seller verification — DDLX Vendor" }, { property: "og:description", content: "Your next step to becoming an approved DDLX seller." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -35,14 +35,6 @@ function Verification() {
   const registered = section(application?.registration ?? {})["registered"] === "yes";
   const current = VERIFICATION_STEPS[step - 1];
   const go = (next: number) => { setStep(next); setErrors({}); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const ensureRecord = async () => {
-    if (verification) return verification;
-    if (!application || application.status !== "approved") throw new Error("Application approval is required.");
-    const { data, error } = await supabase.from("seller_verifications").insert({ application_id: application.id, user_id: user.id }).select().single();
-    if (error) throw error;
-    queryClient.setQueryData(verificationQuery(user.id).queryKey, data);
-    return data;
-  };
   const save = async (advance: boolean, submit = false) => {
     if (busy) return;
     for (const n of submit ? [1,2,3,4,5,6,7,8] : advance ? [step] : []) {
@@ -51,11 +43,11 @@ function Verification() {
     }
     setBusy(true);
     try {
-      const record = await ensureRecord();
       const next = advance ? Math.min(8, step + 1) : step;
-      const { data, error } = await supabase.from("seller_verifications").update({ details, documents, current_step: next, ...(submit ? { status: "submitted" as const } : {}) }).eq("id", record.id).eq("updated_at", record.updated_at).select().single();
-      if (error) throw error;
-      queryClient.setQueryData(verificationQuery(user.id).queryKey, data);
+      const result = await saveVerification({ data: { details, current_step: next, submit, expected_updated_at: verification?.updated_at ?? null } });
+      if (!result.ok) { toast.error(result.error); return; }
+      queryClient.setQueryData(verificationQuery(user.id).queryKey, result.verification);
+      setDocuments(section(result.verification.documents));
       setSaved(true); if (advance) go(next);
       toast.success(submit ? "Verification submitted for review." : "Verification progress saved.");
     } catch { toast.error("Could not save verification. Refresh and try again."); }
@@ -66,24 +58,13 @@ function Verification() {
     const allowed = current.file === "portrait" || current.file === "presence" ? ["image/jpeg", "image/png", "image/webp"] : ["image/jpeg", "image/png", "image/webp", "application/pdf"];
     if (!allowed.includes(file.type) || file.size > 10 * 1024 * 1024) { setErrors({ file: "Choose a JPG, PNG, WebP or permitted PDF up to 10 MB." }); return; }
     setBusy(true);
-    let uploadedPath: string | null = null;
     try {
-      const record = await ensureRecord();
-      const extension = file.type === "application/pdf" ? "pdf" : file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-      const path = `${user.id}/${record.id}/${current.file}-${crypto.randomUUID()}.${extension}`;
-      const result = await supabase.storage.from("seller-verification").upload(path, file, { contentType: file.type });
-      if (result.error) throw result.error;
-      uploadedPath = path;
-      const nextDocs = { ...documents, [current.file]: path };
-      const { data, error } = await supabase.from("seller_verifications").update({ documents: nextDocs, details, current_step: step }).eq("id", record.id).eq("updated_at", record.updated_at).select().single();
-      if (error) throw error;
-      const oldPath = documents[current.file];
-      setDocuments(nextDocs); setErrors({}); setSaved(true);
-      queryClient.setQueryData(verificationQuery(user.id).queryKey, data);
-      uploadedPath = null;
-      if (oldPath) await supabase.storage.from("seller-verification").remove([oldPath]);
+      const result = await uploadVerificationDocument({ data: { kind: current.file, content_type: file.type, data_base64: await fileToBase64(file), details, current_step: step, expected_updated_at: verification?.updated_at ?? null } });
+      if (!result.ok) { setErrors({ file: result.error }); return; }
+      setDocuments(section(result.verification.documents)); setErrors({}); setSaved(true);
+      queryClient.setQueryData(verificationQuery(user.id).queryKey, result.verification);
       toast.success("Document uploaded and saved.");
-    } catch { if (uploadedPath) await supabase.storage.from("seller-verification").remove([uploadedPath]); toast.error("Could not save the document. Please try again."); }
+    } catch { toast.error("Could not save the document. Please try again."); }
     finally { setBusy(false); }
   };
   const confirm = (key: string, text: string) => <label className="flex cursor-pointer items-start gap-3 text-base leading-7"><Checkbox disabled={busy} className="mt-1.5" checked={details[key] === "yes"} onCheckedChange={value => { setDetails(prev => ({ ...prev, [key]: value === true ? "yes" : "no" })); setErrors({}); }} />{text}</label>;

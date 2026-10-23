@@ -9,9 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { VerificationSummary } from "@/components/VerificationSummary";
 import { verificationReviewsQuery, section } from "@/lib/verification";
 import { STATUS_LABEL } from "@/lib/application";
-import { supabase } from "@/integrations/supabase/client";
+import { reviewVerification } from "@/lib/verification.functions";
 
-export function VerificationReview({ reviewerId }: { reviewerId: string }) {
+export function VerificationReview() {
   const { data: items } = useSuspenseQuery(verificationReviewsQuery);
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -28,8 +28,8 @@ export function VerificationReview({ reviewerId }: { reviewerId: string }) {
     if (!window.confirm(`${STATUS_LABEL[status]} — confirm this verification decision?`)) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from("seller_verifications").update({ status, admin_comment: comment.trim() || null, reviewed_by: reviewerId, reviewed_at: new Date().toISOString() }).eq("id", selected.id).eq("updated_at", selected.updated_at).select().single();
-      if (error) throw error;
+      const result = await reviewVerification({ data: { id: selected.id, status, comment: comment.trim(), expected_updated_at: selected.updated_at } });
+      if (!result.ok) { toast.error(result.error); return; }
       await queryClient.invalidateQueries({ queryKey: verificationReviewsQuery.queryKey });
       await queryClient.invalidateQueries({ queryKey: ["verification"] });
       toast.success("Verification decision saved.");

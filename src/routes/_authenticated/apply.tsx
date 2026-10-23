@@ -10,7 +10,7 @@ import { ApplicationSection } from "@/components/ApplicationSection";
 import { ApplicationSummary, type ApplicationSections } from "@/components/ApplicationSummary";
 import { applicationQuery, section } from "@/lib/application-data";
 import { STEPS, STATUS_LABEL, validate, type Section } from "@/lib/application";
-import { supabase } from "@/integrations/supabase/client";
+import { saveApplication } from "@/lib/applications.functions";
 
 const DECLARATIONS = ["I confirm that the information provided is accurate.", "I agree to the Seller Terms.", "I agree to the Privacy Policy.", "I agree to the Seller and Marketplace policies."];
 
@@ -52,29 +52,13 @@ function Apply() {
     }
     setSaving(true);
     try {
-      const email = sections.personal["email"]?.trim().toLowerCase() || null;
-      if (email) {
-        const { data: taken, error } = await supabase.rpc("application_email_taken", { _email: email });
-        if (error) throw error;
-        if (taken) { go(1); setErrors({ email: "This email is already used by another application." }); return; }
-      }
       const next = advance ? Math.min(step + 1, 5) : step;
-      const payload = { ...sections, declaration: declarations, applicant_email: email, current_step: next };
-      const request = application
-        ? supabase.from("seller_applications").update({ ...payload, ...(submit ? { status: "submitted" as const } : {}) }).eq("id", application.id)
-        : supabase.from("seller_applications").insert({ ...payload, user_id: user.id });
-      const { data: savedData, error } = await request.select().single();
-      if (error) throw error;
-      let data = savedData;
-      if (submit && !application) {
-        const result = await supabase.from("seller_applications").update({ status: "submitted" }).eq("id", savedData.id).select().single();
-        if (result.error) {
-          queryClient.setQueryData(applicationQuery(user.id).queryKey, savedData);
-          throw result.error;
-        }
-        data = result.data;
+      const result = await saveApplication({ data: { sections, declaration: declarations, current_step: next, submit } });
+      if (!result.ok) {
+        if (result.code === "email_taken") { go(1); setErrors({ email: result.error }); return; }
+        throw new Error(result.error);
       }
-      queryClient.setQueryData(applicationQuery(user.id).queryKey, data);
+      queryClient.setQueryData(applicationQuery(user.id).queryKey, result.application);
       setSaved(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
       setErrors({});
       if (advance) go(next);

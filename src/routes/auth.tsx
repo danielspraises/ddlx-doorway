@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUser, requestPasswordReset, resetPassword, signIn, signUp } from "@/lib/auth.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,65 +38,59 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
-  const recovering = useRef(typeof window !== "undefined" && /type=recovery|reset=1/.test(window.location.hash + window.location.search));
+  const queryClient = useQueryClient();
+  const resetToken = useRef<string | null>(null);
 
   useEffect(() => {
-    if (recovering.current) setMode("recover");
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session && !recovering.current) navigate({ to: "/apply" });
-    });
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY") { recovering.current = true; setMode("recover"); return; }
-      if (session && !recovering.current) navigate({ to: "/apply" });
-    });
-    return () => data.subscription.unsubscribe();
+    resetToken.current = new URLSearchParams(window.location.search).get("token");
+    if (resetToken.current) {
+      setMode("recover");
+      return;
+    }
+    getCurrentUser()
+      .then((user) => { if (user) navigate({ to: "/apply" }); })
+      .catch(() => undefined);
   }, [navigate]);
+
+  const enter = () => {
+    queryClient.clear();
+    navigate({ to: "/apply" });
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (busy) return;
     if (mode === "forgot") {
       const parsed = emailSchema.safeParse({ email });
       if (!parsed.success) { toast.error(parsed.error.issues[0]?.message ?? "Enter a valid email"); return; }
       setBusy(true);
-      const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, { redirectTo: `${window.location.origin}/auth?reset=1` });
+      try {
+        await requestPasswordReset({ data: { email: parsed.data.email } });
+        toast.success("If that email has an account, a reset link has been created.");
+      } catch { toast.error("Could not start the reset. Please try again."); }
       setBusy(false);
-      if (error) toast.error(error.message);
-      else toast.success("If that email has an account, a reset link is on its way.");
       return;
     }
     if (mode === "recover") {
       const parsed = newPasswordSchema.safeParse({ password });
       if (!parsed.success) { toast.error(parsed.error.issues[0]?.message ?? "Invalid password"); return; }
       setBusy(true);
-      const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
-      setBusy(false);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Password updated.");
-      recovering.current = false;
-      navigate({ to: "/apply" });
+      try {
+        const result = await resetPassword({ data: { token: resetToken.current ?? "", password: parsed.data.password } });
+        if (!result.ok) { toast.error(result.error); setBusy(false); return; }
+        toast.success("Password updated.");
+        enter();
+      } catch { toast.error("Could not update the password. Please try again."); setBusy(false); }
       return;
     }
     const p = schema.safeParse({ email, password });
     if (!p.success) { toast.error(p.error.issues[0]?.message ?? "Invalid input"); return; }
     setBusy(true);
-    if (mode === "signup") {
-      const { data, error } = await supabase.auth.signUp({
-        email: p.data.email,
-        password: p.data.password,
-        options: { emailRedirectTo: `${window.location.origin}/apply` },
-      });
-      if (error) toast.error(error.message);
-      else if (!data.session) toast.success("Check your email to confirm your account, then sign in.");
-    } else {
-      const { error } = await supabase.auth.signInWithPassword(p.data);
-      if (error) toast.error(error.message);
-    }
-    setBusy(false);
-  };
-
-  const google = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${window.location.origin}/auth` } });
-    if (error) toast.error(/not enabled|unsupported provider/i.test(error.message) ? "Google sign-in is not enabled for this project yet. Use email and password." : "Google sign-in failed");
+    try {
+      const result = mode === "signup" ? await signUp({ data: p.data }) : await signIn({ data: p.data });
+      if (!result.ok) { toast.error(result.error); setBusy(false); return; }
+      enter();
+    } catch { toast.error("Something went wrong. Please try again."); setBusy(false); }
   };
 
   return (
@@ -115,14 +110,6 @@ function AuthPage() {
           {mode === "signup" ? "Your journey with DDLX starts here." : mode === "forgot" ? "Enter your email and we will send you a reset link." : mode === "recover" ? "Enter a new password for your account." : "Good to see you again."}
         </p>
         <div className="mt-8">
-          {(mode === "signin" || mode === "signup") && <>
-            <Button variant="outline" className="h-12 w-full gap-3 bg-card" onClick={google} type="button">
-              <span className="font-bold text-lg" aria-hidden="true">G</span> Continue with Google
-            </Button>
-            <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-              <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
-            </div>
-          </>}
           <form onSubmit={submit} className="space-y-4">
             {mode !== "recover" && <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>

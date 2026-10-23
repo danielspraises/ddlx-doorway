@@ -12,5 +12,5 @@
 - Render the decorative vendor scene with dynamically imported Three.js inside a client effect; keep rendering and cleanup browser-only to preserve SSR safety.
 - Keep vendor visuals in semantic global CSS tokens and shared scene/header components so public and account pages stay consistent.
 - Build approved-seller tools as focused pages in one seller workspace; avoid a separate generic dashboard because the platform itself is the management home.
-- Load application and review data through authenticated route loaders and shared query options; browser mutations rely on database RLS and guards to enforce ownership and review privileges.
+- The app owns its PostgreSQL database (db/migrations, applied with `npm run db:migrate`). Load application and review data through authenticated route loaders and shared query options that call server functions (`src/lib/*.functions.ts`); those functions check the session, ownership and admin role on the server. Server-only code lives in `src/server/*.server.ts` and is imported dynamically inside handlers.
 - Share section forms and review summaries between seller and staff pages so conditional fields and submitted details stay consistent.

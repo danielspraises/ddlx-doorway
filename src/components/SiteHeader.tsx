@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { getCurrentUser, signOut } from "@/lib/auth.functions";
 import { Button } from "@/components/ui/button";
 import { ArrowUpRight, LogOut } from "lucide-react";
 
@@ -9,18 +10,21 @@ export function SiteHeader() {
   const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
 
+  const queryClient = useQueryClient();
+
   useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase.auth.getUser();
-      setEmail(data.user?.email ?? null);
-      if (data.user) {
-        const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
-        setIsAdmin(!!roles?.some((r) => r.role === "admin"));
-      } else setIsAdmin(false);
-    };
-    load();
-    const { data } = supabase.auth.onAuthStateChange(() => load());
-    return () => data.subscription.unsubscribe();
+    getCurrentUser()
+      .then((user) => {
+        setEmail(user?.email ?? null);
+        setIsAdmin(!!user?.isAdmin);
+      })
+      .catch(() => {
+        setEmail(null);
+        setIsAdmin(false);
+      });
+  }, []);
+
+  return () => data.subscription.unsubscribe();
   }, []);
 
   return (
@@ -46,7 +50,10 @@ export function SiteHeader() {
                 variant="outline"
                 size="sm"
                 onClick={async () => {
-                  await supabase.auth.signOut();
+                  await signOut();
+                  queryClient.clear();
+                  setEmail(null);
+                  setIsAdmin(false);
                   navigate({ to: "/" });
                 }}
               >

@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { section } from "@/lib/application-data";
+import { getMyVerification, getVerificationFile, listVerificationReviews } from "@/lib/verification.functions";
 import type { Section } from "@/lib/application";
 
 export const VERIFICATION_STEPS = [
@@ -15,19 +15,11 @@ export const VERIFICATION_STEPS = [
 ] as const;
 export const verificationQuery = (userId: string) => queryOptions({
   queryKey: ["verification", userId],
-  queryFn: async () => {
-    const { data, error } = await supabase.from("seller_verifications").select("*").eq("user_id", userId).maybeSingle();
-    if (error) throw error;
-    return data;
-  },
+  queryFn: () => getMyVerification(),
 });
 export const verificationReviewsQuery = queryOptions({
   queryKey: ["verification-reviews"],
-  queryFn: async () => {
-    const { data, error } = await supabase.from("seller_verifications").select("*, seller_applications(brand, personal, business, registration, applicant_email)").neq("status", "draft").order("updated_at", { ascending: false });
-    if (error) throw error;
-    return data;
-  },
+  queryFn: () => listVerificationReviews(),
 });
 export function verificationErrors(step: number, details: Section, documents: Section, registered: boolean): Section {
   const file = VERIFICATION_STEPS[step - 1]?.file;
@@ -39,10 +31,19 @@ export function verificationErrors(step: number, details: Section, documents: Se
   return {};
 }
 export async function downloadVerificationFile(path: string) {
-  const { data, error } = await supabase.storage.from("seller-verification").download(path);
-  if (error) throw error;
-  const extension = path.split(".").pop()?.toLowerCase();
-  const type = data.type || (extension === "pdf" ? "application/pdf" : extension === "png" ? "image/png" : extension === "webp" ? "image/webp" : "image/jpeg");
-  return data.type === type ? data : new Blob([data], { type });
+  const result = await getVerificationFile({ data: { path } });
+  if (!result.ok) throw new Error(result.error);
+  const binary = atob(result.data_base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: result.content_type });
+}
+export function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read the file."));
+    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+    reader.readAsDataURL(file);
+  });
 }
 export { section };

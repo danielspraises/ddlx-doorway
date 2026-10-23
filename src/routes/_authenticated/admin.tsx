@@ -12,22 +12,20 @@ import { SelectField } from "@/components/FormFields";
 import { ApplicationSummary } from "@/components/ApplicationSummary";
 import { reviewsQuery, section } from "@/lib/application-data";
 import { STATUS_LABEL } from "@/lib/application";
-import { supabase } from "@/integrations/supabase/client";
+import { reviewApplication } from "@/lib/applications.functions";
 import { VerificationReview } from "@/components/VerificationReview";
 import { verificationReviewsQuery } from "@/lib/verification";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Review applications — DDLX Seller Center" }, { name: "description", content: "Review applications on DDLX Seller Center." }, { property: "og:title", content: "Review applications — DDLX" }, { property: "og:description", content: "Review applications on DDLX Seller Center." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
-  beforeLoad: async ({ context }) => {
-    const { data, error } = await supabase.rpc("has_role", { _user_id: context.user.id, _role: "admin" });
-    if (error || !data) throw redirect({ to: "/apply" });
+  beforeLoad: ({ context }) => {
+    if (!context.user.isAdmin) throw redirect({ to: "/apply" });
   },
   loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(reviewsQuery), context.queryClient.ensureQueryData(verificationReviewsQuery)]),
   component: Admin,
 });
 
 function Admin() {
-  const { user } = Route.useRouteContext();
   const { data: applications } = useSuspenseQuery(reviewsQuery);
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<"applications" | "verifications">("applications");
@@ -44,8 +42,8 @@ function Admin() {
     if (!window.confirm(`${STATUS_LABEL[status]} — confirm this decision?`)) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from("seller_applications").update({ status, admin_comment: comment.trim() || null, reviewed_by: user.id, reviewed_at: new Date().toISOString() }).eq("id", selected.id).eq("updated_at", selected.updated_at).select().single();
-      if (error) throw error;
+      const result = await reviewApplication({ data: { id: selected.id, status, comment: comment.trim(), expected_updated_at: selected.updated_at } });
+      if (!result.ok) { toast.error(result.error); return; }
       await queryClient.invalidateQueries({ queryKey: reviewsQuery.queryKey });
       await queryClient.invalidateQueries({ queryKey: ["application"] });
       toast.success("Review decision saved.");
@@ -55,7 +53,7 @@ function Admin() {
   return <div className="min-h-screen"><SiteHeader /><main className="mx-auto max-w-5xl px-4 py-12 sm:px-8">
     <p className="eyebrow text-accent">STAFF REVIEW QUEUE</p><h1 className="mt-3 text-3xl font-semibold sm:text-5xl">{tab === "applications" && selected ? section(selected.brand)["store_name"] || "Application details" : "Review queue"}</h1>
     <div className="mt-6 flex gap-2 border-b" role="tablist">{(["applications", "verifications"] as const).map(t => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`-mb-px border-b-2 px-4 py-3 text-sm font-semibold capitalize ${tab === t ? "border-accent text-foreground" : "border-transparent text-muted-foreground"}`}>{t}</button>)}</div>
-    {tab === "verifications" ? <VerificationReview reviewerId={user.id} /> : selected ? <>
+    {tab === "verifications" ? <VerificationReview /> : selected ? <>
       <Button variant="ghost" className="mt-5" onClick={() => setSelectedId(null)}><ArrowLeft className="size-4" /> All applications</Button>
       <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 border-y py-5 text-sm"><span className="font-semibold">{STATUS_LABEL[selected.status]}</span><span className="text-muted-foreground">{selected.applicant_email}</span><span className="text-muted-foreground">Submitted {selected.submitted_at ? new Date(selected.submitted_at).toLocaleDateString() : "—"}</span></div>
       <div className="mt-8"><ApplicationSummary sections={{ personal: section(selected.personal), business: section(selected.business), brand: section(selected.brand), registration: section(selected.registration) }} /></div>

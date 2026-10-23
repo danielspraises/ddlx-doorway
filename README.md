@@ -93,30 +93,30 @@ Keep the UI clean and modern
 The app uses its own PostgreSQL database, email/password sign-in with server-side sessions,
 and a private folder on disk for verification documents. There is no external backend.
 
-Requirements: Node.js 20 or newer, and either Docker Desktop or any PostgreSQL 14+ server.
+Requirements: Node.js 20 or newer, and a PostgreSQL 14+ server (the Windows installer from
+postgresql.org works; remember the password you set for the `postgres` user). Docker is optional.
 
 ```powershell
 # 1. Install packages
 npm install
 
-# 2. Start a local database (skip if you already have Postgres)
-docker compose up -d
+# 2. Create the Verola database and user on your PostgreSQL, and write .env for you
+#    (use the password you chose when installing PostgreSQL)
+npm run db:setup -- "YourPostgresPassword"
 
-# 3. Create your settings file, then edit DATABASE_URL if you use your own Postgres
-Copy-Item .env.example .env
-
-# 4. Create the tables
+# 3. Create the tables
 npm run db:migrate
 
-# 5. Create the admin account (pick your own password)
+# 4. Create the admin account (pick your own password)
 npm run db:admin -- admin@ddlxapparel.com "YourStrongPassword1!"
 
-# 6. Run the app
+# 5. Check everything, then run the app
+npm run db:check
 npm run dev
 ```
 
-The Docker database listens on port **5433** (not 5432) so it cannot clash with a PostgreSQL you already
-have installed. If you made `.env` from an older copy of `.env.example`, replace its `DATABASE_URL` line with the one in the current `.env.example`.
+Prefer Docker? Run `docker compose up -d` instead of step 2, copy `.env.example` to `.env`, and use the
+port 5433 `DATABASE_URL` line from it.
 
 Open the address that `npm run dev` prints, then sign in at `/auth`.
 

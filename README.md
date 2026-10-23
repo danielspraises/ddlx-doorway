@@ -124,6 +124,7 @@ Open the address that `npm run dev` prints, then sign in at `/auth`.
 | Reset any user's password | `npm run db:password -- user@example.com "NewPassword1!"` |
 | Make another admin | `npm run db:admin -- other@example.com "Password1!"` |
 | Apply new database changes | `npm run db:migrate` |
+| Diagnose database problems | `npm run db:check` |
 | Run tests | `npm test` |
 
 Passwords typed on the command line stay in your shell history; clear it if that matters.

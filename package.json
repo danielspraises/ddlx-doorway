@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "db:migrate": "node scripts/migrate.mjs",
     "db:admin": "node scripts/users.mjs admin",
-    "db:password": "node scripts/users.mjs password"
+    "db:password": "node scripts/users.mjs password",
+    "db:check": "node scripts/check.mjs"
   },
   "overrides": {
     "rolldown": "1.2.1"

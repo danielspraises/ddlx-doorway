@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SiteHeader } from "@/components/SiteHeader";
 import { VendorScene } from "@/components/VendorScene";
-import { ArrowUpRight, ArrowRight, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, ArrowRight, Eye, EyeOff, ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -36,6 +36,8 @@ function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "recover">("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -74,6 +76,7 @@ function AuthPage() {
     if (mode === "recover") {
       const parsed = newPasswordSchema.safeParse({ password });
       if (!parsed.success) { toast.error(parsed.error.issues[0]?.message ?? "Invalid password"); return; }
+      if (password !== confirmPassword) { toast.error("The two passwords do not match."); return; }
       setBusy(true);
       try {
         const result = await resetPassword({ data: { token: resetToken.current ?? "", password: parsed.data.password } });
@@ -85,12 +88,13 @@ function AuthPage() {
     }
     const p = schema.safeParse({ email, password });
     if (!p.success) { toast.error(p.error.issues[0]?.message ?? "Invalid input"); return; }
+    if (mode === "signup" && password !== confirmPassword) { toast.error("The two passwords do not match."); return; }
     setBusy(true);
     try {
       const result = mode === "signup" ? await signUp({ data: p.data }) : await signIn({ data: p.data });
       if (!result.ok) { toast.error(result.error); setBusy(false); return; }
       enter();
-    } catch { toast.error("Something went wrong. Please try again."); setBusy(false); }
+    } catch (error) { console.error(error); toast.error("Something went wrong on the server. Check the terminal running npm run dev for the error, and run npm run db:check."); setBusy(false); }
   };
 
   return (
@@ -117,15 +121,25 @@ function AuthPage() {
             </div>}
             {mode !== "forgot" && <div className="space-y-1.5">
               <Label htmlFor="password">{mode === "recover" ? "New password" : "Password"}</Label>
-              <Input id="password" type="password" placeholder="At least 8 characters" className="h-12 bg-card" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "signup" || mode === "recover" ? "new-password" : "current-password"} />
+              <div className="relative">
+                <Input id="password" type={showPassword ? "text" : "password"} placeholder="At least 8 characters" className="h-12 bg-card pr-12" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "signup" || mode === "recover" ? "new-password" : "current-password"} />
+                <button type="button" className="absolute right-0 top-0 grid h-12 w-12 place-items-center text-muted-foreground hover:text-foreground" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword((value) => !value)}>
+                  {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+                </button>
+              </div>
               {mode === "signin" && <button type="button" className="text-sm text-accent underline-offset-4 hover:underline" onClick={() => setMode("forgot")}>Forgot password?</button>}
+            </div>}
+            {(mode === "signup" || mode === "recover") && <div className="space-y-1.5">
+              <Label htmlFor="confirm-password">Confirm password</Label>
+              <Input id="confirm-password" type={showPassword ? "text" : "password"} placeholder="Type the password again" className="h-12 bg-card" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" />
+              {confirmPassword && password !== confirmPassword && <p role="alert" className="text-sm text-destructive">Passwords do not match.</p>}
             </div>}
             <Button type="submit" className="h-12 w-full justify-between px-5" disabled={busy}>
               {busy ? "Please wait…" : mode === "signup" ? "Create account" : mode === "forgot" ? "Send reset link" : mode === "recover" ? "Update password" : "Sign in"}<ArrowUpRight className="size-4" />
             </Button>
           </form>
         </div>
-        <Button variant="link" className="mt-5 h-auto w-full whitespace-normal text-sm" onClick={() => setMode(mode === "signup" ? "signin" : mode === "signin" ? "signup" : "signin")}>
+        <Button variant="link" className="mt-5 h-auto w-full whitespace-normal text-sm" onClick={() => { setConfirmPassword(""); setShowPassword(false); setMode(mode === "signup" ? "signin" : mode === "signin" ? "signup" : "signin"); }}>
           {mode === "signup" ? "Already have an account? Sign in" : mode === "signin" ? "New here? Create an account" : "Back to sign in"}<ArrowRight className="size-3" />
         </Button>
         <p className="mt-10 flex items-center justify-center gap-2 border-t pt-6 text-xs text-muted-foreground"><ShieldCheck className="size-4" /> DDLX Apparel · Vendor community</p>

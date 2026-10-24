@@ -1,10 +1,11 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { getCurrentUser } from "@/lib/auth.functions";
+import { meQuery } from "@/lib/auth-data";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
-  beforeLoad: async () => {
-    const user = await getCurrentUser();
+  beforeLoad: async ({ context }) => {
+    // Always ask the server: role and stage can change between page visits.
+    const user = await context.queryClient.fetchQuery({ ...meQuery, staleTime: 0 });
     if (!user) throw redirect({ to: "/auth" });
     return { user };
   },

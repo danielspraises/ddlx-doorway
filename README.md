@@ -142,3 +142,29 @@ Passwords typed on the command line stay in your shell history; clear it if that
 - Google sign-in has been removed for now and can be added back with your own Google OAuth keys.
 - Before deploying, build for a Node server target (the default build target of the Vite config
   is Cloudflare, which cannot open Postgres connections or write to disk).
+
+## How people move through Verola
+
+After sign-in everyone is sent to the right place for their role and progress (`src/lib/stage.ts`).
+The header menu shows only the links that apply to them.
+
+| Who | Lands on | Menu |
+| --- | --- | --- |
+| Admin | `/admin` | Applications and Verifications, with pending-count badges |
+| New seller or one needing corrections | `/apply` | My application |
+| Application approved | `/verification` | My application, Verification |
+| Verified seller | `/seller` | Seller Center, Products, Inventory |
+
+Actions that change a stage (submitting an application, approving it, verifying, rejecting) refresh
+the menu straight away. When an admin reviews an item the list returns to the next one waiting.
+
+### Seller Center (`/seller`)
+
+- **Overview**: product counts, stock warnings and quick actions.
+- **Products**: add, edit and delete products with up to 6 private photos each.
+- **Inventory**: filter by low or out of stock and adjust units with -/+ or a typed number.
+
+### Roadmap
+
+Store settings and profile, orders, payouts and withdrawals, Google sign-in, email delivery,
+login rate limiting.

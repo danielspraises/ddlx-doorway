@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import { getCurrentUser, requestPasswordReset, resetPassword, signIn, signUp } from "@/lib/auth.functions";
+import { requestPasswordReset, resetPassword, signIn, signUp } from "@/lib/auth.functions";
+import { meQuery } from "@/lib/auth-data";
+import { homePath } from "@/lib/stage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,14 +51,17 @@ function AuthPage() {
       setMode("recover");
       return;
     }
-    getCurrentUser()
-      .then((user) => { if (user) navigate({ to: "/apply" }); })
+    queryClient
+      .fetchQuery({ ...meQuery, staleTime: 0 })
+      .then((user) => { if (user) navigate({ to: homePath(user) }); })
       .catch(() => undefined);
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
-  const enter = () => {
+  // After signing in or up, send each person to the page that fits their role and progress.
+  const enter = async () => {
     queryClient.clear();
-    navigate({ to: "/apply" });
+    const user = await queryClient.fetchQuery({ ...meQuery, staleTime: 0 }).catch(() => null);
+    navigate({ to: user ? homePath(user) : "/apply" });
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -82,7 +87,7 @@ function AuthPage() {
         const result = await resetPassword({ data: { token: resetToken.current ?? "", password: parsed.data.password } });
         if (!result.ok) { toast.error(result.error); setBusy(false); return; }
         toast.success("Password updated.");
-        enter();
+        await enter();
       } catch { toast.error("Could not update the password. Please try again."); setBusy(false); }
       return;
     }
@@ -93,7 +98,7 @@ function AuthPage() {
     try {
       const result = mode === "signup" ? await signUp({ data: p.data }) : await signIn({ data: p.data });
       if (!result.ok) { toast.error(result.error); setBusy(false); return; }
-      enter();
+      await enter();
     } catch (error) { console.error(error); toast.error("Something went wrong on the server. Check the terminal running npm run dev for the error, and run npm run db:check."); setBusy(false); }
   };
 

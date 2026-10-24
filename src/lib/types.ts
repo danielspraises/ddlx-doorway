@@ -42,3 +42,20 @@ export type VerificationReviewItem = Verification & {
 };
 
 export type Failure = { ok: false; error: string; code?: string };
+
+export type Product = {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string;
+  sku: string;
+  category: string;
+  price: number;
+  currency: "NGN" | "USD" | "GBP" | "EUR";
+  stock: number;
+  low_stock_threshold: number;
+  status: "draft" | "ready" | "archived";
+  images: string[];
+  created_at: string;
+  updated_at: string;
+};

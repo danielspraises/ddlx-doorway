@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { section } from "@/lib/application-data";
+import { base64ToBlob, fileToBase64 } from "@/lib/files";
 import { getMyVerification, getVerificationFile, listVerificationReviews } from "@/lib/verification.functions";
 import type { Section } from "@/lib/application";
 
@@ -33,17 +34,7 @@ export function verificationErrors(step: number, details: Section, documents: Se
 export async function downloadVerificationFile(path: string) {
   const result = await getVerificationFile({ data: { path } });
   if (!result.ok) throw new Error(result.error);
-  const binary = atob(result.data_base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return new Blob([bytes], { type: result.content_type });
+  return base64ToBlob(result.data_base64, result.content_type);
 }
-export function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error("Could not read the file."));
-    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
-    reader.readAsDataURL(file);
-  });
-}
+export { fileToBase64 };
 export { section };

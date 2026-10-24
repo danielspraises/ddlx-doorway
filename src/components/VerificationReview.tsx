@@ -32,7 +32,8 @@ export function VerificationReview() {
       if (!result.ok) { toast.error(result.error); return; }
       await queryClient.invalidateQueries({ queryKey: verificationReviewsQuery.queryKey });
       await queryClient.invalidateQueries({ queryKey: ["verification"] });
-      toast.success("Verification decision saved.");
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+      toast.success(status === "approved" ? "Verified. The seller can now open Seller Center." : status === "needs_corrections" ? "Sent back to the seller for corrections." : "Verification rejected.");
       setSelectedId(null);
     } catch { toast.error("Could not save the decision. Refresh and try again."); }
     finally { setSaving(false); }

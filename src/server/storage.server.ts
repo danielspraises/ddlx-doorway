@@ -9,26 +9,30 @@ const root = () => resolve(process.cwd(), env("STORAGE_DIR", "./storage"));
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 export const VERIFICATION_PATH = new RegExp(`^(${UUID})/(${UUID})/[a-z_]+-${UUID}\\.(jpg|png|webp|pdf)$`);
 
-function fullPath(relative: string) {
-  const base = root();
-  const target = resolve(base, "verification", relative);
-  if (!target.startsWith(resolve(base, "verification") + sep)) throw new Error("Invalid file path.");
+type Area = "verification" | "products";
+
+function fullPath(area: Area, relative: string) {
+  const base = resolve(root(), area);
+  const target = resolve(base, relative);
+  if (!target.startsWith(base + sep)) throw new Error("Invalid file path.");
   return target;
 }
 
-export async function saveVerificationFile(relative: string, bytes: Buffer) {
-  const target = fullPath(relative);
+async function save(area: Area, relative: string, bytes: Buffer) {
+  const target = fullPath(area, relative);
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, bytes);
 }
 
-export async function readVerificationFile(relative: string) {
-  return readFile(fullPath(relative));
-}
+export const saveVerificationFile = (relative: string, bytes: Buffer) => save("verification", relative, bytes);
+export const readVerificationFile = (relative: string) => readFile(fullPath("verification", relative));
+export const removeVerificationFile = (relative: string) => rm(fullPath("verification", relative), { force: true });
 
-export async function removeVerificationFile(relative: string) {
-  await rm(fullPath(relative), { force: true });
-}
+// Product photos: <seller id>/<product id>/<image id>.<ext>
+export const PRODUCT_PATH = new RegExp(`^(${UUID})/(${UUID})/${UUID}\\.(jpg|png|webp)$`);
+export const saveProductFile = (relative: string, bytes: Buffer) => save("products", relative, bytes);
+export const readProductFile = (relative: string) => readFile(fullPath("products", relative));
+export const removeProductFile = (relative: string) => rm(fullPath("products", relative), { force: true });
 
 const SIGNATURES: Record<string, (b: Buffer) => boolean> = {
   "image/jpeg": (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,

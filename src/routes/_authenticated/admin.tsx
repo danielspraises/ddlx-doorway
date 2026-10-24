@@ -18,6 +18,7 @@ import { verificationReviewsQuery } from "@/lib/verification";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Review applications — Verola" }, { name: "description", content: "Review applications on Verola." }, { property: "og:title", content: "Review applications — DDLX" }, { property: "og:description", content: "Review applications on Verola." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
+  validateSearch: (search: Record<string, unknown>): { tab: "applications" | "verifications" } => ({ tab: search["tab"] === "verifications" ? "verifications" : "applications" }),
   beforeLoad: ({ context }) => {
     if (!context.user.isAdmin) throw redirect({ to: "/apply" });
   },
@@ -28,9 +29,11 @@ export const Route = createFileRoute("/_authenticated/admin")({
 function Admin() {
   const { data: applications } = useSuspenseQuery(reviewsQuery);
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<"applications" | "verifications">("applications");
+  const { tab } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const setTab = (next: "applications" | "verifications") => { setSelectedId(null); void navigate({ search: { tab: next } }); };
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("All");
+  const [filter, setFilter] = useState("Under review");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
@@ -46,7 +49,9 @@ function Admin() {
       if (!result.ok) { toast.error(result.error); return; }
       await queryClient.invalidateQueries({ queryKey: reviewsQuery.queryKey });
       await queryClient.invalidateQueries({ queryKey: ["application"] });
-      toast.success("Review decision saved.");
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+      toast.success(status === "approved" ? "Approved. The seller can now start verification." : status === "needs_corrections" ? "Sent back to the applicant for corrections." : "Application rejected.");
+      setSelectedId(null);
     } catch { toast.error("Could not save the decision. Refresh and try again."); }
     finally { setSaving(false); }
   };

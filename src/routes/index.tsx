@@ -7,7 +7,7 @@ import { ApplicationSteps } from "@/components/ApplicationSteps";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
-    { title: "Become a DDLX Seller — Verola" },
+    { title: "Become a DDLX Seller — Vendor Hub" },
     { name: "description", content: "Bring your clothing, footwear and accessories to DDLX Apparel. Start your seller application." },
     { property: "og:title", content: "Become a DDLX Seller" },
     { property: "og:description", content: "Your brand. The next chapter. Apply to join DDLX Apparel." },

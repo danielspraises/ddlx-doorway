@@ -1,7 +1,7 @@
 <?php
 /**
- * Plugin Name: Verola Connector
- * Description: Connects WooCommerce to Verola. Pulls products approved on Verola into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Verola.
+ * Plugin Name: Vendor Hub Connector
+ * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
  * Version: 1.0.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -9,7 +9,7 @@
  * License: GPL-2.0-or-later
  * Text Domain: verola-connector
  *
- * Settings can be typed in WooCommerce > Verola, or fixed in wp-config.php:
+ * Settings can be typed in WooCommerce > Vendor Hub, or fixed in wp-config.php:
  *   define('VEROLA_URL', 'https://your-verola-app.example');
  *   define('VEROLA_API_KEY', '...');
  *   define('VEROLA_WEBHOOK_SECRET', '...');
@@ -56,13 +56,13 @@ final class Verola_Connector {
 	}
 
 	public static function schedules($schedules) {
-		$schedules['verola_minute'] = ['interval' => 60, 'display' => 'Every minute (Verola)'];
+		$schedules['verola_minute'] = ['interval' => 60, 'display' => 'Every minute (Vendor Hub)'];
 		return $schedules;
 	}
 
 	public static function activate() {
 		if (!get_role('verola_seller')) {
-			add_role('verola_seller', 'Verola seller', ['read' => true]);
+			add_role('verola_seller', 'Vendor Hub seller', ['read' => true]);
 		}
 		if (!wp_next_scheduled(self::CRON)) {
 			wp_schedule_event(time() + 60, 'verola_minute', self::CRON);
@@ -82,9 +82,8 @@ final class Verola_Connector {
 			'url' => rtrim(defined('VEROLA_URL') ? VEROLA_URL : ($saved['url'] ?? ''), '/'),
 			'api_key' => defined('VEROLA_API_KEY') ? VEROLA_API_KEY : ($saved['api_key'] ?? ''),
 			'secret' => defined('VEROLA_WEBHOOK_SECRET') ? VEROLA_WEBHOOK_SECRET : ($saved['secret'] ?? ''),
-			// The WordPress role given to each seller's account. Use your vendor plugin's role if you have one
-			// (Dokan: seller, WCFM: wcfm_vendor, WC Vendors: vendor).
-			'role' => $saved['role'] ?? 'verola_seller',
+			// The WordPress role given to each seller's account. With Dokan active this is Dokan's `seller` role.
+			'role' => !empty($saved['role']) ? $saved['role'] : (function_exists('dokan') ? 'seller' : 'verola_seller'),
 		];
 	}
 
@@ -117,14 +116,14 @@ final class Verola_Connector {
 					'url' => esc_url_raw(trim($input['url'] ?? '')),
 					'api_key' => $keep('api_key'),
 					'secret' => $keep('secret'),
-					'role' => sanitize_key($input['role'] ?? 'verola_seller') ?: 'verola_seller',
+					'role' => sanitize_key($input['role'] ?? '') ?: (function_exists('dokan') ? 'seller' : 'verola_seller'),
 				];
 			},
 		]);
 	}
 
 	public static function menu() {
-		add_submenu_page('woocommerce', 'Verola', 'Verola', 'manage_woocommerce', 'verola-connector', [__CLASS__, 'page']);
+		add_submenu_page('woocommerce', 'Vendor Hub', 'Vendor Hub', 'manage_woocommerce', 'verola-connector', [__CLASS__, 'page']);
 	}
 
 	public static function page() {
@@ -139,17 +138,17 @@ final class Verola_Connector {
 		$when = !empty($state['last_sync']) ? wp_date('j M Y H:i:s', (int) $state['last_sync']) : 'never';
 		?>
 		<div class="wrap">
-			<h1>Verola</h1>
+			<h1>Vendor Hub</h1>
 			<?php if (isset($_GET['verola_synced'])) : ?>
 				<div class="notice notice-success"><p>Sync finished. See the status below.</p></div>
 			<?php endif; ?>
 			<form method="post" action="options.php">
 				<?php settings_fields('verola_group'); ?>
 				<table class="form-table" role="presentation">
-					<tr><th><label for="verola-url">Verola address</label></th><td><input id="verola-url" class="regular-text" type="url" name="<?php echo esc_attr(self::OPTION); ?>[url]" value="<?php echo esc_attr($s['url']); ?>" placeholder="https://seller.example.com" <?php disabled(defined('VEROLA_URL')); ?>><p class="description">Where the Verola app is hosted.</p></td></tr>
-					<tr><th><label for="verola-key">API key</label></th><td><input id="verola-key" class="regular-text" type="password" autocomplete="new-password" name="<?php echo esc_attr(self::OPTION); ?>[api_key]" value="" placeholder="<?php echo esc_attr($mask($s['api_key'])); ?>" <?php disabled(defined('VEROLA_API_KEY')); ?>><p class="description">Same as MARKETPLACE_API_KEY in Verola's .env. Leave blank to keep the current one.</p></td></tr>
-					<tr><th><label for="verola-secret">Webhook secret</label></th><td><input id="verola-secret" class="regular-text" type="password" autocomplete="new-password" name="<?php echo esc_attr(self::OPTION); ?>[secret]" value="" placeholder="<?php echo esc_attr($mask($s['secret'])); ?>" <?php disabled(defined('VEROLA_WEBHOOK_SECRET')); ?>><p class="description">Same as MARKETPLACE_WEBHOOK_SECRET in Verola's .env. Leave blank to keep the current one.</p></td></tr>
-					<tr><th><label for="verola-role">Seller account role</label></th><td><input id="verola-role" class="regular-text" type="text" name="<?php echo esc_attr(self::OPTION); ?>[role]" value="<?php echo esc_attr($s['role']); ?>"><p class="description">Each Verola seller becomes a user with this role, and their products belong to that user. Use <code>seller</code> for Dokan, <code>wcfm_vendor</code> for WCFM, <code>vendor</code> for WC Vendors, or leave <code>verola_seller</code>.</p></td></tr>
+					<tr><th><label for="verola-url">Vendor Hub address</label></th><td><input id="verola-url" class="regular-text" type="url" name="<?php echo esc_attr(self::OPTION); ?>[url]" value="<?php echo esc_attr($s['url']); ?>" placeholder="https://vendor.ddlx.shop" <?php disabled(defined('VEROLA_URL')); ?>><p class="description">Where Vendor Hub is hosted, for example https://vendor.ddlx.shop</p></td></tr>
+					<tr><th><label for="verola-key">API key</label></th><td><input id="verola-key" class="regular-text" type="password" autocomplete="new-password" name="<?php echo esc_attr(self::OPTION); ?>[api_key]" value="" placeholder="<?php echo esc_attr($mask($s['api_key'])); ?>" <?php disabled(defined('VEROLA_API_KEY')); ?>><p class="description">Same as MARKETPLACE_API_KEY in Vendor Hub's .env. Leave blank to keep the current one.</p></td></tr>
+					<tr><th><label for="verola-secret">Webhook secret</label></th><td><input id="verola-secret" class="regular-text" type="password" autocomplete="new-password" name="<?php echo esc_attr(self::OPTION); ?>[secret]" value="" placeholder="<?php echo esc_attr($mask($s['secret'])); ?>" <?php disabled(defined('VEROLA_WEBHOOK_SECRET')); ?>><p class="description">Same as MARKETPLACE_WEBHOOK_SECRET in Vendor Hub's .env. Leave blank to keep the current one.</p></td></tr>
+					<tr><th><label for="verola-role">Seller account role</label></th><td><input id="verola-role" class="regular-text" type="text" name="<?php echo esc_attr(self::OPTION); ?>[role]" value="<?php echo esc_attr($s['role']); ?>"><p class="description">Each Vendor Hub seller becomes a user with this role, and their products belong to that user. Leave this as <code>seller</code> for Dokan.</p></td></tr>
 				</table>
 				<?php submit_button('Save settings'); ?>
 			</form>
@@ -180,7 +179,7 @@ final class Verola_Connector {
 		exit;
 	}
 
-	// ------------------------------------------------------------------ product sync (Verola -> store)
+	// ------------------------------------------------------------------ product sync (Vendor Hub -> store)
 
 	public static function sync() {
 		if (!self::configured() || !class_exists('WooCommerce')) {
@@ -198,18 +197,18 @@ final class Verola_Connector {
 				$url = $s['url'] . '/api/marketplace/products?limit=50' . ($since !== '' ? '&updated_since=' . rawurlencode($since) : '');
 				$res = wp_remote_get($url, ['timeout' => 30, 'headers' => ['Authorization' => 'Bearer ' . $s['api_key']]]);
 				if (is_wp_error($res)) {
-					throw new Exception('Could not reach Verola: ' . $res->get_error_message());
+					throw new Exception('Could not reach Vendor Hub: ' . $res->get_error_message());
 				}
 				$code = wp_remote_retrieve_response_code($res);
 				if ($code === 401) {
-					throw new Exception('Verola rejected the API key.');
+					throw new Exception('Vendor Hub rejected the API key.');
 				}
 				if ($code !== 200) {
-					throw new Exception('Verola answered with status ' . $code . '.');
+					throw new Exception('Vendor Hub answered with status ' . $code . '.');
 				}
 				$data = json_decode(wp_remote_retrieve_body($res), true);
 				if (!is_array($data) || !isset($data['products'])) {
-					throw new Exception('Verola sent an unreadable answer.');
+					throw new Exception('Vendor Hub sent an unreadable answer.');
 				}
 				foreach ($data['products'] as $item) {
 					try {
@@ -241,7 +240,7 @@ final class Verola_Connector {
 		return $id ? (int) $id : 0;
 	}
 
-	// Verola SKUs are unique per seller; WooCommerce wants them unique across the store.
+	// Vendor Hub SKUs are unique per seller; WooCommerce wants them unique across the store.
 	private static function free_sku($sku, $own_id, $seller) {
 		$candidate = $sku;
 		$taken = wc_get_product_id_by_sku($candidate);
@@ -258,10 +257,14 @@ final class Verola_Connector {
 	private static function vendor_user($seller) {
 		$s = self::settings();
 		$existing = get_users(['meta_key' => '_verola_seller_id', 'meta_value' => $seller['id'], 'number' => 1, 'fields' => 'ID']);
-		$name = $seller['store_name'] ?? 'Verola seller';
+		$name = $seller['store_name'] ?? 'DDLX seller';
 		if ($existing) {
 			$uid = (int) $existing[0];
-			wp_update_user(['ID' => $uid, 'display_name' => $name]);
+			$update = ['ID' => $uid, 'display_name' => $name];
+			if (!empty($seller['store_slug'])) {
+				$update['user_nicename'] = sanitize_title($seller['store_slug']);
+			}
+			wp_update_user($update);
 		} else {
 			$short = substr(str_replace('-', '', $seller['id']), 0, 8);
 			$login = 'verola_' . $short;
@@ -272,6 +275,8 @@ final class Verola_Connector {
 				'user_email' => $email,
 				'display_name' => $name,
 				'nickname' => $name,
+				// Dokan builds the store address (/store/<nicename>) from this.
+				'user_nicename' => sanitize_title($seller['store_slug'] ?? $login),
 				'role' => get_role($s['role']) ? $s['role'] : 'verola_seller',
 			]);
 			if (is_wp_error($uid)) {
@@ -283,9 +288,13 @@ final class Verola_Connector {
 		// Best-effort support for the common vendor plugins.
 		if (function_exists('dokan')) {
 			update_user_meta($uid, 'dokan_enable_selling', 'yes');
+			update_user_meta($uid, 'dokan_publishing', 'yes');
 			$profile = get_user_meta($uid, 'dokan_profile_settings', true);
 			$profile = is_array($profile) ? $profile : [];
 			$profile['store_name'] = $name;
+			if (!empty($seller['city'])) {
+				$profile['address'] = array_merge(is_array($profile['address'] ?? null) ? $profile['address'] : [], ['city' => $seller['city']]);
+			}
 			update_user_meta($uid, 'dokan_profile_settings', $profile);
 		}
 		return (int) $uid;
@@ -466,7 +475,7 @@ final class Verola_Connector {
 		WC_Product_Variable::sync($parent_id);
 	}
 
-	// ------------------------------------------------------------------ sales (store -> Verola)
+	// ------------------------------------------------------------------ sales (store -> Vendor Hub)
 
 	public static function order_paid($order_id) {
 		self::queue($order_id, 'order.paid');
@@ -478,10 +487,12 @@ final class Verola_Connector {
 
 	private static function queue($order_id, $event) {
 		$order = wc_get_order($order_id);
-		if (!$order || $order->get_meta('_verola_sent_' . $event)) {
+		// Dokan splits a multi-seller order into one sub-order per seller. The parent order already holds every
+		// item, so only parent orders are reported; reporting the sub-orders as well would pay sellers twice.
+		if (!$order || $order->get_parent_id() || $order->get_meta('_verola_sent_' . $event)) {
 			return;
 		}
-		// Send in the background so checkout is never slowed down or broken by Verola being offline.
+		// Send in the background so checkout is never slowed down or broken by Vendor Hub being offline.
 		wp_schedule_single_event(time() + 5, self::SEND, [(int) $order_id, $event, 1]);
 	}
 
@@ -542,7 +553,7 @@ final class Verola_Connector {
 		}
 		$payload = self::payload($order, $event);
 		if (!$payload) {
-			return; // nothing from Verola sellers in this order
+			return; // nothing from Vendor Hub sellers in this order
 		}
 		$s = self::settings();
 		$body = wp_json_encode($payload);
@@ -556,7 +567,7 @@ final class Verola_Connector {
 		$code = is_wp_error($res) ? 0 : (int) wp_remote_retrieve_response_code($res);
 		if ($code >= 200 && $code < 300) {
 			$order->update_meta_data('_verola_sent_' . $event, time());
-			$order->add_order_note('Reported to Verola (' . $event . ').');
+			$order->add_order_note('Reported to Vendor Hub (' . $event . ').');
 			$order->save();
 			return;
 		}
@@ -564,11 +575,11 @@ final class Verola_Connector {
 		// Bad data will not fix itself; a wrong key, a downed server or a network error will.
 		$permanent = in_array($code, [400, 404, 422], true);
 		if ($permanent || $attempt >= 8) {
-			$order->add_order_note('Could not report to Verola (' . $event . '): ' . $why . '. Not retrying.');
+			$order->add_order_note('Could not report to Vendor Hub (' . $event . '): ' . $why . '. Not retrying.');
 			$order->save();
 			return;
 		}
-		$order->add_order_note('Verola did not accept the ' . $event . ' report (attempt ' . $attempt . '): ' . $why . '. Trying again later.');
+		$order->add_order_note('Vendor Hub did not accept the ' . $event . ' report (attempt ' . $attempt . '): ' . $why . '. Trying again later.');
 		$order->save();
 		wp_schedule_single_event(time() + 300 * $attempt, self::SEND, [(int) $order_id, $event, $attempt + 1]);
 	}

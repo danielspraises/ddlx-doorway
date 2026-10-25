@@ -6,7 +6,7 @@ import { announce } from "./events.server";
 import { slugify } from "../lib/product-rules";
 import type { Snapshot } from "./products.server";
 
-// The marketplace (verola.ng in production, ddlxapparel.com while testing) talks to Verola in two ways:
+// The marketplace (ddlx.shop in production, ddlxapparel.com while testing) talks to Vendor Hub in two ways:
 //   - it PULLS the catalogue of approved products:   GET  /api/marketplace/products
 //   - it PUSHES sales and refunds (signed):           POST /api/marketplace/orders
 // See docs/marketplace-api.md.
@@ -31,7 +31,7 @@ const same = (a: string, b: string) => {
 export function checkApiKey(request: Request): Response | null {
   loadEnv();
   const key = process.env["MARKETPLACE_API_KEY"];
-  if (!key) return json({ error: "MARKETPLACE_API_KEY is not configured on Verola." }, 503);
+  if (!key) return json({ error: "MARKETPLACE_API_KEY is not configured on Vendor Hub." }, 503);
   const header = request.headers.get("authorization") ?? "";
   if (!header.startsWith("Bearer ") || !same(header.slice(7), key)) return json({ error: "Invalid API key." }, 401);
   return null;
@@ -41,7 +41,7 @@ export function checkApiKey(request: Request): Response | null {
 export function checkSignature(request: Request, raw: string): Response | null {
   loadEnv();
   const secret = process.env["MARKETPLACE_WEBHOOK_SECRET"];
-  if (!secret) return json({ error: "MARKETPLACE_WEBHOOK_SECRET is not configured on Verola." }, 503);
+  if (!secret) return json({ error: "MARKETPLACE_WEBHOOK_SECRET is not configured on Vendor Hub." }, 503);
   const timestamp = request.headers.get("x-verola-timestamp") ?? "";
   const signature = (request.headers.get("x-verola-signature") ?? "").replace(/^sha256=/, "");
   const age = Math.abs(Date.now() / 1000 - Number(timestamp));
@@ -93,7 +93,7 @@ export async function catalogue(request: Request, since: string | null, limit: n
   const url = (path: string | null) => (path ? `${base}/api/media?p=${encodeURIComponent(path)}` : null);
   const products = rows.map((row) => {
     const s = row.snapshot;
-    const storeName = row.store_name || "Verola seller";
+    const storeName = row.store_name || "DDLX seller";
     return {
       id: row.id,
       live: row.live,

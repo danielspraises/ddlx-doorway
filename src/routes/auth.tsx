@@ -16,9 +16,9 @@ import { ArrowUpRight, ArrowRight, Eye, EyeOff, ShieldCheck } from "lucide-react
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — Verola" },
+      { title: "Sign in — Vendor Hub" },
       { name: "description", content: "Sign in or create an account to start your DDLX seller application." },
-      { property: "og:title", content: "Sign in — Verola" },
+      { property: "og:title", content: "Sign in — Vendor Hub" },
       { property: "og:description", content: "Sign in to continue your DDLX seller application." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -116,7 +116,7 @@ function AuthPage() {
         <p className="eyebrow mb-4 text-accent">{mode === "signup" ? "JOIN THE COMMUNITY" : mode === "forgot" || mode === "recover" ? "ACCOUNT RECOVERY" : "YOUR VENDOR ACCOUNT"}</p>
         <h1 className="text-3xl font-semibold sm:text-4xl">{mode === "signup" ? "Create your account" : mode === "forgot" ? "Reset your password" : mode === "recover" ? "Choose a new password" : "Welcome back"}<span className="text-accent">.</span></h1>
         <p className="mt-2 text-muted-foreground">
-          {mode === "signup" ? "Your journey with Verola starts here." : mode === "forgot" ? "Enter your email and we will send you a reset link." : mode === "recover" ? "Enter a new password for your account." : "Good to see you again."}
+          {mode === "signup" ? "Your journey with Vendor Hub starts here." : mode === "forgot" ? "Enter your email and we will send you a reset link." : mode === "recover" ? "Enter a new password for your account." : "Good to see you again."}
         </p>
         <div className="mt-8">
           <form onSubmit={submit} className="space-y-4">
@@ -147,7 +147,7 @@ function AuthPage() {
         <Button variant="link" className="mt-5 h-auto w-full whitespace-normal text-sm" onClick={() => { setConfirmPassword(""); setShowPassword(false); setMode(mode === "signup" ? "signin" : mode === "signin" ? "signup" : "signin"); }}>
           {mode === "signup" ? "Already have an account? Sign in" : mode === "signin" ? "New here? Create an account" : "Back to sign in"}<ArrowRight className="size-3" />
         </Button>
-        <p className="mt-10 flex items-center justify-center gap-2 border-t pt-6 text-xs text-muted-foreground"><ShieldCheck className="size-4" /> Verola · DDLX vendor community</p>
+        <p className="mt-10 flex items-center justify-center gap-2 border-t pt-6 text-xs text-muted-foreground"><ShieldCheck className="size-4" /> Vendor Hub · DDLX vendor community</p>
         </section>
       </main>
     </div>

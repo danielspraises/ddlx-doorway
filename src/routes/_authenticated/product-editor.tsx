@@ -8,7 +8,7 @@ import { homePath } from "@/lib/stage";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const Route = createFileRoute("/_authenticated/product-editor")({
-  head: () => ({ meta: [{ title: "Product — Verola" }, { name: "description", content: "Create or edit a product for the marketplace." }] }),
+  head: () => ({ meta: [{ title: "Product — Vendor Hub" }, { name: "description", content: "Create or edit a product for the marketplace." }] }),
   validateSearch: (search: Record<string, unknown>): { id?: string } => {
     const id = search["id"];
     return typeof id === "string" && UUID.test(id) ? { id } : {};

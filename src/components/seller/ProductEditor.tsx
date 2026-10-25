@@ -335,7 +335,7 @@ export function ProductEditor({ initial }: { initial: Product | null }) {
               <span className="text-muted-foreground">Status</span>
               {state ? <Badge variant={state.tone === "live" ? "default" : "outline"}>{state.label}</Badge> : <Badge variant="outline">New</Badge>}
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">Products reach the marketplace after the Verola team approves them. Stock changes go live straight away.</p>
+            <p className="mt-3 text-xs text-muted-foreground">Products reach the marketplace after the Vendor Hub team approves them. Stock changes go live straight away.</p>
             <div className="mt-4 flex flex-col gap-2">
               <Button disabled={busy || locked} onClick={() => void onSave()}>{busy ? <Loader2 className="size-4 animate-spin" /> : null}{product ? "Save changes" : "Create product"}</Button>
               {canSubmit && <Button variant="outline" disabled={busy || locked} onClick={() => void onSubmit()}><Send className="size-4" />{product?.live ? "Submit changes for review" : "Submit for review"}</Button>}

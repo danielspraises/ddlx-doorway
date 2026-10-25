@@ -1,4 +1,4 @@
-# Verola
+# Vendor Hub
 
 You are a programmer, developer, web designer.
 
@@ -100,7 +100,7 @@ postgresql.org works; remember the password you set for the `postgres` user). Do
 # 1. Install packages
 npm install
 
-# 2. Create the Verola database and user on your PostgreSQL, and write .env for you
+# 2. Create the database (named `verola`) and user on your PostgreSQL, and write .env for you
 #    (use the password you chose when installing PostgreSQL)
 npm run db:setup -- "YourPostgresPassword"
 
@@ -143,7 +143,7 @@ Passwords typed on the command line stay in your shell history; clear it if that
 - Before deploying, build for a Node server target (the default build target of the Vite config
   is Cloudflare, which cannot open Postgres connections or write to disk).
 
-## How people move through Verola
+## How people move through Vendor Hub
 
 After sign-in everyone is sent to the right place for their role and progress (`src/lib/stage.ts`).
 The header menu shows only the links that apply to them.
@@ -178,7 +178,7 @@ customers see until the new version is approved. Admins create staff accounts un
 
 ### Marketplace connection
 
-The marketplace (verola.ng, or ddlxapparel.com while testing) reads approved products and reports sales to Verola.
+The marketplace (ddlx.shop, or ddlxapparel.com while testing) reads approved products and reports sales to Vendor Hub. Vendor Hub itself is served at vendor.ddlx.shop.
 Set `MARKETPLACE_API_KEY` and `MARKETPLACE_WEBHOOK_SECRET` in `.env` and give the marketplace side the contract in
 [docs/marketplace-api.md](docs/marketplace-api.md).
 

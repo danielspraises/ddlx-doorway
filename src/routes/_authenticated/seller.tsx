@@ -20,7 +20,7 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 export const Route = createFileRoute("/_authenticated/seller")({
-  head: () => ({ meta: [{ title: "Seller Center — Verola" }, { name: "description", content: "Manage your products and stock on Verola." }, { property: "og:title", content: "Seller Center — Verola" }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
+  head: () => ({ meta: [{ title: "Seller Center — Vendor Hub" }, { name: "description", content: "Manage your products and stock on Vendor Hub." }, { property: "og:title", content: "Seller Center — Vendor Hub" }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   validateSearch: (search: Record<string, unknown>): { tab: Tab } => {
     const tab = search["tab"];
     return { tab: tab === "products" ? "products" : tab === "inventory" ? "inventory" : tab === "sales" ? "sales" : "overview" };

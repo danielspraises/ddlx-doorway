@@ -1,12 +1,12 @@
 # Marketplace integration
 
-Verola is the seller platform. The marketplace (**verola.ng** in production, **ddlxapparel.com** while testing)
+Vendor Hub (vendor.ddlx.shop) is the seller platform. The marketplace (**ddlx.shop** in production, **ddlxapparel.com** while testing)
 shows the products sellers create here and reports the sales back. Two things connect them:
 
 | Direction | What | Endpoint |
 | --- | --- | --- |
-| Marketplace pulls from Verola | Approved products, grouped under their seller, with live stock | `GET /api/marketplace/products` |
-| Marketplace pushes to Verola | A paid order, or a refund | `POST /api/marketplace/orders` |
+| Marketplace pulls from Vendor Hub | Approved products, grouped under their seller, with live stock | `GET /api/marketplace/products` |
+| Marketplace pushes to Vendor Hub | A paid order, or a refund | `POST /api/marketplace/orders` |
 
 Only products **approved** by an admin, or by a staff account an admin created with the "review and publish products"
 permission, ever appear in the feed. Sellers cannot publish on their own.
@@ -22,7 +22,7 @@ APP_URL=https://verola-seller-site.example       # public address of this app (u
 ```
 
 Generate secrets with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
-Use different values for testing (ddlxapparel.com) and production (verola.ng).
+Use different values for testing (ddlxapparel.com) and production (ddlx.shop).
 
 ## 1. Read products
 
@@ -94,7 +94,7 @@ X-Verola-Signature: sha256=<hex>
 
 - `unit_price` is what the customer paid per unit (after any sale price or discount).
 - Sending the same order id again is safe: nothing is counted twice (`{"ok":true,"duplicate":true}`).
-- Verola takes the commission, credits the seller's wallet (withdrawable after the hold period), lowers stock,
+- Vendor Hub takes the commission, credits the seller's wallet (withdrawable after the hold period), lowers stock,
   and shows the sale on the seller's screen immediately.
 - A refund reverses every line of the order: `{"event":"order.refunded","order":{"id":"1042","restock":true, ...same fields}}`.
   `restock: true` puts the units back into stock.
@@ -120,19 +120,32 @@ wp_remote_post(VEROLA_URL . '/api/marketplace/orders', [
 
 1. Zip the `verola-connector` folder (PowerShell: `Compress-Archive wordpress-plugin\verola-connector verola-connector.zip`).
 2. In WordPress: Plugins > Add New > Upload Plugin, install and activate it. WooCommerce must be active.
-3. Open WooCommerce > Verola. Enter the Verola address, the API key and the webhook secret, then press
+3. Open WooCommerce > Vendor Hub. Enter the Vendor Hub address, the API key and the webhook secret, then press
    "Sync products now". (Or put `VEROLA_URL`, `VEROLA_API_KEY` and `VEROLA_WEBHOOK_SECRET` in `wp-config.php`.)
 
 What it does:
 
 - Every minute it pulls approved products and creates or updates them in WooCommerce: simple and variable products,
   variations, prices, scheduled sale dates, stock, photos, category, tags and brand. Taken-down products become drafts.
-- Each Verola seller becomes a WordPress user (role set in the settings) and owns their products. For Dokan, WCFM or
-  WC Vendors, enter that plugin's seller role so the products show under the vendor.
-- When an order is paid it reports the Verola items; when an order is marked refunded it reports the refund.
-  Sends happen in the background and are retried for a few hours if Verola is unreachable.
-- Verola is the source of truth for stock: stock is overwritten from Verola on each sync.
+- Each Vendor Hub seller becomes a WordPress user with Dokan's `seller` role and owns their products, so the products
+  appear in their Dokan store (`/store/<store-slug>`) with the store name from their application.
+- When an order is paid it reports the Vendor Hub items; when an order is marked refunded it reports the refund.
+  Sends happen in the background and are retried for a few hours if Vendor Hub is unreachable.
+- Vendor Hub is the source of truth for stock: stock is overwritten from Vendor Hub on each sync.
 
 WordPress's schedule only runs when the site gets visits. For a steady one-minute rhythm add
 `define('DISABLE_WP_CRON', true);` to `wp-config.php` and have the host run `wp-cron.php` every minute.
-Partial refunds are not reported yet. Orders are only sent while the order has Verola items.
+Partial refunds are not reported yet. Orders are only sent while the order has Vendor Hub items.
+
+### Dokan settings to change
+
+Vendor Hub is where sellers manage products and money, so switch off the overlapping parts of Dokan
+(names vary a little between Dokan versions):
+
+- **Commission:** set Dokan's commission to 0%. Vendor Hub takes its own commission (`COMMISSION_PERCENT`) from each sale;
+  charging both would take it twice.
+- **Withdrawals:** turn off Dokan's withdraw feature. Sellers withdraw in Vendor Hub.
+- **Product editing:** stop vendors from adding or editing products in Dokan. Products are created in Vendor Hub, and anything
+  edited in Dokan is overwritten at the next sync.
+- **Orders:** Dokan splits an order that contains several sellers' items into one sub-order per seller. The plugin reports only
+  the main order, which already holds every item, so nothing is counted twice.

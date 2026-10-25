@@ -23,7 +23,7 @@ import { productReviewsQuery, staffQuery } from "@/lib/product-reviews";
 type Tab = "applications" | "verifications" | "products" | "staff";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  head: () => ({ meta: [{ title: "Review applications — Verola" }, { name: "description", content: "Review applications on Verola." }, { property: "og:title", content: "Review applications — DDLX" }, { property: "og:description", content: "Review applications on Verola." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
+  head: () => ({ meta: [{ title: "Review applications — Vendor Hub" }, { name: "description", content: "Review applications on Vendor Hub." }, { property: "og:title", content: "Review applications — DDLX" }, { property: "og:description", content: "Review applications on Vendor Hub." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   validateSearch: (search: Record<string, unknown>): { tab?: Tab } => {
     const tab = search["tab"];
     return tab === "applications" || tab === "verifications" || tab === "products" || tab === "staff" ? { tab } : {};

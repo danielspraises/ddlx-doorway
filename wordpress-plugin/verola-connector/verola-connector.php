@@ -46,6 +46,11 @@ final class Verola_Connector {
 		add_action('admin_menu', [__CLASS__, 'menu']);
 		add_action('admin_init', [__CLASS__, 'register_settings']);
 		add_action('admin_post_verola_sync_now', [__CLASS__, 'sync_now']);
+		add_action('admin_post_verola_test', [__CLASS__, 'test_connection']);
+		add_filter('plugin_action_links_' . plugin_basename(__FILE__), function ($links) {
+			array_unshift($links, '<a href="' . esc_url(admin_url('admin.php?page=verola-connector')) . '">Settings</a>');
+			return $links;
+		});
 		// A sale is reported once it is paid; a refund is reported when the order is marked refunded.
 		add_action('woocommerce_order_status_processing', [__CLASS__, 'order_paid']);
 		add_action('woocommerce_order_status_completed', [__CLASS__, 'order_paid']);
@@ -139,6 +144,9 @@ final class Verola_Connector {
 		?>
 		<div class="wrap">
 			<h1>Vendor Hub</h1>
+			<?php if (isset($_GET['verola_test'])) : $ok = $_GET['verola_test'] === 'ok'; ?>
+				<div class="notice notice-<?php echo $ok ? 'success' : 'error'; ?>"><p><?php echo esc_html(get_transient('verola_test_message') ?: ($ok ? 'Connected.' : 'Could not connect.')); ?></p></div>
+			<?php endif; ?>
 			<?php if (isset($_GET['verola_synced'])) : ?>
 				<div class="notice notice-success"><p>Sync finished. See the status below.</p></div>
 			<?php endif; ?>
@@ -165,8 +173,43 @@ final class Verola_Connector {
 				<?php wp_nonce_field('verola_sync_now'); ?>
 				<?php submit_button('Sync products now', 'secondary', 'submit', false, self::configured() ? [] : ['disabled' => 'disabled']); ?>
 			</form>
+			<form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-top:.5em">
+				<input type="hidden" name="action" value="verola_test">
+				<?php wp_nonce_field('verola_test'); ?>
+				<?php submit_button('Test connection', 'secondary', 'submit', false, self::configured() ? [] : ['disabled' => 'disabled']); ?>
+			</form>
+			<h2>Give these to Vendor Hub</h2>
+			<p>Nothing to enter on the Vendor Hub side except the two secrets in its <code>.env</code> file (<code>MARKETPLACE_API_KEY</code> and <code>MARKETPLACE_WEBHOOK_SECRET</code>), which must match the values above. Sales are sent from this store to <code><?php echo esc_html($s['url'] !== '' ? $s['url'] : 'your-vendor-hub-address'); ?>/api/marketplace/orders</code>.</p>
 		</div>
 		<?php
+	}
+
+	public static function test_connection() {
+		if (!current_user_can('manage_woocommerce')) {
+			wp_die('Not allowed.');
+		}
+		check_admin_referer('verola_test');
+		$s = self::settings();
+		$ok = false;
+		$res = wp_remote_get($s['url'] . '/api/marketplace/products?limit=1', ['timeout' => 20, 'headers' => ['Authorization' => 'Bearer ' . $s['api_key']]]);
+		if (is_wp_error($res)) {
+			$message = 'Could not reach Vendor Hub: ' . $res->get_error_message();
+		} else {
+			$code = (int) wp_remote_retrieve_response_code($res);
+			if ($code === 200) {
+				$ok = true;
+				$message = 'Connected. Vendor Hub accepted the API key. The webhook secret can only be checked when the first sale is reported.';
+			} elseif ($code === 401) {
+				$message = 'Vendor Hub is reachable but rejected the API key. Check that it matches MARKETPLACE_API_KEY.';
+			} elseif ($code === 503) {
+				$message = 'Vendor Hub is reachable but has no MARKETPLACE_API_KEY set yet.';
+			} else {
+				$message = 'Vendor Hub answered with status ' . $code . '. Check the address.';
+			}
+		}
+		set_transient('verola_test_message', $message, 60);
+		wp_safe_redirect(admin_url('admin.php?page=verola-connector&verola_test=' . ($ok ? 'ok' : 'fail')));
+		exit;
 	}
 
 	public static function sync_now() {

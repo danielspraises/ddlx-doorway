@@ -12,8 +12,11 @@ export type SessionUser = {
   email: string;
   isAdmin: boolean;
   stage: SellerStage;
-  // Only filled in for admins: how many items are waiting for a decision.
-  pending: { applications: number; verifications: number };
+  // Staff accounts are created by an admin and only get the permissions listed here.
+  isStaff: boolean;
+  canReviewProducts: boolean;
+  // Only filled in for reviewers: how many items are waiting for a decision.
+  pending: { applications: number; verifications: number; products: number };
 };
 
 export const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -40,32 +43,43 @@ export async function destroySession() {
 
 export async function currentUser(): Promise<SessionUser | null> {
   const token = getCookie(COOKIE);
-  if (!token) return null;
+  return token ? userFromToken(token) : null;
+}
+
+// Also used by plain API routes (the live sales stream) that read the cookie header themselves.
+export async function userFromToken(token: string): Promise<SessionUser | null> {
   const sql = getSql();
   const rows = await sql<
-    { id: string; email: string; is_admin: boolean; application_status: Status | null; verification_status: Status | null }[]
+    { id: string; email: string; is_admin: boolean; permissions: string[]; application_status: Status | null; verification_status: Status | null }[]
   >`
     SELECT u.id, u.email,
       EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id AND r.role = 'admin') AS is_admin,
+      COALESCE(sm.permissions, '{}') AS permissions,
       a.status AS application_status, v.status AS verification_status
     FROM sessions s
     JOIN users u ON u.id = s.user_id
+    LEFT JOIN staff_members sm ON sm.user_id = u.id AND sm.active
     LEFT JOIN seller_applications a ON a.user_id = u.id
     LEFT JOIN seller_verifications v ON v.user_id = u.id
     WHERE s.token_hash = ${hashToken(token)} AND s.expires_at > now()`;
   const row = rows[0];
   if (!row) return null;
-  let pending = { applications: 0, verifications: 0 };
-  if (row.is_admin) {
-    const counts = await sql<{ applications: number; verifications: number }[]>`
+  const canReviewProducts = row.is_admin || row.permissions.includes("products");
+  let pending = { applications: 0, verifications: 0, products: 0 };
+  if (row.is_admin || canReviewProducts) {
+    const counts = await sql<{ applications: number; verifications: number; products: number }[]>`
       SELECT (SELECT count(*) FROM seller_applications WHERE status = 'submitted')::int AS applications,
-             (SELECT count(*) FROM seller_verifications WHERE status = 'submitted')::int AS verifications`;
-    pending = counts[0] ?? pending;
+             (SELECT count(*) FROM seller_verifications WHERE status = 'submitted')::int AS verifications,
+             (SELECT count(*) FROM products WHERE status = 'pending_review')::int AS products`;
+    const found = counts[0];
+    if (found) pending = { applications: row.is_admin ? found.applications : 0, verifications: row.is_admin ? found.verifications : 0, products: found.products };
   }
   return {
     id: row.id,
     email: row.email,
     isAdmin: row.is_admin,
+    isStaff: row.permissions.length > 0,
+    canReviewProducts,
     stage: sellerStage(row.application_status, row.verification_status),
     pending,
   };
@@ -80,6 +94,12 @@ export async function requireUser(): Promise<SessionUser> {
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await requireUser();
   if (!user.isAdmin) throw new Error("Staff access required.");
+  return user;
+}
+
+export async function requireProductReviewer(): Promise<SessionUser> {
+  const user = await requireUser();
+  if (!user.canReviewProducts) throw new Error("Product review access required.");
   return user;
 }
 

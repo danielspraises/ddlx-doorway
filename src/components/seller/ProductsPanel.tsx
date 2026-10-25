@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { PackagePlus, Pencil, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -15,25 +16,38 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ProductDialog } from "@/components/seller/ProductDialog";
 import { ProductImage } from "@/components/seller/ProductImage";
 import { StockBadge } from "@/components/seller/StockBadge";
-import { PRODUCT_STATUS_LABEL, formatPrice, productsQuery } from "@/lib/products";
+import { priceLabel, productsQuery, visibility } from "@/lib/products";
 import { deleteProduct } from "@/lib/products.functions";
 import type { Product } from "@/lib/types";
+
+type Filter = "all" | "live" | "review" | "attention" | "draft";
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "live", label: "Live" },
+  { key: "review", label: "In review" },
+  { key: "attention", label: "Needs changes" },
+  { key: "draft", label: "Drafts" },
+];
+
+function matches(p: Product, filter: Filter) {
+  if (filter === "all") return true;
+  if (filter === "live") return p.live;
+  if (filter === "review") return p.status === "pending_review";
+  if (filter === "attention") return p.status === "changes_requested" || p.status === "rejected";
+  return !p.live && (p.status === "draft" || p.status === "approved");
+}
 
 export function ProductsPanel() {
   const { data: products } = useSuspenseQuery(productsQuery);
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [editing, setEditing] = useState<Product | null>(null);
-  const [creating, setCreating] = useState(0);
+  const [filter, setFilter] = useState<Filter>("all");
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const visible = products.filter((p) => `${p.name} ${p.sku} ${p.category}`.toLowerCase().includes(search.trim().toLowerCase()));
-  const dialogOpen = creating > 0 || editing !== null;
-  const close = () => { setEditing(null); setCreating(0); };
+  const visible = products.filter((p) => matches(p, filter) && `${p.name} ${p.sku} ${p.category} ${p.brand}`.toLowerCase().includes(search.trim().toLowerCase()));
 
   const remove = async () => {
     if (!deleting || busy) return;
@@ -51,41 +65,45 @@ export function ProductsPanel() {
   return (
     <div className="mt-8">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-52 flex-1"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><Input aria-label="Search products" className="pl-10" placeholder="Search name, SKU or category" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-        <Button onClick={() => setCreating((n) => n + 1)}><PackagePlus className="size-4" /> Add product</Button>
+        <div className="relative min-w-52 flex-1"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><Input aria-label="Search products" className="pl-10" placeholder="Search name, SKU, brand or category" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+        <Button asChild><Link to="/product-editor"><PackagePlus className="size-4" /> Add product</Link></Button>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Filter products">
+        {FILTERS.map((item) => <Button key={item.key} size="sm" variant={filter === item.key ? "default" : "outline"} aria-pressed={filter === item.key} onClick={() => setFilter(item.key)}>{item.label}</Button>)}
       </div>
 
       <p className="mt-6 text-sm text-muted-foreground">{visible.length} product{visible.length === 1 ? "" : "s"}</p>
       <ul className="mt-3 divide-y border-y">
-        {visible.map((p) => (
-          <li key={p.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 py-4">
-            <ProductImage path={p.images[0]} alt={p.name} className="size-16 rounded-md border" />
-            <div className="min-w-0">
-              <h3 className="truncate font-semibold">{p.name}</h3>
-              <p className="mt-0.5 truncate text-sm text-muted-foreground">{p.sku} · {p.category} · {formatPrice(p.price, p.currency)}</p>
-              <div className="mt-2 flex flex-wrap gap-2"><StockBadge product={p} /><Badge variant={p.status === "ready" ? "default" : "outline"}>{PRODUCT_STATUS_LABEL[p.status]}</Badge></div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setEditing(p)}><Pencil className="size-4" /><span className="sr-only sm:not-sr-only">Edit</span></Button>
-              <Button variant="outline" size="icon" className="size-9" aria-label={`Delete ${p.name}`} onClick={() => setDeleting(p)}><Trash2 className="size-4" /></Button>
-            </div>
-          </li>
-        ))}
+        {visible.map((p) => {
+          const state = visibility(p);
+          return (
+            <li key={p.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 py-4">
+              <ProductImage path={p.featured_image ?? undefined} alt={p.name} className="size-16 rounded-md border" />
+              <div className="min-w-0">
+                <h3 className="truncate font-semibold">{p.name}</h3>
+                <p className="mt-0.5 truncate text-sm text-muted-foreground">{p.sku} · {p.category || "No category"} · {priceLabel(p)}{p.product_type === "variable" ? ` · ${p.variations.length} variations` : ""}</p>
+                <div className="mt-2 flex flex-wrap gap-2"><Badge variant={state.tone === "live" ? "default" : "outline"}>{state.label}</Badge><StockBadge product={p} /></div>
+              </div>
+              <div className="flex gap-2">
+                <Button asChild variant="outline" size="sm"><Link to="/product-editor" search={{ id: p.id }}><Pencil className="size-4" /><span className="sr-only sm:not-sr-only">Edit</span></Link></Button>
+                {!p.live && p.status !== "pending_review" && <Button variant="outline" size="icon" className="size-9" aria-label={`Delete ${p.name}`} onClick={() => setDeleting(p)}><Trash2 className="size-4" /></Button>}
+              </div>
+            </li>
+          );
+        })}
       </ul>
       {!visible.length && (
         <div className="py-14 text-center">
-          <p className="text-muted-foreground">{products.length ? "No products match your search." : "You have not added any products yet."}</p>
-          {!products.length && <Button className="mt-5" onClick={() => setCreating((n) => n + 1)}><PackagePlus className="size-4" /> Add your first product</Button>}
+          <p className="text-muted-foreground">{products.length ? "No products match." : "You have not added any products yet."}</p>
+          {!products.length && <Button asChild className="mt-5"><Link to="/product-editor"><PackagePlus className="size-4" /> Add your first product</Link></Button>}
         </div>
       )}
-
-      {dialogOpen && <ProductDialog key={editing?.id ?? `new-${creating}`} open product={editing} onOpenChange={(open) => { if (!open) close(); }} />}
 
       <AlertDialog open={deleting !== null} onOpenChange={(open) => { if (!open) setDeleting(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this product?</AlertDialogTitle>
-            <AlertDialogDescription>{deleting?.name} and its photos will be removed permanently. This cannot be undone.</AlertDialogDescription>
+            <AlertDialogDescription>{deleting?.name}, its variations and its photos will be removed permanently. Past sales stay in your records.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Keep product</AlertDialogCancel>

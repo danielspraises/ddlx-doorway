@@ -150,21 +150,39 @@ The header menu shows only the links that apply to them.
 
 | Who | Lands on | Menu |
 | --- | --- | --- |
-| Admin | `/admin` | Applications and Verifications, with pending-count badges |
+| Admin | `/admin` | Applications, Verifications, Products and Staff, with pending-count badges |
+| Staff (product reviewers) | `/admin?tab=products` | Product review |
 | New seller or one needing corrections | `/apply` | My application |
 | Application approved | `/verification` | My application, Verification |
-| Verified seller | `/seller` | Seller Center, Products, Inventory |
+| Verified seller | `/seller` | Seller Center, Products, Inventory, Sales |
 
 Actions that change a stage (submitting an application, approving it, verifying, rejecting) refresh
 the menu straight away. When an admin reviews an item the list returns to the next one waiting.
 
 ### Seller Center (`/seller`)
 
-- **Overview**: product counts, stock warnings and quick actions.
-- **Products**: add, edit and delete products with up to 6 private photos each.
-- **Inventory**: filter by low or out of stock and adjust units with -/+ or a typed number.
+- **Overview**: balances, product counts, stock warnings and things that need attention.
+- **Products**: a WooCommerce-style editor (`/product-editor`) with simple and variable products, sizes and colours
+  as variations, featured image, gallery, category, brand, tags, regular and sale prices with start/end dates,
+  stock, shipping details and per-variation photos.
+- **Inventory**: filter by low or out of stock and adjust units per product or variation. Stock changes reach the
+  marketplace straight away, with no review.
+- **Sales**: every marketplace sale appears here live, with your earnings after commission, a pending balance
+  during the payout hold, and what is available to withdraw.
+
+### Publishing needs approval
+
+Sellers submit a product for review. It reaches the marketplace only when an admin, or a staff account created by an
+admin with the "review and publish products" permission, approves it. Editing a live product never changes what
+customers see until the new version is approved. Admins create staff accounts under **Admin > Staff**.
+
+### Marketplace connection
+
+The marketplace (verola.ng, or ddlxapparel.com while testing) reads approved products and reports sales to Verola.
+Set `MARKETPLACE_API_KEY` and `MARKETPLACE_WEBHOOK_SECRET` in `.env` and give the marketplace side the contract in
+[docs/marketplace-api.md](docs/marketplace-api.md).
 
 ### Roadmap
 
-Store settings and profile, orders, payouts and withdrawals, Google sign-in, email delivery,
-login rate limiting.
+Withdrawals (bank accounts and payout requests), store settings and profile, fulfilment status on orders,
+the marketplace-side connector (WooCommerce plugin), Google sign-in, email delivery, login rate limiting.

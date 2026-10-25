@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { meQuery } from "@/lib/auth-data";
+import { useLiveEvents } from "@/lib/live";
 import { signOut } from "@/lib/auth.functions";
 import { STAGE_LABEL, applicationApproved } from "@/lib/stage";
 
@@ -23,7 +24,12 @@ function navItems(user: Me): NavItem[] {
     return [
       { key: "applications", label: "Applications", to: "/admin", tab: "applications", badge: user.pending.applications },
       { key: "verifications", label: "Verifications", to: "/admin", tab: "verifications", badge: user.pending.verifications },
+      { key: "products-review", label: "Products", to: "/admin", tab: "products", badge: user.pending.products },
+      { key: "staff", label: "Staff", to: "/admin", tab: "staff" },
     ];
+  }
+  if (user.canReviewProducts) {
+    return [{ key: "products-review", label: "Product review", to: "/admin", tab: "products", badge: user.pending.products }];
   }
   const items: NavItem[] = [{ key: "apply", label: "My application", to: "/apply" }];
   if (applicationApproved(user.stage)) items.push({ key: "verify", label: "Verification", to: "/verification" });
@@ -32,6 +38,7 @@ function navItems(user: Me): NavItem[] {
       { key: "seller", label: "Seller Center", to: "/seller", tab: "overview" },
       { key: "products", label: "Products", to: "/seller", tab: "products" },
       { key: "inventory", label: "Inventory", to: "/seller", tab: "inventory" },
+      { key: "sales", label: "Sales", to: "/seller", tab: "sales" },
     );
   }
   return items;
@@ -62,6 +69,7 @@ export function SiteHeader() {
   const queryClient = useQueryClient();
   const { data: user } = useQuery(meQuery);
   const items = user ? navItems(user) : [];
+  useLiveEvents(Boolean(user));
 
   const logout = async () => {
     await signOut();
@@ -96,7 +104,7 @@ export function SiteHeader() {
                 <DropdownMenuContent align="end" className="w-64">
                   <DropdownMenuLabel className="space-y-1">
                     <span className="block truncate font-medium">{user.email}</span>
-                    <span className="block text-xs font-normal text-muted-foreground">{user.isAdmin ? "Staff · Review team" : STAGE_LABEL[user.stage]}</span>
+                    <span className="block text-xs font-normal text-muted-foreground">{user.isAdmin ? "Admin" : user.canReviewProducts ? "Staff · Product review" : STAGE_LABEL[user.stage]}</span>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={logout} className="cursor-pointer"><LogOut className="size-4" /> Sign out</DropdownMenuItem>

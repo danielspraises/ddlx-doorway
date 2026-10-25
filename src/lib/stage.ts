@@ -42,12 +42,12 @@ export const STAGE_LABEL: Record<SellerStage, string> = {
   verified: "Verified seller",
 };
 
-export type HomeInfo = { isAdmin: boolean; stage: SellerStage };
+export type HomeInfo = { isAdmin: boolean; canReviewProducts: boolean; stage: SellerStage };
 export type HomePath = "/admin" | "/apply" | "/verification" | "/seller";
 
 // The page a person should land on after signing in or finishing an action.
 export function homePath(user: HomeInfo): HomePath {
-  if (user.isAdmin) return "/admin";
+  if (user.isAdmin || user.canReviewProducts) return "/admin";
   if (user.stage === "verified") return "/seller";
   if (user.stage.startsWith("verification_")) return "/verification";
   return "/apply";

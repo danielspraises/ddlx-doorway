@@ -32,7 +32,7 @@ export function DocumentPreviewDialog({ path, title, open, onOpenChange }: { pat
     <DialogContent className="flex h-[90vh] max-w-4xl flex-col gap-3 p-4 sm:p-6">
       <DialogHeader className="pr-8">
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>Private document preview. It is only visible to you and the verification team.</DialogDescription>
+        <DialogDescription className="sr-only">Document preview</DialogDescription>
       </DialogHeader>
       <div className="min-h-0 flex-1 overflow-auto rounded-md border bg-muted/30">
         {failed ? <p role="alert" className="grid h-full place-items-center p-6 text-center text-destructive">Could not load this document. Close this window and try again.</p>

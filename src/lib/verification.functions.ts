@@ -179,7 +179,7 @@ export const reviewVerification = createServerFn({ method: "POST" })
       UPDATE seller_verifications SET
         status = ${data.status}::application_status, admin_comment = ${data.comment || null},
         reviewed_by = ${admin.id}, reviewed_at = now(), updated_at = date_trunc('milliseconds', now())
-      WHERE id = ${data.id} AND updated_at = ${data.expected_updated_at}::timestamptz RETURNING id`;
-    if (!rows.length) return { ok: false, error: "This verification changed. Refresh and try again." };
+      WHERE id = ${data.id} AND status = 'submitted' AND updated_at = ${data.expected_updated_at}::timestamptz RETURNING id`;
+    if (!rows.length) return { ok: false, error: "This verification was already decided or has changed. Refresh and try again." };
     return { ok: true };
   });

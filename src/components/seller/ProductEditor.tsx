@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Eye, EyeOff, ImagePlus, Loader2, Send, Undo2, X } from "lucide-react";
@@ -12,7 +12,7 @@ import { SelectField, TextField } from "@/components/FormFields";
 import { ProductImage } from "@/components/seller/ProductImage";
 import { fileToBase64 } from "@/lib/files";
 import { CURRENCIES, MAX_GALLERY, MAX_VARIATIONS, PRODUCT_CATEGORIES, combinations, optionKey, productsQuery, readinessProblems, validateProduct, visibility } from "@/lib/products";
-import { removeProductImage, saveProduct, setProductLive, submitProduct, uploadProductImage, withdrawSubmission } from "@/lib/products.functions";
+import { removeProductImage, saveProduct, setProductLive, submitProduct, suggestSku, uploadProductImage, withdrawSubmission } from "@/lib/products.functions";
 import type { Product } from "@/lib/types";
 
 type VarForm = { id: string | null; sku: string; options: Record<string, string>; regular_price: string; sale_price: string; sale_starts_at: string; sale_ends_at: string; stock: string; enabled: boolean };
@@ -101,6 +101,8 @@ export function ProductEditor({ initial }: { initial: Product | null }) {
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [bulkPrice, setBulkPrice] = useState("");
+  const [progress, setProgress] = useState("");
+  const [skuBusy, setSkuBusy] = useState(false);
 
   const set = <K extends keyof Form>(key: K) => (value: Form[K]) => setForm((prev) => ({ ...prev, [key]: value }));
   const variable = form.product_type === "variable";
@@ -185,6 +187,47 @@ export function ProductEditor({ initial }: { initial: Product | null }) {
     } catch { toast.error("Could not remove the photo. Please try again."); } finally { setPhotoBusy(false); }
   };
 
+  // Asks for the next free SKU (the marketplace picks it when connected, so it cannot clash with its products).
+  const generateSku = async () => {
+    if (skuBusy) return;
+    setSkuBusy(true);
+    try {
+      const result = await suggestSku();
+      if (!result.ok) { toast.error(result.error); return; }
+      setForm((prev) => ({ ...prev, sku: result.sku }));
+    } catch { toast.error("Could not get a SKU. Type one in instead."); } finally { setSkuBusy(false); }
+  };
+  useEffect(() => {
+    if (!initial) void generateSku();
+    // only once, when a new product is opened
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Several photos can be chosen at once; they upload one after another.
+  const uploadGallery = async (files: File[]) => {
+    if (!product || photoBusy || files.length === 0) return;
+    const room = MAX_GALLERY - product.gallery.length;
+    if (room <= 0) { toast.error(`The gallery is full (${MAX_GALLERY} photos).`); return; }
+    const chosen = files.slice(0, room);
+    if (files.length > room) toast.error(`Only ${room} more photo${room === 1 ? "" : "s"} fit in the gallery. The rest were skipped.`);
+    setPhotoBusy(true);
+    let done = 0;
+    try {
+      for (const file of chosen) {
+        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+          toast.error(`${file.name}: choose a JPG, PNG or WebP photo up to 5 MB.`);
+          continue;
+        }
+        setProgress(`Uploading ${done + 1} of ${chosen.length}…`);
+        const result = await uploadProductImage({ data: { product_id: product.id, slot: "gallery", variation_id: null, content_type: file.type, data_base64: await fileToBase64(file) } });
+        if (!result.ok) { toast.error(result.error); break; }
+        putProduct(result.product);
+        done++;
+      }
+      if (done > 0) toast.success(`${done} photo${done === 1 ? "" : "s"} added.`);
+    } catch { toast.error("Could not upload the photos. Please try again."); } finally { setPhotoBusy(false); setProgress(""); }
+  };
+
   const setAttr = (index: number, patch: Partial<Form["attributes"][number]>) =>
     setForm((prev) => ({ ...prev, attributes: prev.attributes.map((a, i) => (i === index ? { ...a, ...patch } : a)) }));
   const setVar = (index: number, patch: Partial<VarForm>) =>
@@ -252,7 +295,10 @@ export function ProductEditor({ initial }: { initial: Product | null }) {
               </>}
 
               {activeTab === "inventory" && <>
-                <TextField name="product-sku" label="SKU" required value={form.sku} onChange={set("sku")} hint="Your own unique code for this product." />
+                <div>
+                  <TextField name="product-sku" label="SKU" required value={form.sku} onChange={set("sku")} hint="Must be unique across the whole marketplace." />
+                  <Button type="button" variant="link" className="h-auto px-0 pt-1" disabled={skuBusy} onClick={() => void generateSku()}>{skuBusy ? "Finding a free SKU…" : "Generate the next free SKU"}</Button>
+                </div>
                 {!variable && <label className="flex cursor-pointer items-center gap-3 text-sm"><Checkbox checked={form.manage_stock} onCheckedChange={(v) => set("manage_stock")(v === true)} />Track stock for this product</label>}
                 <div className="grid gap-4 sm:grid-cols-2">
                   {!variable && form.manage_stock && <TextField name="product-stock" label="Units in stock" required type="number" value={form.stock} onChange={set("stock")} />}
@@ -261,13 +307,13 @@ export function ProductEditor({ initial }: { initial: Product | null }) {
                 <label className="flex cursor-pointer items-center gap-3 text-sm"><Checkbox checked={form.allow_backorders} onCheckedChange={(v) => set("allow_backorders")(v === true)} />Allow orders when out of stock</label>
               </>}
 
-              {activeTab === "shipping" && <div className="grid gap-4 sm:grid-cols-2">
-                <TextField name="weight" label="Weight (kg)" type="number" value={form.weight_kg} onChange={set("weight_kg")} />
+              {activeTab === "shipping" && <><p className="text-sm text-muted-foreground">The marketplace uses the weight and size to price delivery, so they are needed before you can submit the product. Measure the packed item.</p><div className="grid gap-4 sm:grid-cols-2">
+                <TextField name="weight" label="Weight (kg)" required type="number" value={form.weight_kg} onChange={set("weight_kg")} />
                 <span className="hidden sm:block" />
-                <TextField name="length" label="Length (cm)" type="number" value={form.length_cm} onChange={set("length_cm")} />
-                <TextField name="width" label="Width (cm)" type="number" value={form.width_cm} onChange={set("width_cm")} />
-                <TextField name="height" label="Height (cm)" type="number" value={form.height_cm} onChange={set("height_cm")} />
-              </div>}
+                <TextField name="length" label="Length (cm)" required type="number" value={form.length_cm} onChange={set("length_cm")} />
+                <TextField name="width" label="Width (cm)" required type="number" value={form.width_cm} onChange={set("width_cm")} />
+                <TextField name="height" label="Height (cm)" required type="number" value={form.height_cm} onChange={set("height_cm")} />
+              </div></>}
 
               {activeTab === "attributes" && <>
                 <p className="text-sm text-muted-foreground">Add what customers choose between, such as Size or Colour. Separate values with commas, then build the variations.</p>
@@ -380,13 +426,13 @@ export function ProductEditor({ initial }: { initial: Product | null }) {
                       <label className="grid aspect-square cursor-pointer place-items-center rounded border border-dashed text-muted-foreground hover:bg-secondary">
                         {photoBusy ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-5" />}
                         <span className="sr-only">Add gallery photo</span>
-                        <input type="file" className="sr-only" accept="image/jpeg,image/png,image/webp" disabled={photoBusy || locked} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; void upload(f, "gallery", null); }} />
+                        <input type="file" multiple className="sr-only" accept="image/jpeg,image/png,image/webp" disabled={photoBusy || locked} onChange={(e) => { const chosen = Array.from(e.target.files ?? []); e.target.value = ""; void uploadGallery(chosen); }} />
                       </label>
                     </li>
                   )}
                 </ul>
               ) : <p className="mt-2 text-sm text-muted-foreground">Create the product first, then add photos.</p>}
-              <p className="mt-3 text-xs text-muted-foreground">Up to {MAX_GALLERY} more photos from other angles.</p>
+              <p className="mt-3 text-xs text-muted-foreground">{progress || `Pick several photos at once. Up to ${MAX_GALLERY}, 5 MB each.`}</p>
             </section>
 
             <section className="space-y-4 rounded-md border p-5">

@@ -149,3 +149,15 @@ Vendor Hub is where sellers manage products and money, so switch off the overlap
   edited in Dokan is overwritten at the next sync.
 - **Orders:** Dokan splits an order that contains several sellers' items into one sub-order per seller. The plugin reports only
   the main order, which already holds every item, so nothing is counted twice.
+
+### SKUs
+
+SKUs must be unique across the whole store. Vendor Hub fills in the next free SKU for each new product (for example
+`DEMO-0007`, from the seller's store name) and checks every SKU before saving. Set `MARKETPLACE_URL` in Vendor Hub's `.env`
+and the plugin answers two questions over WordPress REST, using the same API key:
+
+- `GET  /wp-json/vendor-hub/v1/sku/next?prefix=DEMO` returns `{"sku":"DEMO-0007"}`, the next number after the highest in the store.
+- `POST /wp-json/vendor-hub/v1/sku/check` with `{"items":[{"sku","product_id","variation_id"}]}` returns `{"conflicts":[...]}`,
+  the SKUs already used by something other than that product.
+
+If the marketplace cannot be reached, Vendor Hub still checks against its own sellers and carries on.

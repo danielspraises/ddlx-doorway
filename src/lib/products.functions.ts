@@ -72,10 +72,13 @@ export const saveProduct = createServerFn({ method: "POST" })
     const { randomUUID } = await import("node:crypto");
     const { requireVerifiedSeller } = await import("@/server/session.server");
     const { getSql, isUniqueViolation } = await import("@/server/db.server");
-    const { loadProduct, removeUnreferenced } = await import("@/server/products.server");
+    const { loadProduct, removeUnreferenced, skuProblem } = await import("@/server/products.server");
     const user = await requireVerifiedSeller();
     const problem = validateProduct(data);
     if (problem) return fail(problem);
+    if (data.id && !(await owned(data.id, user.id))) return fail("Product not found.");
+    const skuIssue = await skuProblem(data.id, data);
+    if (skuIssue) return fail(skuIssue);
     const sql = getSql();
     const variable = data.product_type === "variable";
     const tags = [...new Set(data.tags.map((t) => t.toLowerCase()))];
@@ -154,7 +157,7 @@ export const saveProduct = createServerFn({ method: "POST" })
       const { plain } = await import("@/server/db.server");
       return { ok: true, product: plain(product) };
     } catch (error) {
-      if (isUniqueViolation(error)) return fail("You already have a product or variation with this SKU.");
+      if (isUniqueViolation(error)) return fail("That SKU is already taken. Press Generate to get a free one.");
       throw error;
     }
   });
@@ -164,6 +167,20 @@ async function owned(id: string, sellerId: string) {
   const product = await loadProduct(id);
   return product && product.seller_id === sellerId ? product : null;
 }
+
+// A free SKU in the style "DEMO-0001". The marketplace picks it when connected, so it cannot clash with its own products.
+export const suggestSku = createServerFn({ method: "POST" }).handler(async (): Promise<{ ok: true; sku: string } | Failure> => {
+  const { requireVerifiedSeller } = await import("@/server/session.server");
+  const { skuPrefix, localNextSku, skuProblem } = await import("@/server/products.server");
+  const { marketplaceNextSku } = await import("@/server/marketplace-sku.server");
+  const user = await requireVerifiedSeller();
+  const prefix = await skuPrefix(user.id);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const sku = (await marketplaceNextSku(prefix)) ?? (await localNextSku(prefix));
+    if (!(await skuProblem(null, { sku, product_type: "simple", variations: [] }))) return { ok: true, sku };
+  }
+  return fail("Could not find a free SKU. Type one in instead.");
+});
 
 export const submitProduct = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))

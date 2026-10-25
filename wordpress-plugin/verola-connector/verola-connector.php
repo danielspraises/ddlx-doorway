@@ -47,6 +47,7 @@ final class Verola_Connector {
 		add_action('admin_init', [__CLASS__, 'register_settings']);
 		add_action('admin_post_verola_sync_now', [__CLASS__, 'sync_now']);
 		add_action('admin_post_verola_test', [__CLASS__, 'test_connection']);
+		add_action('rest_api_init', [__CLASS__, 'register_rest']);
 		add_filter('plugin_action_links_' . plugin_basename(__FILE__), function ($links) {
 			array_unshift($links, '<a href="' . esc_url(admin_url('admin.php?page=verola-connector')) . '">Settings</a>');
 			return $links;
@@ -182,6 +183,61 @@ final class Verola_Connector {
 			<p>Nothing to enter on the Vendor Hub side except the two secrets in its <code>.env</code> file (<code>MARKETPLACE_API_KEY</code> and <code>MARKETPLACE_WEBHOOK_SECRET</code>), which must match the values above. Sales are sent from this store to <code><?php echo esc_html($s['url'] !== '' ? $s['url'] : 'your-vendor-hub-address'); ?>/api/marketplace/orders</code>.</p>
 		</div>
 		<?php
+	}
+
+	// ------------------------------------------------------------------ SKUs (Vendor Hub asks this store)
+
+	public static function register_rest() {
+		register_rest_route('vendor-hub/v1', '/sku/next', ['methods' => 'GET', 'callback' => [__CLASS__, 'rest_sku_next'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
+		register_rest_route('vendor-hub/v1', '/sku/check', ['methods' => 'POST', 'callback' => [__CLASS__, 'rest_sku_check'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
+	}
+
+	// Vendor Hub proves who it is with the same API key used everywhere else.
+	public static function rest_auth($request) {
+		$key = self::settings()['api_key'];
+		$header = (string) $request->get_header('authorization');
+		return $key !== '' && strncmp($header, 'Bearer ', 7) === 0 && hash_equals($key, substr($header, 7));
+	}
+
+	// The next unused number for a prefix, e.g. DEMO-0007 when DEMO-0006 is the highest in the store.
+	public static function rest_sku_next($request) {
+		global $wpdb;
+		$prefix = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $request->get_param('prefix')));
+		$prefix = $prefix !== '' ? substr($prefix, 0, 12) : 'DDLX';
+		$like = $wpdb->esc_like($prefix . '-') . '%';
+		$skus = $wpdb->get_col($wpdb->prepare("SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_sku' AND meta_value LIKE %s", $like));
+		$highest = 0;
+		foreach ($skus as $sku) {
+			if (preg_match('/^' . preg_quote($prefix, '/') . '-(\d+)$/i', $sku, $m)) {
+				$highest = max($highest, (int) $m[1]);
+			}
+		}
+		return ['sku' => $prefix . '-' . str_pad((string) ($highest + 1), 4, '0', STR_PAD_LEFT)];
+	}
+
+	// Which of these SKUs belong to something other than the Vendor Hub product being saved?
+	public static function rest_sku_check($request) {
+		$items = $request->get_param('items');
+		$conflicts = [];
+		foreach (array_slice(is_array($items) ? $items : [], 0, 300) as $item) {
+			$sku = isset($item['sku']) ? trim((string) $item['sku']) : '';
+			if ($sku === '') {
+				continue;
+			}
+			$found = wc_get_product_id_by_sku($sku);
+			if (!$found) {
+				continue;
+			}
+			$variation_id = !empty($item['variation_id']) ? (string) $item['variation_id'] : '';
+			$product_id = !empty($item['product_id']) ? (string) $item['product_id'] : '';
+			$own = $variation_id !== ''
+				? get_post_meta($found, '_verola_variation_id', true) === $variation_id
+				: ($product_id !== '' && get_post_meta($found, '_verola_product_id', true) === $product_id);
+			if (!$own) {
+				$conflicts[] = $sku;
+			}
+		}
+		return ['conflicts' => array_values(array_unique($conflicts))];
 	}
 
 	public static function test_connection() {

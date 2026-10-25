@@ -56,7 +56,7 @@ export function validateProduct(p: ProductInput): string | null {
   for (const v of p.variations) {
     const label = `Variation ${v.sku || "(no SKU)"}`;
     if (!v.sku.trim()) return "Every variation needs a SKU.";
-    if (seenSku.has(v.sku.trim().toLowerCase())) return `Variation SKU ${v.sku} is used twice.`;
+    if (seenSku.has(v.sku.trim().toLowerCase()) || v.sku.trim().toLowerCase() === p.sku.trim().toLowerCase()) return `Variation SKU ${v.sku} is used twice.`;
     seenSku.add(v.sku.trim().toLowerCase());
     const keys = Object.keys(v.options);
     if (keys.length !== attributes.length || attributes.some((a) => !a.values.includes(v.options[a.name] ?? ""))) {
@@ -72,7 +72,7 @@ export function validateProduct(p: ProductInput): string | null {
 }
 
 type VariationDraft = Pick<Variation, "regular_price" | "enabled">;
-type Draftable = Pick<Product, "name" | "product_type" | "category" | "description" | "short_description" | "regular_price" | "featured_image" | "attributes"> & { variations: VariationDraft[] };
+type Draftable = Pick<Product, "name" | "product_type" | "category" | "description" | "short_description" | "regular_price" | "featured_image" | "attributes" | "weight_kg" | "length_cm" | "width_cm" | "height_cm"> & { variations: VariationDraft[] };
 
 // What must be filled in before a product can go to review.
 export function readinessProblems(product: Draftable): string[] {
@@ -81,6 +81,9 @@ export function readinessProblems(product: Draftable): string[] {
   if (!product.category.trim()) problems.push("Choose a category.");
   if (!product.description.trim() && !product.short_description.trim()) problems.push("Add a description.");
   if (!product.featured_image) problems.push("Add a featured image.");
+  // The marketplace needs these to price delivery.
+  if (!product.weight_kg || product.weight_kg <= 0) problems.push("Add the product weight in the Shipping tab.");
+  if (!product.length_cm || !product.width_cm || !product.height_cm) problems.push("Add the length, width and height in the Shipping tab.");
   if (product.product_type === "simple") {
     if (!product.regular_price || product.regular_price <= 0) problems.push("Set a regular price above zero.");
   } else {

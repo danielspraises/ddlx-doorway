@@ -85,3 +85,50 @@ export async function removeUnreferenced(productId: string, candidates: string[]
     unique.filter((path) => !keep.has(path) && PRODUCT_PATH.test(path)).map((path) => removeProductFile(path).catch(() => undefined)),
   );
 }
+
+// A short code for the seller's store, used at the start of generated SKUs ("Demo Store" -> "DEMO-0001").
+export async function skuPrefix(sellerId: string): Promise<string> {
+  const rows = await getSql()<{ n: string | null }[]>`SELECT brand->>'store_name' AS n FROM seller_applications WHERE user_id = ${sellerId}`;
+  const word = (rows[0]?.n ?? "").toUpperCase().replace(/[^A-Z0-9 ]+/g, "").trim().split(/\s+/)[0] ?? "";
+  return word.length >= 2 ? word.slice(0, 4) : "DDLX";
+}
+
+// Next number in line among the SKUs Vendor Hub already knows about.
+export async function localNextSku(prefix: string): Promise<string> {
+  const rows = await getSql()<{ sku: string }[]>`
+    SELECT sku FROM products WHERE sku ILIKE ${`${prefix}-%`}
+    UNION ALL SELECT sku FROM product_variations WHERE sku ILIKE ${`${prefix}-%`}`;
+  const pattern = new RegExp(`^${prefix}-(\\d+)$`, "i");
+  const highest = rows.reduce((max, row) => Math.max(max, Number(pattern.exec(row.sku)?.[1] ?? 0)), 0);
+  return `${prefix}-${String(highest + 1).padStart(4, "0")}`;
+}
+
+type SkuInput = { sku: string; product_type: "simple" | "variable"; variations: { id: string | null; sku: string }[] };
+
+// Is every SKU free? Checks the other sellers in Vendor Hub, then the marketplace store itself
+// (only for SKUs that are new or changed, so editing other fields never fails on an old SKU).
+export async function skuProblem(productId: string | null, data: SkuInput): Promise<string | null> {
+  const { marketplaceSkuConflicts } = await import("./marketplace-sku.server");
+  const sql = getSql();
+  const items = [
+    { sku: data.sku.trim(), product_id: productId, variation_id: null as string | null },
+    ...(data.product_type === "variable" ? data.variations.map((v) => ({ sku: v.sku.trim(), product_id: productId, variation_id: v.id })) : []),
+  ];
+  const lowers = items.map((i) => i.sku.toLowerCase());
+  const taken = await sql<{ sku: string }[]>`
+    SELECT sku FROM products WHERE lower(sku) = ANY(${sql.array(lowers)}) AND id IS DISTINCT FROM ${productId}::uuid
+    UNION ALL
+    SELECT sku FROM product_variations WHERE lower(sku) = ANY(${sql.array(lowers)}) AND product_id IS DISTINCT FROM ${productId}::uuid`;
+  if (taken[0]) return `The SKU ${taken[0].sku} is already used by another product. Press Generate to get a free one.`;
+
+  const known = new Set<string>();
+  if (productId) {
+    const own = await sql<{ sku: string }[]>`
+      SELECT sku FROM products WHERE id = ${productId} UNION ALL SELECT sku FROM product_variations WHERE product_id = ${productId}`;
+    own.forEach((row) => known.add(row.sku.toLowerCase()));
+  }
+  const changed = items.filter((i) => !known.has(i.sku.toLowerCase()));
+  const conflicts = await marketplaceSkuConflicts(changed);
+  if (conflicts && conflicts.length > 0) return `The SKU ${conflicts[0]} is already used on the marketplace. Press Generate to get a free one.`;
+  return null;
+}

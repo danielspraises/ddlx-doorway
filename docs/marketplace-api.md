@@ -161,3 +161,10 @@ and the plugin answers two questions over WordPress REST, using the same API key
   the SKUs already used by something other than that product.
 
 If the marketplace cannot be reached, Vendor Hub still checks against its own sellers and carries on.
+
+## Store profile in the feed
+
+Each product's `seller` object now carries `profile`: `tagline`, `description`, `phone`, `support_email`,
+`return_policy`, `shipping_policy`, `logo`, `banner` (public image URLs), `vacation`, `vacation_message`.
+While a seller is on vacation their products come back with `live: false`, so the marketplace hides them
+and shows them again when vacation ends. The connector maps the profile onto the Dokan store page.

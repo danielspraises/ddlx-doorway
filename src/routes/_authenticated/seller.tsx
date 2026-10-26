@@ -4,6 +4,10 @@ import { AlertTriangle, Boxes, PackageCheck, PackagePlus, Warehouse } from "luci
 import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { InventoryPanel } from "@/components/seller/InventoryPanel";
+import { PayoutsPanel } from "@/components/seller/PayoutsPanel";
+import { payoutsQuery } from "@/lib/payouts";
+import { StorePanel } from "@/components/seller/StorePanel";
+import { storeQuery } from "@/lib/store";
 import { ProductsPanel } from "@/components/seller/ProductsPanel";
 import { Money, SalesPanel } from "@/components/seller/SalesPanel";
 import { StockBadge } from "@/components/seller/StockBadge";
@@ -11,25 +15,27 @@ import { productsQuery, stockState, visibility } from "@/lib/products";
 import { salesOverviewQuery, salesQuery } from "@/lib/sales";
 import { homePath } from "@/lib/stage";
 
-type Tab = "overview" | "products" | "inventory" | "sales";
+type Tab = "overview" | "products" | "inventory" | "sales" | "payouts" | "store";
 const TABS: { key: Tab; label: string }[] = [
   { key: "overview", label: "Overview" },
   { key: "products", label: "Products" },
   { key: "inventory", label: "Inventory" },
   { key: "sales", label: "Sales" },
+  { key: "payouts", label: "Payouts" },
+  { key: "store", label: "Store" },
 ];
 
 export const Route = createFileRoute("/_authenticated/seller")({
   head: () => ({ meta: [{ title: "Seller Center — Vendor Hub" }, { name: "description", content: "Manage your products and stock on Vendor Hub." }, { property: "og:title", content: "Seller Center — Vendor Hub" }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   validateSearch: (search: Record<string, unknown>): { tab: Tab } => {
     const tab = search["tab"];
-    return { tab: tab === "products" ? "products" : tab === "inventory" ? "inventory" : tab === "sales" ? "sales" : "overview" };
+    return { tab: tab === "products" ? "products" : tab === "inventory" ? "inventory" : tab === "sales" ? "sales" : tab === "payouts" ? "payouts" : tab === "store" ? "store" : "overview" };
   },
   // Only verified sellers belong here; everyone else is sent to the step that fits them.
   beforeLoad: ({ context }) => {
     if (context.user.stage !== "verified") throw redirect({ to: homePath(context.user) });
   },
-  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(productsQuery), context.queryClient.ensureQueryData(salesOverviewQuery), context.queryClient.ensureQueryData(salesQuery)]),
+  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(productsQuery), context.queryClient.ensureQueryData(salesOverviewQuery), context.queryClient.ensureQueryData(salesQuery), context.queryClient.ensureQueryData(payoutsQuery), context.queryClient.ensureQueryData(storeQuery)]),
   component: Seller,
 });
 
@@ -67,7 +73,7 @@ function Overview() {
           </ul>
         </section>
       )}
-      <p className="mt-10 text-sm text-muted-foreground">Withdrawals and store settings are coming next.</p>
+      <p className="mt-10 text-sm text-muted-foreground">Request withdrawals from the Payouts tab.</p>
     </div>
   );
 }
@@ -82,7 +88,7 @@ function Seller() {
       <div className="mt-6 flex gap-2 border-b" role="tablist">
         {TABS.map((t) => <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => void navigate({ search: { tab: t.key } })} className={`-mb-px border-b-2 px-4 py-3 text-sm font-semibold ${tab === t.key ? "border-accent text-foreground" : "border-transparent text-muted-foreground"}`}>{t.label}</button>)}
       </div>
-      {tab === "products" ? <ProductsPanel /> : tab === "inventory" ? <InventoryPanel /> : tab === "sales" ? <SalesPanel /> : <Overview />}
+      {tab === "products" ? <ProductsPanel /> : tab === "inventory" ? <InventoryPanel /> : tab === "sales" ? <SalesPanel /> : tab === "payouts" ? <PayoutsPanel /> : tab === "store" ? <StorePanel /> : <Overview />}
     </main></div>
   );
 }

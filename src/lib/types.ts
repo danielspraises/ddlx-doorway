@@ -136,3 +136,27 @@ export type SalesOverview = {
 };
 
 export type StaffMember = { user_id: string; email: string; permissions: string[]; active: boolean; created_at: string };
+
+export type BankAccount = { id: string; bank_name: string; account_number: string; account_name: string };
+export type WithdrawalStatus = "requested" | "paid" | "rejected" | "cancelled";
+export type Withdrawal = {
+  id: string; amount: number; fee: number; currency: Currency;
+  bank_name: string; account_number: string; account_name: string;
+  status: WithdrawalStatus; admin_note: string | null; reference: string | null;
+  requested_at: string; decided_at: string | null;
+};
+export type WithdrawalReviewItem = Withdrawal & { store_name: string; seller_email: string };
+export type PayoutOverview = {
+  accounts: BankAccount[];
+  withdrawals: Withdrawal[];
+  available: { currency: Currency; amount: number }[];
+  min_withdrawal: number;
+  fee: number;
+};
+
+export type StoreProfile = {
+  tagline: string; description: string; phone: string; support_email: string;
+  return_policy: string; shipping_policy: string;
+  logo: string | null; banner: string | null;
+  vacation: boolean; vacation_message: string;
+};

@@ -9,7 +9,7 @@ const root = () => resolve(process.cwd(), env("STORAGE_DIR", "./storage"));
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 export const VERIFICATION_PATH = new RegExp(`^(${UUID})/(${UUID})/[a-z_]+-${UUID}\\.(jpg|png|webp|pdf)$`);
 
-type Area = "verification" | "products";
+type Area = "verification" | "products" | "stores";
 
 function fullPath(area: Area, relative: string) {
   const base = resolve(root(), area);
@@ -33,6 +33,12 @@ export const PRODUCT_PATH = new RegExp(`^(${UUID})/(${UUID})/${UUID}\\.(jpg|png|
 export const saveProductFile = (relative: string, bytes: Buffer) => save("products", relative, bytes);
 export const readProductFile = (relative: string) => readFile(fullPath("products", relative));
 export const removeProductFile = (relative: string) => rm(fullPath("products", relative), { force: true });
+
+// Store logo and banner: <seller id>/<image id>.<ext>
+export const STORE_PATH = new RegExp(`^(${UUID})/${UUID}\\.(jpg|png|webp)$`);
+export const saveStoreFile = (relative: string, bytes: Buffer) => save("stores", relative, bytes);
+export const readStoreFile = (relative: string) => readFile(fullPath("stores", relative));
+export const removeStoreFile = (relative: string) => rm(fullPath("stores", relative), { force: true });
 
 const SIGNATURES: Record<string, (b: Buffer) => boolean> = {
   "image/jpeg": (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,

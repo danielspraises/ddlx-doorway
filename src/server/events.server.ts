@@ -3,9 +3,9 @@ import { getSql } from "./db.server";
 // Live updates: a change is announced with Postgres NOTIFY, and every open browser
 // connection (see /api/seller/events) hears about the ones meant for it.
 export type LiveEvent = {
-  audience: "seller" | "reviewers";
+  audience: "seller" | "reviewers" | "admins";
   seller_id?: string;
-  type: "sale" | "refund" | "product" | "review_queue";
+  type: "sale" | "refund" | "product" | "review_queue" | "payout";
   message?: string;
 };
 

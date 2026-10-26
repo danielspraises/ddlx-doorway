@@ -17,18 +17,20 @@ import { VerificationReview } from "@/components/VerificationReview";
 import { homePath } from "@/lib/stage";
 import { verificationReviewsQuery } from "@/lib/verification";
 import { ProductReview } from "@/components/ProductReview";
+import { PayoutReview } from "@/components/PayoutReview";
+import { withdrawalReviewsQuery } from "@/lib/payouts";
 import { CategoriesPanel } from "@/components/CategoriesPanel";
 import { categoriesQuery } from "@/lib/categories";
 import { StaffPanel } from "@/components/StaffPanel";
 import { productReviewsQuery, staffQuery } from "@/lib/product-reviews";
 
-type Tab = "applications" | "verifications" | "products" | "categories" | "staff";
+type Tab = "applications" | "verifications" | "products" | "payouts" | "categories" | "staff";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Review applications — Vendor Hub" }, { name: "description", content: "Review applications on Vendor Hub." }, { property: "og:title", content: "Review applications — DDLX" }, { property: "og:description", content: "Review applications on Vendor Hub." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   validateSearch: (search: Record<string, unknown>): { tab?: Tab } => {
     const tab = search["tab"];
-    return tab === "applications" || tab === "verifications" || tab === "products" || tab === "categories" || tab === "staff" ? { tab } : {};
+    return tab === "applications" || tab === "verifications" || tab === "products" || tab === "payouts" || tab === "categories" || tab === "staff" ? { tab } : {};
   },
   beforeLoad: ({ context }) => {
     if (!context.user.isAdmin && !context.user.canReviewProducts) throw redirect({ to: homePath(context.user) });
@@ -36,7 +38,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
   loader: ({ context }) => {
     const { user, queryClient } = context;
     const jobs: Promise<unknown>[] = [];
-    if (user.isAdmin) jobs.push(queryClient.ensureQueryData(reviewsQuery), queryClient.ensureQueryData(verificationReviewsQuery), queryClient.ensureQueryData(staffQuery), queryClient.ensureQueryData(categoriesQuery));
+    if (user.isAdmin) jobs.push(queryClient.ensureQueryData(reviewsQuery), queryClient.ensureQueryData(verificationReviewsQuery), queryClient.ensureQueryData(staffQuery), queryClient.ensureQueryData(categoriesQuery), queryClient.ensureQueryData(withdrawalReviewsQuery));
     jobs.push(queryClient.ensureQueryData(productReviewsQuery));
     return Promise.all(jobs);
   },
@@ -93,12 +95,12 @@ function Admin() {
   const tabs: { key: Tab; label: string; badge: number }[] = [
     ...(user.isAdmin ? [{ key: "applications" as const, label: "Applications", badge: user.pending.applications }, { key: "verifications" as const, label: "Verifications", badge: user.pending.verifications }] : []),
     { key: "products", label: "Products", badge: user.pending.products },
-    ...(user.isAdmin ? [{ key: "categories" as const, label: "Categories", badge: 0 }, { key: "staff" as const, label: "Staff", badge: 0 }] : []),
+    ...(user.isAdmin ? [{ key: "payouts" as const, label: "Payouts", badge: user.pending.payouts }, { key: "categories" as const, label: "Categories", badge: 0 }, { key: "staff" as const, label: "Staff", badge: 0 }] : []),
   ];
   const active: Tab = tab && tabs.some((t) => t.key === tab) ? tab : (tabs[0]?.key ?? "products");
   return <div className="min-h-screen"><SiteHeader /><main className="mx-auto max-w-5xl px-4 py-12 sm:px-8">
     <p className="eyebrow text-accent">{user.isAdmin ? "STAFF REVIEW QUEUE" : "PRODUCT REVIEW"}</p><h1 className="mt-3 text-3xl font-semibold sm:text-5xl">{tabs.find((t) => t.key === active)?.label ?? "Review queue"}</h1>
     <div className="mt-6 flex flex-wrap gap-2 border-b" role="tablist">{tabs.map((t) => <button key={t.key} role="tab" aria-selected={active === t.key} onClick={() => void navigate({ search: { tab: t.key } })} className={`-mb-px border-b-2 px-4 py-3 text-sm font-semibold ${active === t.key ? "border-accent text-foreground" : "border-transparent text-muted-foreground"}`}>{t.label}{t.badge > 0 && <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] leading-5 text-accent-foreground">{t.badge}</span>}</button>)}</div>
-    {active === "applications" ? <ApplicationsPanel /> : active === "verifications" ? <VerificationReview /> : active === "categories" ? <CategoriesPanel /> : active === "staff" ? <StaffPanel /> : <ProductReview />}
+    {active === "applications" ? <ApplicationsPanel /> : active === "verifications" ? <VerificationReview /> : active === "payouts" ? <PayoutReview /> : active === "categories" ? <CategoriesPanel /> : active === "staff" ? <StaffPanel /> : <ProductReview />}
   </main></div>;
 }

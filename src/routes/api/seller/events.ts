@@ -24,7 +24,7 @@ export const Route = createFileRoute("/api/seller/events")({
             };
             send("retry: 5000\n\n");
             const unsubscribe = await subscribe((event) => {
-              const mine = (event.audience === "seller" && event.seller_id === user.id) || (event.audience === "reviewers" && user.canReviewProducts);
+              const mine = (event.audience === "seller" && event.seller_id === user.id) || (event.audience === "reviewers" && user.canReviewProducts) || (event.audience === "admins" && user.isAdmin);
               if (mine) send(`data: ${JSON.stringify({ type: event.type, message: event.message ?? "" })}\n\n`);
             });
             const beat = setInterval(() => send(": keep-alive\n\n"), 25_000);

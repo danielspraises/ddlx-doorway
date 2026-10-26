@@ -16,7 +16,7 @@ export type SessionUser = {
   isStaff: boolean;
   canReviewProducts: boolean;
   // Only filled in for reviewers: how many items are waiting for a decision.
-  pending: { applications: number; verifications: number; products: number };
+  pending: { applications: number; verifications: number; products: number; payouts: number };
 };
 
 export const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -65,14 +65,15 @@ export async function userFromToken(token: string): Promise<SessionUser | null> 
   const row = rows[0];
   if (!row) return null;
   const canReviewProducts = row.is_admin || row.permissions.includes("products");
-  let pending = { applications: 0, verifications: 0, products: 0 };
+  let pending = { applications: 0, verifications: 0, products: 0, payouts: 0 };
   if (row.is_admin || canReviewProducts) {
-    const counts = await sql<{ applications: number; verifications: number; products: number }[]>`
+    const counts = await sql<{ applications: number; verifications: number; products: number; payouts: number }[]>`
       SELECT (SELECT count(*) FROM seller_applications WHERE status = 'submitted')::int AS applications,
              (SELECT count(*) FROM seller_verifications WHERE status = 'submitted')::int AS verifications,
-             (SELECT count(*) FROM products WHERE status = 'pending_review')::int AS products`;
+             (SELECT count(*) FROM products WHERE status = 'pending_review')::int AS products,
+             (SELECT count(*) FROM withdrawals WHERE status = 'requested')::int AS payouts`;
     const found = counts[0];
-    if (found) pending = { applications: row.is_admin ? found.applications : 0, verifications: row.is_admin ? found.verifications : 0, products: found.products };
+    if (found) pending = { applications: row.is_admin ? found.applications : 0, verifications: row.is_admin ? found.verifications : 0, products: found.products, payouts: row.is_admin ? found.payouts : 0 };
   }
   return {
     id: row.id,

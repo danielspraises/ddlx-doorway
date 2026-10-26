@@ -25,6 +25,7 @@ function navItems(user: Me): NavItem[] {
       { key: "applications", label: "Applications", to: "/admin", tab: "applications", badge: user.pending.applications },
       { key: "verifications", label: "Verifications", to: "/admin", tab: "verifications", badge: user.pending.verifications },
       { key: "products-review", label: "Products", to: "/admin", tab: "products", badge: user.pending.products },
+      { key: "payouts", label: "Payouts", to: "/admin", tab: "payouts", badge: user.pending.payouts },
       { key: "categories", label: "Categories", to: "/admin", tab: "categories" },
       { key: "staff", label: "Staff", to: "/admin", tab: "staff" },
     ];
@@ -40,6 +41,8 @@ function navItems(user: Me): NavItem[] {
       { key: "products", label: "Products", to: "/seller", tab: "products" },
       { key: "inventory", label: "Inventory", to: "/seller", tab: "inventory" },
       { key: "sales", label: "Sales", to: "/seller", tab: "sales" },
+      { key: "payouts", label: "Payouts", to: "/seller", tab: "payouts" },
+      { key: "store", label: "Store", to: "/seller", tab: "store" },
     );
   }
   return items;

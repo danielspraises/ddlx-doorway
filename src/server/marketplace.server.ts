@@ -75,31 +75,46 @@ type FeedRow = {
   email: string | null;
   city: string | null;
   state: string | null;
+  profile: Record<string, unknown> | null;
+  vacation: boolean | null;
 };
 
 // Approved products grouped under their seller. Stock is live; everything else is the approved version.
 // Without updated_since only live products are returned. With it, every product changed since then is returned,
 // including ones that went offline (live = false) so the marketplace can hide them.
+function storeProfile(profile: Record<string, unknown> | null, url: (path: string | null) => string | null) {
+  const p = profile ?? {};
+  const text = (key: string) => (typeof p[key] === "string" ? (p[key] as string) : "");
+  return {
+    tagline: text("tagline"), description: text("description"), phone: text("phone"), support_email: text("support_email"),
+    return_policy: text("return_policy"), shipping_policy: text("shipping_policy"),
+    logo: url(typeof p["logo"] === "string" ? (p["logo"] as string) : null), banner: url(typeof p["banner"] === "string" ? (p["banner"] as string) : null),
+    vacation: p["vacation"] === true, vacation_message: text("vacation_message"),
+  };
+}
+
 export async function catalogue(request: Request, since: string | null, limit: number) {
   const sql = getSql();
   const base = baseUrl(request);
   const cols = sql`p.id, p.seller_id, p.live, p.published_snapshot AS snapshot, p.stock, p.updated_at, p.published_at,
       COALESCE((SELECT jsonb_object_agg(v.id::text, v.stock) FROM product_variations v WHERE v.product_id = p.id), '{}'::jsonb) AS variation_stock,
-      a.brand->>'store_name' AS store_name, a.applicant_email AS email, a.business->>'city' AS city, a.business->>'state' AS state`;
+      a.brand->>'store_name' AS store_name, a.applicant_email AS email, a.business->>'city' AS city, a.business->>'state' AS state,
+      (SELECT to_jsonb(sp) - 'seller_id' - 'updated_at' FROM store_profiles sp WHERE sp.seller_id = p.seller_id) AS profile,
+      (SELECT vacation FROM store_profiles sp WHERE sp.seller_id = p.seller_id) AS vacation`;
   const from = sql`FROM products p LEFT JOIN seller_applications a ON a.user_id = p.seller_id`;
   const rows = since
     ? await sql<FeedRow[]>`SELECT ${cols} ${from} WHERE p.published_snapshot IS NOT NULL AND p.updated_at >= ${since} ORDER BY p.updated_at, p.id LIMIT ${limit}`
-    : await sql<FeedRow[]>`SELECT ${cols} ${from} WHERE p.live ORDER BY p.updated_at, p.id LIMIT ${limit}`;
+    : await sql<FeedRow[]>`SELECT ${cols} ${from} WHERE p.live AND NOT COALESCE((SELECT vacation FROM store_profiles sp WHERE sp.seller_id = p.seller_id), false) ORDER BY p.updated_at, p.id LIMIT ${limit}`;
   const url = (path: string | null) => (path ? `${base}/api/media?p=${encodeURIComponent(path)}` : null);
   const products = rows.map((row) => {
     const s = row.snapshot;
     const storeName = row.store_name || "DDLX seller";
     return {
       id: row.id,
-      live: row.live,
+      live: row.live && !row.vacation,
       updated_at: row.updated_at.toISOString(),
       published_at: row.published_at?.toISOString() ?? null,
-      seller: { id: row.seller_id, store_name: storeName, store_slug: `${slugify(storeName)}-${row.seller_id.slice(0, 6)}`, email: row.email, city: row.city, state: row.state },
+      seller: { id: row.seller_id, store_name: storeName, store_slug: `${slugify(storeName)}-${row.seller_id.slice(0, 6)}`, email: row.email, city: row.city, state: row.state, profile: storeProfile(row.profile, url) },
       name: s.name, slug: s.slug, sku: s.sku, type: s.type, brand: s.brand, category: s.category,
       category_path: s.category_path ?? (s.category ? [s.category] : []), tags: s.tags,
       short_description: s.short_description, description: s.description, currency: s.currency,

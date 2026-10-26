@@ -394,6 +394,22 @@ final class Verola_Connector {
 			if (!empty($seller['city'])) {
 				$profile['address'] = array_merge(is_array($profile['address'] ?? null) ? $profile['address'] : [], ['city' => $seller['city']]);
 			}
+			$extra = is_array($seller['profile'] ?? null) ? $seller['profile'] : [];
+			if ($extra) {
+				$profile['phone'] = $extra['phone'] ?? '';
+				$profile['vendor_biography'] = trim(($extra['tagline'] ?? '') . "\n\n" . ($extra['description'] ?? ''));
+				if (!empty($extra['logo'])) {
+					$profile['gravatar'] = self::image($extra['logo']);
+				}
+				if (!empty($extra['banner'])) {
+					$profile['banner'] = self::image($extra['banner']);
+				}
+				$profile['setting_go_vacation'] = !empty($extra['vacation']) ? 'yes' : 'no';
+				$profile['settings_closing_style'] = 'datewise';
+				$profile['setting_vacation_message'] = $extra['vacation_message'] ?? '';
+				update_user_meta($uid, '_verola_return_policy', $extra['return_policy'] ?? '');
+				update_user_meta($uid, '_verola_shipping_policy', $extra['shipping_policy'] ?? '');
+			}
 			update_user_meta($uid, 'dokan_profile_settings', $profile);
 		}
 		return (int) $uid;

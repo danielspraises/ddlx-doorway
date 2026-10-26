@@ -186,3 +186,13 @@ Set `MARKETPLACE_API_KEY` and `MARKETPLACE_WEBHOOK_SECRET` in `.env` and give th
 
 Withdrawals (bank accounts and payout requests), store settings and profile, fulfilment status on orders,
 the marketplace-side connector (WooCommerce plugin), Google sign-in, email delivery, login rate limiting.
+
+## Categories, payouts and store profile
+
+- **Categories**: a tree up to 4 levels deep (seeded in migration 0004). Admins manage it under Admin > Categories
+  (add, rename, move, hide, delete); sellers pick the most specific one. The marketplace receives `category_path`
+  and the connector builds the same nested WooCommerce categories.
+- **Payouts**: sellers save up to 3 bank accounts and request withdrawals from available balance. The amount leaves the
+  wallet at once; admins pay manually and record the transfer reference under Admin > Payouts, or reject (money returns).
+  Set `MIN_WITHDRAWAL` and `WITHDRAWAL_FEE`.
+- **Store**: logo, banner, about, contact, policies and vacation mode, synced to the marketplace.

@@ -417,6 +417,29 @@ final class Verola_Connector {
 		return $ids;
 	}
 
+	// Builds Fashion > Men > Clothing as nested product_cat terms and returns every level, top first.
+	// Same-named categories under different parents stay separate because the lookup is scoped to the parent.
+	private static function category_chain($path) {
+		$ids = [];
+		$parent = 0;
+		foreach ((array) $path as $name) {
+			$name = trim((string) $name);
+			if ($name === '') {
+				continue;
+			}
+			$term = term_exists($name, 'product_cat', $parent);
+			if (!$term) {
+				$term = wp_insert_term($name, 'product_cat', ['parent' => $parent]);
+			}
+			if (is_wp_error($term)) {
+				break;
+			}
+			$parent = (int) (is_array($term) ? $term['term_id'] : $term);
+			$ids[] = $parent;
+		}
+		return $ids;
+	}
+
 	// Downloads a photo once and remembers which URL it came from.
 	private static function image($url) {
 		if (!$url) {
@@ -481,7 +504,8 @@ final class Verola_Connector {
 		$product->set_width(isset($dims['width']) && $dims['width'] !== null ? (string) $dims['width'] : '');
 		$product->set_height(isset($dims['height']) && $dims['height'] !== null ? (string) $dims['height'] : '');
 		$product->set_backorders(!empty($item['allow_backorders']) ? 'yes' : 'no');
-		$product->set_category_ids(self::term_ids([$item['category'] ?? ''], 'product_cat'));
+		$path = !empty($item['category_path']) ? $item['category_path'] : [$item['category'] ?? ''];
+		$product->set_category_ids(self::category_chain($path));
 		$product->set_tag_ids(self::term_ids($item['tags'] ?? [], 'product_tag'));
 
 		$attributes = [];

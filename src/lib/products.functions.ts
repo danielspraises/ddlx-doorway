@@ -26,7 +26,7 @@ const productInput = z.object({
   sku: z.string().trim().max(100),
   product_type: z.enum(["simple", "variable"]),
   brand: z.string().trim().max(100),
-  category: z.string().trim().max(80),
+  category_id: z.string().uuid().nullable(),
   tags: z.array(word.min(1)).max(20),
   short_description: z.string().trim().max(500),
   description: z.string().trim().max(10_000),
@@ -80,6 +80,17 @@ export const saveProduct = createServerFn({ method: "POST" })
     const skuIssue = await skuProblem(data.id, data);
     if (skuIssue) return fail(skuIssue);
     const sql = getSql();
+    // The chosen category must exist and be switched on (a product may keep one that was hidden later).
+    let categoryName = "";
+    if (data.category_id) {
+      const found = await sql<{ name: string; active: boolean; current: boolean }[]>`
+        SELECT c.name, c.active, (p.id IS NOT NULL) AS current
+        FROM categories c LEFT JOIN products p ON p.id = ${data.id}::uuid AND p.category_id = c.id
+        WHERE c.id = ${data.category_id}`;
+      const row = found[0];
+      if (!row || (!row.active && !row.current)) return fail("Choose a category from the list.");
+      categoryName = row.name;
+    }
     const variable = data.product_type === "variable";
     const tags = [...new Set(data.tags.map((t) => t.toLowerCase()))];
     const lowImages: string[] = [];
@@ -94,7 +105,7 @@ export const saveProduct = createServerFn({ method: "POST" })
           if (row.status === "pending_review") return { error: "This product is in review. Withdraw it from review to edit it." };
           await tx`
             UPDATE products SET name = ${data.name}, sku = ${data.sku}, product_type = ${data.product_type}, brand = ${data.brand},
-              category = ${data.category}, tags = ${tx.array(tags)}, short_description = ${data.short_description},
+              category = ${categoryName}, category_id = ${data.category_id}, tags = ${tx.array(tags)}, short_description = ${data.short_description},
               description = ${data.description}, currency = ${data.currency},
               regular_price = ${cents(data.regular_price)}, sale_price = ${cents(data.sale_price)},
               sale_starts_at = ${data.sale_starts_at}, sale_ends_at = ${data.sale_ends_at},
@@ -108,10 +119,10 @@ export const saveProduct = createServerFn({ method: "POST" })
           id = randomUUID();
           const slug = `${slugify(data.name)}-${id.slice(0, 6)}`;
           await tx`
-            INSERT INTO products (id, seller_id, name, slug, sku, product_type, brand, category, tags, short_description, description,
+            INSERT INTO products (id, seller_id, name, slug, sku, product_type, brand, category, category_id, tags, short_description, description,
               currency, regular_price, sale_price, sale_starts_at, sale_ends_at, manage_stock, stock, low_stock_threshold,
               allow_backorders, weight_kg, length_cm, width_cm, height_cm, attributes)
-            VALUES (${id}, ${user.id}, ${data.name}, ${slug}, ${data.sku}, ${data.product_type}, ${data.brand}, ${data.category},
+            VALUES (${id}, ${user.id}, ${data.name}, ${slug}, ${data.sku}, ${data.product_type}, ${data.brand}, ${categoryName}, ${data.category_id},
               ${tx.array(tags)}, ${data.short_description}, ${data.description}, ${data.currency},
               ${cents(data.regular_price)}, ${cents(data.sale_price)}, ${data.sale_starts_at}, ${data.sale_ends_at},
               ${data.manage_stock}, ${data.stock}, ${data.low_stock_threshold}, ${data.allow_backorders},
@@ -195,6 +206,8 @@ export const submitProduct = createServerFn({ method: "POST" })
     if (!["draft", "changes_requested", "rejected"].includes(product.status)) return fail("This product cannot be submitted right now.");
     const problems = readinessProblems(product);
     if (problems.length) return fail(problems[0] ?? "Complete the product first.");
+    const sub = await getSql()<{ n: number }[]>`SELECT count(*)::int AS n FROM categories WHERE parent_id = ${product.category_id}`;
+    if ((sub[0]?.n ?? 0) > 0) return fail("Choose the most specific category for this product.");
     const rows = await getSql()<{ id: string }[]>`
       UPDATE products SET status = 'pending_review', submitted_at = now(), updated_at = date_trunc('milliseconds', now())
       WHERE id = ${data.id} AND seller_id = ${user.id} AND status IN ('draft', 'changes_requested', 'rejected') RETURNING id`;

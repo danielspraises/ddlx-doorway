@@ -72,13 +72,13 @@ export function validateProduct(p: ProductInput): string | null {
 }
 
 type VariationDraft = Pick<Variation, "regular_price" | "enabled">;
-type Draftable = Pick<Product, "name" | "product_type" | "category" | "description" | "short_description" | "regular_price" | "featured_image" | "attributes" | "weight_kg" | "length_cm" | "width_cm" | "height_cm"> & { variations: VariationDraft[] };
+type Draftable = Pick<Product, "name" | "product_type" | "category_id" | "description" | "short_description" | "regular_price" | "featured_image" | "attributes" | "weight_kg" | "length_cm" | "width_cm" | "height_cm"> & { variations: VariationDraft[] };
 
 // What must be filled in before a product can go to review.
 export function readinessProblems(product: Draftable): string[] {
   const problems: string[] = [];
   if (!product.name.trim()) problems.push("Add a product name.");
-  if (!product.category.trim()) problems.push("Choose a category.");
+  if (!product.category_id) problems.push("Choose a category.");
   if (!product.description.trim() && !product.short_description.trim()) problems.push("Add a description.");
   if (!product.featured_image) problems.push("Add a featured image.");
   // The marketplace needs these to price delivery.

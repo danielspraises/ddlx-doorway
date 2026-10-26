@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProductImage } from "@/components/seller/ProductImage";
 import { effectivePrice, saleActive } from "@/lib/pricing";
-import { formatPrice, priceLabel, readinessProblems, visibility } from "@/lib/products";
+import { categoryLabel, formatPrice, priceLabel, readinessProblems, visibility } from "@/lib/products";
 import { productReviewsQuery } from "@/lib/product-reviews";
 import { reviewProduct } from "@/lib/product-review.functions";
 import type { ProductReviewItem } from "@/lib/types";
@@ -72,7 +72,7 @@ function Detail({ product, onBack }: { product: ProductReviewItem; onBack: () =>
         <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
           <div><dt className="text-muted-foreground">Type</dt><dd className="mt-1 font-medium">{product.product_type === "variable" ? "Variable product" : "Simple product"}</dd></div>
           <div><dt className="text-muted-foreground">SKU</dt><dd className="mt-1 font-medium">{product.sku}</dd></div>
-          <div><dt className="text-muted-foreground">Category</dt><dd className="mt-1 font-medium">{product.category || "—"}</dd></div>
+          <div><dt className="text-muted-foreground">Category</dt><dd className="mt-1 font-medium">{categoryLabel(product)}</dd></div>
           <div><dt className="text-muted-foreground">Brand</dt><dd className="mt-1 font-medium">{product.brand || "—"}</dd></div>
           <div><dt className="text-muted-foreground">Price</dt><dd className="mt-1 font-medium">{priceLabel(product)}</dd></div>
           {product.product_type === "simple" && product.sale_price !== null && <div><dt className="text-muted-foreground">Sale</dt><dd className="mt-1 font-medium">{formatPrice(product.sale_price, product.currency)} {sale ? "(running now)" : "(scheduled)"}<span className="block text-xs font-normal text-muted-foreground">{when(product.sale_starts_at)} to {product.sale_ends_at ? when(product.sale_ends_at) : "no end date"}</span></dd></div>}
@@ -134,7 +134,7 @@ export function ProductReview() {
         {visible.map((p) => (
           <li key={p.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 py-4">
             <ProductImage path={p.featured_image ?? undefined} alt={p.name} className="size-16 rounded-md border" />
-            <div className="min-w-0"><h3 className="truncate font-semibold">{p.name}</h3><p className="mt-0.5 truncate text-sm text-muted-foreground">{p.store_name} · {p.category || "No category"} · {priceLabel(p)}</p><div className="mt-2"><Badge variant={p.status === "pending_review" ? "default" : "outline"}>{visibility(p).label}</Badge></div></div>
+            <div className="min-w-0"><h3 className="truncate font-semibold">{p.name}</h3><p className="mt-0.5 truncate text-sm text-muted-foreground">{p.store_name} · {categoryLabel(p) || "No category"} · {priceLabel(p)}</p><div className="mt-2"><Badge variant={p.status === "pending_review" ? "default" : "outline"}>{visibility(p).label}</Badge></div></div>
             <Button variant="outline" onClick={() => setSelectedId(p.id)}>{p.status === "pending_review" ? "Review" : "Open"}</Button>
           </li>
         ))}

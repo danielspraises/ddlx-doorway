@@ -9,15 +9,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField, TextField } from "@/components/FormFields";
+import { CategoryPicker } from "@/components/seller/CategoryPicker";
 import { ProductImage } from "@/components/seller/ProductImage";
 import { fileToBase64 } from "@/lib/files";
-import { CURRENCIES, MAX_GALLERY, MAX_VARIATIONS, PRODUCT_CATEGORIES, combinations, optionKey, productsQuery, readinessProblems, validateProduct, visibility } from "@/lib/products";
+import { CURRENCIES, MAX_GALLERY, MAX_VARIATIONS, combinations, optionKey, productsQuery, readinessProblems, validateProduct, visibility } from "@/lib/products";
 import { removeProductImage, saveProduct, setProductLive, submitProduct, suggestSku, uploadProductImage, withdrawSubmission } from "@/lib/products.functions";
 import type { Product } from "@/lib/types";
 
 type VarForm = { id: string | null; sku: string; options: Record<string, string>; regular_price: string; sale_price: string; sale_starts_at: string; sale_ends_at: string; stock: string; enabled: boolean };
 type Form = {
-  name: string; sku: string; product_type: "simple" | "variable"; brand: string; category: string; tags: string;
+  name: string; sku: string; product_type: "simple" | "variable"; brand: string; category_id: string | null; tags: string;
   short_description: string; description: string; currency: string;
   regular_price: string; sale_price: string; sale_starts_at: string; sale_ends_at: string;
   manage_stock: boolean; stock: string; low_stock_threshold: string; allow_backorders: boolean;
@@ -46,7 +47,7 @@ const parseValues = (value: string) => {
 
 function toForm(p: Product | null): Form {
   return {
-    name: p?.name ?? "", sku: p?.sku ?? "", product_type: p?.product_type ?? "simple", brand: p?.brand ?? "", category: p?.category ?? "",
+    name: p?.name ?? "", sku: p?.sku ?? "", product_type: p?.product_type ?? "simple", brand: p?.brand ?? "", category_id: p?.category_id ?? null,
     tags: (p?.tags ?? []).join(", "), short_description: p?.short_description ?? "", description: p?.description ?? "", currency: p?.currency ?? "NGN",
     regular_price: text(p?.regular_price ?? null), sale_price: text(p?.sale_price ?? null),
     sale_starts_at: isoToLocal(p?.sale_starts_at ?? null), sale_ends_at: isoToLocal(p?.sale_ends_at ?? null),
@@ -72,7 +73,7 @@ function toInput(form: Form, id: string | null) {
   const whole = (value: string) => { const n = num(value); return n === null ? 0 : Math.trunc(n); };
   const input = {
     id,
-    name: form.name, sku: form.sku, product_type: form.product_type, brand: form.brand, category: form.category,
+    name: form.name, sku: form.sku, product_type: form.product_type, brand: form.brand, category_id: form.category_id,
     tags: parseValues(form.tags), short_description: form.short_description, description: form.description,
     currency: form.currency as Product["currency"],
     regular_price: num(form.regular_price), sale_price: num(form.sale_price),
@@ -256,7 +257,6 @@ export function ProductEditor({ initial }: { initial: Product | null }) {
     setForm((prev) => ({ ...prev, variations: prev.variations.map((v) => ({ ...v, regular_price: bulkPrice })) }));
   };
 
-  const categories = form.category && !PRODUCT_CATEGORIES.includes(form.category) ? [form.category, ...PRODUCT_CATEGORIES] : PRODUCT_CATEGORIES;
   const canSubmit = !product || ["draft", "changes_requested", "rejected"].includes(product.status);
 
   return (
@@ -436,7 +436,7 @@ export function ProductEditor({ initial }: { initial: Product | null }) {
             </section>
 
             <section className="space-y-4 rounded-md border p-5">
-              <SelectField name="product-category" label="Category" required value={form.category} onChange={set("category")} options={categories} />
+              <CategoryPicker value={form.category_id} onChange={set("category_id")} />
               <TextField name="product-brand" label="Brand" value={form.brand} onChange={set("brand")} />
               <TextField name="product-tags" label="Tags" value={form.tags} onChange={set("tags")} hint="Separate with commas, e.g. ankara, summer." />
             </section>

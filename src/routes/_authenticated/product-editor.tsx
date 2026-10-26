@@ -1,3 +1,4 @@
+import { categoriesQuery } from "@/lib/categories";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -16,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/product-editor")({
   beforeLoad: ({ context }) => {
     if (context.user.stage !== "verified") throw redirect({ to: homePath(context.user) });
   },
-  loader: ({ context }) => context.queryClient.ensureQueryData(productsQuery),
+  loader: async ({ context }) => { await Promise.all([context.queryClient.ensureQueryData(productsQuery), context.queryClient.ensureQueryData(categoriesQuery)]); },
   component: Editor,
 });
 

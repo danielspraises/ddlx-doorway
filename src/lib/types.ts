@@ -70,6 +70,9 @@ export type Product = {
   sku: string;
   brand: string;
   category: string;
+  category_id: string | null;
+  // Names from the top of the tree down to the chosen category.
+  category_path: string[];
   tags: string[];
   short_description: string;
   description: string;
@@ -100,6 +103,8 @@ export type Product = {
   updated_at: string;
   variations: Variation[];
 };
+
+export type Category = { id: string; parent_id: string | null; name: string; position: number; active: boolean; product_count: number };
 
 export type ProductReviewItem = Product & { store_name: string; seller_email: string };
 

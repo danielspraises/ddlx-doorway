@@ -4,7 +4,7 @@ import type { Product } from "../lib/types";
 // The columns sent to the browser. numeric(12,2) would otherwise arrive as a string,
 // so prices are cast to float8. Variations travel inside the product as JSON.
 export const productCols = () => getSql()`
-  p.id, p.seller_id, p.name, p.slug, p.product_type, p.sku, p.brand, p.category, p.tags,
+  p.id, p.seller_id, p.name, p.slug, p.product_type, p.sku, p.brand, p.category, p.category_id, category_path(p.category_id) AS category_path, p.tags,
   p.short_description, p.description, p.currency,
   p.regular_price::float8 AS regular_price, p.sale_price::float8 AS sale_price, p.sale_starts_at, p.sale_ends_at,
   p.manage_stock, p.stock, p.low_stock_threshold, p.allow_backorders,
@@ -39,6 +39,7 @@ export function buildSnapshot(p: Product) {
     type: p.product_type,
     brand: p.brand,
     category: p.category,
+    category_path: p.category_path,
     tags: p.tags,
     short_description: p.short_description,
     description: p.description,

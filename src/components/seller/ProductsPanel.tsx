@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ProductImage } from "@/components/seller/ProductImage";
 import { StockBadge } from "@/components/seller/StockBadge";
-import { priceLabel, productsQuery, visibility } from "@/lib/products";
+import { categoryLabel, priceLabel, productsQuery, visibility } from "@/lib/products";
 import { deleteProduct } from "@/lib/products.functions";
 import type { Product } from "@/lib/types";
 
@@ -47,7 +47,7 @@ export function ProductsPanel() {
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const visible = products.filter((p) => matches(p, filter) && `${p.name} ${p.sku} ${p.category} ${p.brand}`.toLowerCase().includes(search.trim().toLowerCase()));
+  const visible = products.filter((p) => matches(p, filter) && `${p.name} ${p.sku} ${categoryLabel(p)} ${p.brand}`.toLowerCase().includes(search.trim().toLowerCase()));
 
   const remove = async () => {
     if (!deleting || busy) return;
@@ -81,7 +81,7 @@ export function ProductsPanel() {
               <ProductImage path={p.featured_image ?? undefined} alt={p.name} className="size-16 rounded-md border" />
               <div className="min-w-0">
                 <h3 className="truncate font-semibold">{p.name}</h3>
-                <p className="mt-0.5 truncate text-sm text-muted-foreground">{p.sku} · {p.category || "No category"} · {priceLabel(p)}{p.product_type === "variable" ? ` · ${p.variations.length} variations` : ""}</p>
+                <p className="mt-0.5 truncate text-sm text-muted-foreground">{p.sku} · {categoryLabel(p)} · {priceLabel(p)}{p.product_type === "variable" ? ` · ${p.variations.length} variations` : ""}</p>
                 <div className="mt-2 flex flex-wrap gap-2"><Badge variant={state.tone === "live" ? "default" : "outline"}>{state.label}</Badge><StockBadge product={p} /></div>
               </div>
               <div className="flex gap-2">

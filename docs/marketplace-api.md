@@ -47,7 +47,7 @@ Each product:
   "seller": { "id": "uuid", "store_name": "Ada Wears", "store_slug": "ada-wears-1a2b3c", "email": "...", "city": "Lagos", "state": "Lagos" },
   "name": "Ankara shirt", "slug": "ankara-shirt-1a2b3c", "sku": "ANK-1",
   "type": "simple | variable",
-  "brand": "", "category": "Men's clothing", "tags": ["ankara"],
+  "brand": "", "category": "T-shirts & Polos", "category_path": ["Fashion", "Men", "Clothing", "T-shirts & Polos"], "tags": ["ankara"],
   "short_description": "", "description": "", "currency": "NGN",
   "regular_price": 12000, "sale_price": 9000,
   "sale_starts_at": "2026-11-01T00:00:00Z", "sale_ends_at": "2026-11-30T23:59:00Z",
@@ -126,7 +126,7 @@ wp_remote_post(VEROLA_URL . '/api/marketplace/orders', [
 What it does:
 
 - Every minute it pulls approved products and creates or updates them in WooCommerce: simple and variable products,
-  variations, prices, scheduled sale dates, stock, photos, category, tags and brand. Taken-down products become drafts.
+  variations, prices, scheduled sale dates, stock, photos, category (the full `category_path` is created as nested WooCommerce categories), tags and brand. Taken-down products become drafts.
 - Each Vendor Hub seller becomes a WordPress user with Dokan's `seller` role and owns their products, so the products
   appear in their Dokan store (`/store/<store-slug>`) with the store name from their application.
 - When an order is paid it reports the Vendor Hub items; when an order is marked refunded it reports the refund.

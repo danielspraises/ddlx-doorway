@@ -6,7 +6,9 @@ import type { Product, ProductStatus } from "@/lib/types";
 export const CURRENCIES = ["NGN", "USD", "GBP", "EUR"] as const;
 export const MAX_GALLERY = 8;
 export const MAX_VARIATIONS = 100;
-export const PRODUCT_CATEGORIES = ["Men's clothing", "Women's clothing", "Kids' clothing", "Footwear", "Bags", "Accessories", "Jewellery", "Fabrics", "Others"];
+// "Fashion › Men › Footwear › Sneakers"
+export const categoryLabel = (product: Pick<Product, "category" | "category_path">) =>
+  product.category_path.length ? product.category_path.join(" › ") : product.category || "No category";
 
 export const productsQuery = queryOptions({
   queryKey: ["products"],

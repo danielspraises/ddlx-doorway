@@ -1,6 +1,6 @@
 # Use this when the subdomain points at this folder (not at /public).
 Options -Indexes
 RewriteEngine On
-RewriteRule ^(app|config|database|storage|tests)(/|$) - [F,L]
+RewriteRule ^(app|config|database|storage|tests|dev)(/|$) - [F,L]
 RewriteCond %{REQUEST_URI} !^/public/
 RewriteRule ^(.*)$ public/$1 [L]

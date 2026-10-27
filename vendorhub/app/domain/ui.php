@@ -52,7 +52,7 @@ function f_check(string $name, string $text, bool $checked, ?string $error = nul
 
 function pill(string $status, array $labels = [], array $kinds = []): string
 {
-    $kind = $kinds[$status] ?? (in_array($status, ['approved', 'paid', 'live', 'verified'], true) ? 'ok' : (in_array($status, ['rejected', 'cancelled', 'refunded', 'out'], true) ? 'bad' : (in_array($status, ['draft', 'submitted', 'pending_review', 'changes_requested', 'needs_corrections', 'requested', 'low'], true) ? 'warn' : '')));
+    $kind = $kinds[$status] ?? (in_array($status, ['approved', 'paid', 'live', 'verified', 'delivered'], true) ? 'ok' : (in_array($status, ['rejected', 'cancelled', 'refunded', 'out'], true) ? 'bad' : (in_array($status, ['draft', 'submitted', 'pending_review', 'changes_requested', 'needs_corrections', 'requested', 'low'], true) ? 'warn' : '')));
     return '<span class="pill' . ($kind ? ' pill-' . $kind : '') . '">' . e($labels[$status] ?? ucfirst(str_replace('_', ' ', $status))) . '</span>';
 }
 

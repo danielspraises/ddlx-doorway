@@ -76,14 +76,23 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 
 <?php if ($tab === 'sales'): ?>
   <h2>Recent sales</h2>
-  <div class="table-wrap"><table><thead><tr><th>Order</th><th>Item</th><th class="t-right">Qty</th><th class="t-right">Sold for</th><th class="t-right">You earn</th><th>Customer</th></tr></thead><tbody>
+  <div class="table-wrap"><table><thead><tr><th>Order</th><th>Item</th><th class="t-right">Qty</th><th class="t-right">Sold for</th><th class="t-right">You earn</th><th>Customer</th><th>Delivery</th></tr></thead><tbody>
   <?php foreach ($sales as $s): $opts = jdec($s['options'], []); ?>
     <tr><td><strong><?= $s['order_number'] ? '#' . e($s['order_number']) : 'Order' ?></strong><br><span class="muted small"><?= e(human_date($s['placed_at'])) ?></span></td>
       <td><strong><?= e($s['name']) ?></strong><br><span class="muted small"><?= e($s['sku']) ?><?= $opts ? ' · ' . e(implode(' / ', $opts)) : '' ?></span></td>
       <td class="t-right"><?= (int) $s['quantity'] ?></td><td class="t-right"><?= e($m($s['line_total'], $s['currency'])) ?></td>
       <td class="t-right"><?= $s['status'] === 'refunded' ? pill('refunded') : e($m($s['net'], $s['currency'])) ?></td>
-      <td><?= e($s['customer_name'] ?: '—') ?><br><span class="muted small"><?= e(trim($s['ship_city'] . ', ' . $s['ship_state'], ', ')) ?></span></td></tr>
-  <?php endforeach; if (!$sales): ?><tr><td colspan="6" class="muted" style="text-align:center;padding:40px">Sales will be listed here.</td></tr><?php endif; ?></tbody></table></div>
+      <td><?= e($s['customer_name'] ?: '—') ?><br><span class="muted small"><?= e(trim($s['ship_city'] . ', ' . $s['ship_state'], ', ')) ?></span></td>
+      <td><?php if ($s['status'] === 'refunded'): ?><span class="muted small">—</span>
+        <?php elseif ($s['fulfilment'] === 'pending'): ?>
+          <form method="post" action="/orders/fulfil" class="stack" style="min-width:170px"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($s['id']) ?>"><input type="hidden" name="action" value="ship">
+            <select name="carrier" aria-label="Carrier"><?php foreach (CARRIERS as $c): ?><option><?= e($c) ?></option><?php endforeach; ?></select>
+            <input name="tracking" maxlength="100" placeholder="Tracking number" aria-label="Tracking number">
+            <button class="btn btn-sm" type="submit">Mark shipped</button></form>
+        <?php else: ?><?= pill($s['fulfilment'], FULFILMENT_LABEL) ?><br><span class="muted small"><?= e($s['carrier']) ?><?= $s['tracking_number'] ? ' · ' . e($s['tracking_number']) : '' ?></span>
+          <?php if ($s['fulfilment'] === 'shipped'): ?><form method="post" action="/orders/fulfil" style="margin-top:6px"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($s['id']) ?>"><input type="hidden" name="action" value="deliver"><button class="btn btn-outline btn-sm" type="submit" data-confirm="Mark this item as delivered?">Mark delivered</button></form><?php endif; ?>
+        <?php endif; ?></td></tr>
+  <?php endforeach; if (!$sales): ?><tr><td colspan="7" class="muted" style="text-align:center;padding:40px">Sales will be listed here.</td></tr><?php endif; ?></tbody></table></div>
 <?php endif; ?>
 
 <?php if ($tab === 'payouts'): $cur = $balances[0]['currency'] ?? 'NGN'; ?>

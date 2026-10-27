@@ -47,7 +47,34 @@ function sales_last_30d(string $sellerId): array
 
 function seller_sales(string $sellerId, int $limit = 200): array
 {
-    return db()->all('SELECT i.id, o.number AS order_number, o.placed_at, i.name, i.sku, i.options, i.quantity, i.unit_price, i.line_total, i.commission, i.net, o.currency, i.status, o.customer_name, o.ship_city, o.ship_state FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.seller_id = ? ORDER BY o.placed_at DESC, i.created_at DESC LIMIT ' . (int) $limit, [$sellerId]);
+    return db()->all('SELECT i.id, o.number AS order_number, o.placed_at, i.name, i.sku, i.options, i.quantity, i.unit_price, i.line_total, i.commission, i.net, o.currency, i.status, i.fulfilment, i.carrier, i.tracking_number, i.shipped_at, i.delivered_at, o.customer_name, o.ship_city, o.ship_state FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.seller_id = ? ORDER BY o.placed_at DESC, i.created_at DESC LIMIT ' . (int) $limit, [$sellerId]);
+}
+
+const CARRIERS = ['DHL', 'GIG Logistics', 'FedEx', 'UPS', 'Kwik', 'Sendbox', 'Own delivery', 'Other'];
+const FULFILMENT_LABEL = ['pending' => 'To ship', 'shipped' => 'Shipped', 'delivered' => 'Delivered'];
+
+// Seller moves an item along: pending -> shipped -> delivered. Returns an error message or null.
+function update_fulfilment(string $sellerId, string $itemId, string $action, string $carrier = '', string $tracking = ''): ?string
+{
+    $db = db();
+    $it = $db->one('SELECT id, status, fulfilment FROM order_items WHERE id = ? AND seller_id = ?', [$itemId, $sellerId]);
+    if (!$it) return 'Order item not found.';
+    if ($it['status'] === 'refunded') return 'This item was refunded.';
+    $now = now_db();
+    if ($action === 'ship') {
+        if ($it['fulfilment'] !== 'pending') return 'This item is already marked as shipped.';
+        $carrier = trim($carrier); $tracking = trim($tracking);
+        if (!in_array($carrier, CARRIERS, true)) return 'Choose a carrier.';
+        if ($carrier !== 'Own delivery' && $tracking === '') return 'Enter the tracking number.';
+        if (mb_strlen($tracking) > 100) return 'Tracking number is too long.';
+        $db->exec("UPDATE order_items SET fulfilment = 'shipped', carrier = ?, tracking_number = ?, shipped_at = ? WHERE id = ?", [$carrier, $tracking, $now, $itemId]);
+    } elseif ($action === 'deliver') {
+        if ($it['fulfilment'] !== 'shipped') return 'Mark the item as shipped first.';
+        $db->exec("UPDATE order_items SET fulfilment = 'delivered', delivered_at = ? WHERE id = ?", [$now, $itemId]);
+    } else {
+        return 'Unknown action.';
+    }
+    return null;
 }
 
 // ---------------------------------------------------------------- marketplace orders

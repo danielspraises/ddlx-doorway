@@ -117,6 +117,17 @@ eq(count(seller_sales($sid)), 2, 'two sale lines');
 // hold: nothing available yet? order was 10 days ago and hold is 7 -> available
 eq($bal['available'], 18000.0, 'available after hold');
 
+// ---- fulfilment
+$itemId = (string) db()->val('SELECT id FROM order_items WHERE seller_id = ? ORDER BY created_at LIMIT 1', [$sid]);
+ok(update_fulfilment($sid, $itemId, 'deliver') !== null, 'cannot deliver before shipping');
+ok(update_fulfilment($sid, $itemId, 'ship', 'Nope', 'X1') !== null, 'unknown carrier rejected');
+ok(update_fulfilment($sid, $itemId, 'ship', 'DHL', '') !== null, 'tracking required');
+ok(update_fulfilment('other-seller', $itemId, 'ship', 'DHL', 'X1') !== null, 'other seller cannot ship');
+eq(update_fulfilment($sid, $itemId, 'ship', 'DHL', 'X1'), null, 'shipped');
+ok(update_fulfilment($sid, $itemId, 'ship', 'DHL', 'X2') !== null, 'cannot ship twice');
+eq(update_fulfilment($sid, $itemId, 'deliver'), null, 'delivered');
+eq(db()->val('SELECT fulfilment FROM order_items WHERE id = ?', [$itemId]), 'delivered', 'fulfilment stored');
+
 // ---- withdrawals
 eq(add_bank_account($sid, 'GTBank', '0123456789', 'A B'), null, 'bank added');
 ok(add_bank_account($sid, 'GTBank', '0123456789', 'A B') !== null, 'duplicate bank rejected');

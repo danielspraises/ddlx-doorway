@@ -15,6 +15,14 @@ route('GET', '/seller', function () {
     render('seller', $vars);
 });
 
+// ---------------------------------------------------------------- fulfilment
+
+route('POST', '/orders/fulfil', function () {
+    $u = require_seller();
+    $err = update_fulfilment($u['id'], input('id'), input('action'), input('carrier'), input('tracking'));
+    redirect('/seller?tab=sales', $err ?? (input('action') === 'ship' ? 'Marked as shipped.' : 'Marked as delivered.'), $err ? 'error' : 'ok');
+});
+
 // ---------------------------------------------------------------- payouts
 
 route('POST', '/payouts/bank', function () {

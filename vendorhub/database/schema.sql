@@ -200,6 +200,11 @@ CREATE TABLE order_items (
   commission DECIMAL(12,2) NOT NULL,
   net DECIMAL(12,2) NOT NULL,
   status VARCHAR(10) NOT NULL DEFAULT 'paid',
+  fulfilment VARCHAR(12) NOT NULL DEFAULT 'pending',
+  carrier VARCHAR(80) NOT NULL DEFAULT '',
+  tracking_number VARCHAR(100) NOT NULL DEFAULT '',
+  shipped_at DATETIME(3) NULL,
+  delivered_at DATETIME(3) NULL,
   created_at DATETIME(3) NOT NULL,
   CONSTRAINT oi_order_fk FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
   CONSTRAINT oi_seller_fk FOREIGN KEY (seller_id) REFERENCES users(id)

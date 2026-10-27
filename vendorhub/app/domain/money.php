@@ -58,6 +58,10 @@ const FULFILMENT_LABEL = ['placed' => 'New order', 'processing' => 'Processing',
     'delivered' => 'Delivered', 'completed' => 'Completed'];
 const FULFILMENT_RANK = ['placed' => 0, 'processing' => 1, 'ready_for_shipping' => 2, 'shipped' => 3, 'delivered' => 4, 'completed' => 5];
 
+// A sale's money stays "pending" until the order is delivered; then it is released after the hold period.
+const NOT_DELIVERED_YET = '9999-12-31 00:00:00.000';
+const LOG_LABEL = FULFILMENT_LABEL + ['refunded' => 'Refunded', 'cancelled' => 'Cancelled'];
+
 function log_item_status(string $itemId, string $status, string $source, string $note = ''): void
 {
     db()->insert('order_item_log', ['id' => uuid(), 'order_item_id' => $itemId, 'status' => $status, 'source' => $source, 'note' => str_limit($note, 250), 'created_at' => now_db()]);
@@ -94,17 +98,18 @@ function seller_set_fulfilment(string $sellerId, string $itemId, string $to): ?s
             log_item_status($l['id'], $to, 'seller');
         }
     });
-    announce('admins', 'order', 'Order ' . ($it['number'] ?: $it['marketplace_order_id']) . ': seller marked ' . strtolower(FULFILMENT_LABEL[$to]));
+    announce('orders', 'order', 'Order ' . ($it['number'] ?: $it['marketplace_order_id']) . ': seller marked ' . strtolower(FULFILMENT_LABEL[$to]));
     return null;
 }
 
 // A status the marketplace reports (shipped, delivered, completed, or ready_for_shipping set on its side). Only moves forward.
 // Returns false when the order is unknown.
-function apply_marketplace_status(array $o): bool
+function apply_marketplace_status(array $o, string $source = 'marketplace'): bool
 {
     $db = db();
     $sellers = [];
-    $found = $db->tx(function () use ($db, $o, &$sellers) {
+    $release = db_plus('+' . hold_days() . ' days');
+    $found = $db->tx(function () use ($db, $o, $source, $release, &$sellers) {
         $order = $db->one('SELECT id, number FROM orders WHERE marketplace_order_id = ?', [$o['id']]);
         if (!$order) return false;
         $rank = FULFILMENT_RANK[$o['status']];
@@ -115,8 +120,12 @@ function apply_marketplace_status(array $o): bool
             }
             $db->exec('UPDATE order_items SET fulfilment = ?, carrier = CASE WHEN ? <> \'\' THEN ? ELSE carrier END, tracking_number = CASE WHEN ? <> \'\' THEN ? ELSE tracking_number END WHERE id = ?',
                 [$o['status'], $o['carrier'], $o['carrier'], $o['tracking'], $o['tracking'], $l['id']]);
-            log_item_status($l['id'], $o['status'], 'marketplace', $o['note']);
+            log_item_status($l['id'], $o['status'], $source, $o['note']);
             $sellers[$l['seller_id']] = $order['number'] ?: $o['id'];
+        }
+        // Delivered: start the hold clock on the sellers' money. (Completed also releases it, in case Delivered was skipped.)
+        if (FULFILMENT_RANK[$o['status']] >= FULFILMENT_RANK['delivered']) {
+            $db->exec("UPDATE wallet_entries SET available_at = ? WHERE available_at = ? AND order_item_id IN (SELECT id FROM order_items WHERE order_id = ?)", [$release, NOT_DELIVERED_YET, $order['id']]);
         }
         return true;
     });
@@ -181,9 +190,8 @@ function record_paid_order(array $event): array
     $o = $event['order'];
     if (!$o['items']) throw new OrderRejected('The order has no items.');
     $rate = commission_percent();
-    $hold = hold_days();
     $sellers = [];
-    $result = $db->tx(function () use ($db, $o, $rate, $hold, &$sellers) {
+    $result = $db->tx(function () use ($db, $o, $rate, &$sellers) {
         if ($db->val('SELECT id FROM orders WHERE marketplace_order_id = ?', [$o['id']])) return ['duplicate' => true];
         $orderId = uuid();
         try {
@@ -215,7 +223,7 @@ function record_paid_order(array $event): array
                 'commission_rate' => $rate, 'commission' => $commission, 'net' => $net, 'status' => 'paid', 'fulfilment' => 'placed', 'created_at' => now_db()]);
             log_item_status($itemId, 'placed', 'marketplace', 'Order paid');
             $db->insert('wallet_entries', ['id' => uuid(), 'seller_id' => $p['seller_id'], 'kind' => 'sale', 'amount' => $net, 'currency' => $o['currency'], 'order_item_id' => $itemId,
-                'note' => 'Order ' . ($o['number'] ?: $o['id']), 'available_at' => db_plus('+' . $hold . ' days', $o['placed_at']), 'created_at' => now_db()]);
+                'note' => 'Order ' . ($o['number'] ?: $o['id']), 'available_at' => NOT_DELIVERED_YET, 'created_at' => now_db()]);
             if ($it['variation_id']) {
                 $db->exec('UPDATE product_variations SET stock = CASE WHEN stock > ? THEN stock - ? ELSE 0 END WHERE id = ?', [$it['quantity'], $it['quantity'], $it['variation_id']]);
             } elseif ((int) $p['manage_stock'] === 1) {
@@ -227,6 +235,7 @@ function record_paid_order(array $event): array
         return ['duplicate' => false];
     });
     if (!$result['duplicate']) {
+        announce('orders', 'order', 'New order ' . ($o['number'] ?: $o['id']));
         foreach ($sellers as $sid => $net) announce('seller', 'sale', 'New sale: ' . $o['currency'] . ' ' . number_format($net, 2) . ' earned', $sid);
     }
     return $result;

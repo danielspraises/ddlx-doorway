@@ -262,6 +262,9 @@ final class Verola_Connector {
 	public static function rest_order_status($request) {
 		$order = wc_get_order((int) $request->get_param('order_id'));
 		$status = (string) $request->get_param('status');
+		if ($order && in_array($status, ['shipped', 'delivered', 'completed', 'cancelled', 'refunded'], true)) {
+			return self::admin_order_status($order, $status, $request);
+		}
 		$seller = sanitize_text_field((string) $request->get_param('seller_id'));
 		if (!$order || !in_array($status, ['processing', 'ready_for_shipping'], true) || $seller === '') {
 			return new WP_REST_Response(['error' => 'Unknown order or status.'], 404);
@@ -293,6 +296,25 @@ final class Verola_Connector {
 			if ($sellers && !array_diff(array_keys($sellers), $ready)) {
 				$order->update_status('ready-shipping', 'All sellers have packed their items. ');
 			}
+		}
+		return ['ok' => true];
+	}
+
+	// The admin moved the order from Vendor Hub. Apply the same change in WooCommerce.
+	private static function admin_order_status($order, $status, $request) {
+		$carrier = sanitize_text_field((string) $request->get_param('carrier'));
+		$tracking = sanitize_text_field((string) $request->get_param('tracking_number'));
+		if ($carrier !== '') {
+			$order->update_meta_data('_vh_carrier', $carrier);
+			$order->update_meta_data('_vh_tracking', $tracking);
+			$order->save_meta_data();
+		}
+		$note = 'Changed in Vendor Hub. ';
+		if ($status === 'refunded') {
+			$note .= 'Marked refunded for the sellers; the customer\'s payment must still be refunded here. ';
+		}
+		if (!$order->has_status($status)) {
+			$order->update_status($status, $note);
 		}
 		return ['ok' => true];
 	}

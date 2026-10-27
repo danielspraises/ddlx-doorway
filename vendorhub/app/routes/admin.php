@@ -5,14 +5,15 @@ function admin_tabs(array $u): array
 {
     $tabs = [];
     if ($u['isAdmin']) $tabs += ['applications' => 'Applications', 'verifications' => 'Verifications'];
-    $tabs['products'] = 'Products';
+    if ($u['canReview']) $tabs['products'] = 'Products';
+    if ($u['canOrders']) $tabs['orders'] = 'Orders';
     if ($u['isAdmin']) $tabs += ['payouts' => 'Payouts', 'categories' => 'Categories', 'staff' => 'Staff', 'settings' => 'Settings'];
     return $tabs;
 }
 
 route('GET', '/admin', function () {
     $u = require_user();
-    if (!$u['isAdmin'] && !$u['canReview']) redirect(home_path($u));
+    if (!$u['isAdmin'] && !$u['canReview'] && !$u['canOrders']) redirect(home_path($u));
     $tabs = admin_tabs($u);
     $tab = array_key_exists(input('tab'), $tabs) ? input('tab') : array_key_first($tabs);
     $vars = ['title' => $tabs[$tab], 'tab' => $tab, 'tabs' => $tabs, 'user' => $u, 'sel' => input('id'), 'filter' => input('filter'), 'live_refresh' => !in_array($tab, ['categories', 'staff', 'settings'], true)];
@@ -20,12 +21,22 @@ route('GET', '/admin', function () {
         case 'applications': $vars['items'] = application_review_list(); break;
         case 'verifications': $vars['items'] = verification_review_list(); break;
         case 'products': $vars['items'] = review_queue(); break;
+        case 'orders': $f = array_key_exists(input('filter'), ADMIN_ORDER_FILTERS) ? input('filter') : 'open'; $vars['items'] = admin_orders($f); $vars['filter'] = $f; $vars['history'] = []; break;
         case 'payouts': $vars['items'] = withdrawal_review_list(); break;
         case 'categories': $vars['all'] = categories_all(true); break;
         case 'staff': $vars['items'] = staff_list(); break;
         case 'settings': break;
     }
     render('admin', $vars);
+});
+
+route('POST', '/admin/order', function () {
+    $u = require_orders();
+    $to = input('to');
+    $err = admin_set_order_status($u, input('id'), $to, input('carrier'), input('tracking'), input('restock') !== 'no', input('note'));
+    $done = ['shipped' => 'Marked as shipped. Sellers and the marketplace are updated.', 'delivered' => 'Marked as delivered. The sellers\' payout clock has started.', 'completed' => 'Order completed.',
+        'cancelled' => 'Order cancelled and the sellers\' earnings reversed.', 'refunded' => 'Order marked as refunded and the sellers\' earnings reversed.'][$to] ?? 'Saved.';
+    redirect('/admin?tab=orders&filter=' . rawurlencode(input('filter') ?: 'open'), $err ?? $done, $err ? 'error' : 'ok');
 });
 
 $adminBack = function (string $tab, ?string $err, string $done, string $extra = ''): never {

@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 route('GET', '/apply', function () {
     $u = require_user();
-    if ($u['isAdmin'] || $u['canReview']) redirect(home_path($u));
+    if ($u['isAdmin'] || $u['canReview'] || $u['canOrders']) redirect(home_path($u));
     $app = load_application($u['id']);
     $editable = !$app || in_array($app['status'], ['draft', 'needs_corrections'], true);
     $step = max(1, min(5, (int) input('step', (string) ($app['current_step'] ?? 1))));

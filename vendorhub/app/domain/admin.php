@@ -58,7 +58,7 @@ function verification_review_list(): array
 
 // ---------------------------------------------------------------- staff
 
-const STAFF_PERMISSIONS = ['products' => 'Review and publish products'];
+const STAFF_PERMISSIONS = ['products' => 'Review and publish products', 'orders' => 'Manage orders (pickup, shipping, delivery)'];
 
 function staff_list(): array
 {

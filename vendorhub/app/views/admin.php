@@ -23,7 +23,7 @@ $docLinks = function (array $docs): string {
 ?>
 <p class="eyebrow"><?= $user['isAdmin'] ? 'Staff review queue' : 'Product review' ?></p>
 <h1><?= e($tabs[$tab]) ?></h1>
-<?= tabs_nav($nav, $tab, '/admin', ['applications' => $badges['applications'], 'verifications' => $badges['verifications'], 'products' => $badges['products'], 'payouts' => $badges['payouts']]) ?>
+<?= tabs_nav($nav, $tab, '/admin', ['applications' => $badges['applications'], 'verifications' => $badges['verifications'], 'products' => $badges['products'], 'payouts' => $badges['payouts'], 'orders' => $badges['orders'] ?? 0]) ?>
 
 <?php if ($tab === 'applications'):
     $filters = ['pending' => 'Under review', 'all' => 'All'];
@@ -91,6 +91,39 @@ $docLinks = function (array $docs): string {
       <div><a href="/admin?tab=products&id=<?= e($p['id']) ?>"><strong><?= e($p['name']) ?></strong></a><div class="muted small"><?= e($p['store_name']) ?> · <?= e(category_label($p)) ?> · <?= e(price_label($p)) ?></div></div></div><span><?= pill($p['status'], PRODUCT_STATUS_LABEL) ?> <?= $p['live'] ? pill('live') : '' ?></span></li><?php endforeach; ?>
       <?php if (!$list): ?><li class="muted">Nothing here.</li><?php endif; ?></ul>
   <?php endif; ?>
+<?php endif; ?>
+
+<?php if ($tab === 'orders'): ?>
+  <p class="muted">Move orders from here or from WooCommerce. Either way both places stay in step. Sellers pack their items in Vendor Hub; you collect, ship and close the order.</p>
+  <div class="row" style="margin:16px 0"><?php foreach (ADMIN_ORDER_FILTERS as $k => $l): ?><a class="btn btn-sm <?= $filter === $k ? '' : 'btn-outline' ?>" href="/admin?tab=orders&filter=<?= $k ?>"><?= e($l) ?></a><?php endforeach; ?></div>
+  <ul class="list"><?php foreach ($items as $o): $state = $o['state']; ?><li>
+    <div class="row between" style="align-items:flex-start;gap:16px"><div>
+      <strong><?= $o['number'] ? '#' . e($o['number']) : 'Order ' . e($o['marketplace_order_id']) ?></strong> · <?= e($m($o['total'], $o['currency'])) ?>
+      <?= $state === 'refunded' ? pill('refunded') : pill($state, FULFILMENT_LABEL, ['placed' => 'warn', 'processing' => 'warn', 'ready_for_shipping' => 'warn', 'completed' => 'ok']) ?>
+      <div class="muted small"><?= e(human_date($o['placed_at'], true)) ?> · <?= e($o['customer_name'] ?: 'Customer') ?> · <?= e(trim($o['ship_city'] . ', ' . $o['ship_state'], ', ')) ?></div>
+      <div class="small" style="margin-top:6px"><?php foreach ($o['items'] as $it): ?><?= (int) $it['quantity'] ?> × <?= e($it['name']) ?><?= $it['status'] === 'refunded' ? ' (refunded)' : ($it['fulfilment'] !== $state && $state !== 'refunded' ? ' <span class="muted">(' . e(strtolower(FULFILMENT_LABEL[$it['fulfilment']])) . ')</span>' : '') ?><br><?php endforeach; ?></div>
+      <div class="muted small">Seller<?= count($o['seller_labels']) > 1 ? 's' : '' ?>: <?= e(implode(', ', $o['seller_labels'])) ?><?= $o['carrier'] ? ' · ' . e(trim($o['carrier'] . ' ' . $o['tracking'])) : '' ?></div></div>
+    <?php if ($state !== 'refunded' && $state !== 'completed'): ?><div style="min-width:280px">
+      <?php if (FULFILMENT_RANK[$state] < FULFILMENT_RANK['shipped']): ?>
+        <form method="post" action="/admin/order" class="stack" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($o['id']) ?>"><input type="hidden" name="to" value="shipped"><input type="hidden" name="filter" value="<?= e($filter) ?>">
+          <?php if ($state !== 'ready_for_shipping'): ?><span class="muted small">Not packed by every seller yet. You can still ship it.</span><?php endif; ?>
+          <select name="carrier" aria-label="Carrier"><?php foreach (CARRIERS as $c): ?><option><?= e($c) ?></option><?php endforeach; ?></select>
+          <input name="tracking" maxlength="100" placeholder="Tracking number" aria-label="Tracking number">
+          <button class="btn btn-sm" type="submit" data-confirm="Mark this order as picked up and shipped?">Picked up &amp; shipped</button></form>
+      <?php elseif ($state === 'shipped'): ?>
+        <form method="post" action="/admin/order" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($o['id']) ?>"><input type="hidden" name="to" value="delivered"><input type="hidden" name="filter" value="<?= e($filter) ?>"><button class="btn btn-sm" type="submit" data-confirm="Mark as delivered? This starts the sellers' payout clock.">Mark delivered</button></form>
+      <?php elseif ($state === 'delivered'): ?>
+        <form method="post" action="/admin/order" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($o['id']) ?>"><input type="hidden" name="to" value="completed"><input type="hidden" name="filter" value="<?= e($filter) ?>"><button class="btn btn-sm" type="submit" data-confirm="Close this order as completed?">Mark completed</button></form>
+      <?php endif; ?>
+      <details style="margin-top:8px"><summary class="muted small"><?= FULFILMENT_RANK[$state] < FULFILMENT_RANK['shipped'] ? 'Cancel or refund' : 'Refund' ?></summary>
+        <form method="post" action="/admin/order" class="stack" data-keep style="margin-top:8px"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($o['id']) ?>"><input type="hidden" name="filter" value="<?= e($filter) ?>">
+          <input name="note" maxlength="200" placeholder="Reason (optional)" aria-label="Reason">
+          <label class="check"><input type="checkbox" name="restock" value="yes" checked><span>Put the items back in stock</span></label>
+          <p class="muted small" style="margin:0">This reverses the sellers' earnings and updates WooCommerce. Returning the customer's money is still done in your payment gateway in WooCommerce.</p>
+          <div class="row"><?php if (FULFILMENT_RANK[$state] < FULFILMENT_RANK['shipped']): ?><button class="btn btn-sm btn-outline" name="to" value="cancelled" type="submit" data-confirm="Cancel this order?">Cancel order</button><?php endif; ?>
+          <button class="btn btn-sm btn-danger" name="to" value="refunded" type="submit" data-confirm="Mark this order as refunded and reverse the sellers' earnings?">Refund</button></div></form></details>
+    </div><?php endif; ?></div></li><?php endforeach; ?>
+    <?php if (!$items): ?><li class="muted">No orders here.</li><?php endif; ?></ul>
 <?php endif; ?>
 
 <?php if ($tab === 'payouts'): ?>

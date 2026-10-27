@@ -12,7 +12,7 @@ route('GET', '/api/pulse', function () {
     if ($since !== null && $last > $since) {
         $rows = $db->all('SELECT id, audience, seller_id, type, message FROM events WHERE id > ? ORDER BY id LIMIT 50', [$since]);
         foreach ($rows as $r) {
-            $mine = ($r['audience'] === 'seller' && $r['seller_id'] === $u['id']) || ($r['audience'] === 'reviewers' && $u['canReview']) || ($r['audience'] === 'admins' && $u['isAdmin']);
+            $mine = ($r['audience'] === 'seller' && $r['seller_id'] === $u['id']) || ($r['audience'] === 'reviewers' && $u['canReview']) || ($r['audience'] === 'admins' && $u['isAdmin']) || ($r['audience'] === 'orders' && $u['canOrders']);
             if ($mine) $events[] = ['type' => $r['type'], 'message' => $r['message']];
         }
     }

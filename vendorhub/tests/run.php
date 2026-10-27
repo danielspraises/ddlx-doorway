@@ -114,8 +114,9 @@ eq($bal["total"], 18000.0, "wallet total (20000 less 10 percent)");
 eq(load_product($pid)['stock'], 9, 'stock reduced by sale');
 eq(load_product($vp['id'])['variations'][0]['stock'], 3, 'variation stock reduced');
 eq(count(seller_sales($sid)), 2, 'two sale lines');
-// hold: nothing available yet? order was 10 days ago and hold is 7 -> available
-eq($bal['available'], 18000.0, 'available after hold');
+// money stays pending until the order is delivered
+eq($bal['available'], 0.0, 'nothing withdrawable before delivery');
+eq($bal['pending'], 18000.0, 'earnings pending before delivery');
 
 // ---- fulfilment (shared with the marketplace)
 $itemId = (string) db()->val('SELECT id FROM order_items WHERE seller_id = ? ORDER BY created_at LIMIT 1', [$sid]);
@@ -145,10 +146,45 @@ ok(apply_marketplace_status($st('shipped', 'DHL', 'TRK1')), 'shipped applied');
 eq(db()->val('SELECT tracking_number FROM order_items WHERE id = ?', [$itemId]), 'TRK1', 'tracking stored');
 apply_marketplace_status($st('ready_for_shipping'));
 eq(db()->val('SELECT fulfilment FROM order_items WHERE id = ?', [$itemId]), 'shipped', 'status never goes backwards');
+set_setting('payout_hold_days', '7');
 apply_marketplace_status($st('delivered'));
+eq(wallet_balances($sid)[0]['available'], 0.0, 'still held for the hold period after delivery');
+db()->exec("UPDATE wallet_entries SET available_at = ? WHERE available_at > ?", [db_plus('-1 days'), db_plus('+1 days')]);
+eq(wallet_balances($sid)[0]['available'], 18000.0, 'withdrawable once the hold has passed');
 apply_marketplace_status($st('completed'));
 eq(db()->val('SELECT fulfilment FROM order_items WHERE id = ?', [$itemId]), 'completed', 'completed');
 ok(count(item_history([$itemId])[$itemId]) >= 5, 'history recorded');
+
+// ---- admin moves orders from Vendor Hub
+$adm = ['id' => $admin, 'isAdmin' => true];
+$ev2 = parse_order_event(['event' => 'order.paid', 'order' => ['id' => 'WC-2', 'number' => '1002', 'currency' => 'NGN', 'placed_at' => gmdate('c', time() - 86400), 'customer_name' => 'Bo',
+    'items' => [['product_id' => $pid, 'quantity' => 1, 'unit_price' => 10000]]]]);
+record_paid_order($ev2);
+$o2 = (string) db()->val("SELECT id FROM orders WHERE marketplace_order_id = 'WC-2'");
+$i2 = (string) db()->val('SELECT id FROM order_items WHERE order_id = ?', [$o2]);
+eq(count(admin_orders('ready')), 0, 'new order not ready yet');
+ok(admin_set_order_status($adm, $o2, 'delivered') !== null, 'cannot deliver before shipping');
+ok(admin_set_order_status($adm, $o2, 'shipped', 'Nope', 'T') !== null, 'carrier must be known');
+ok(admin_set_order_status($adm, $o2, 'shipped', 'DHL', '') !== null, 'tracking required');
+$GLOBALS['vh_market_stub'] = fn () => null; set_setting('marketplace_url', 'https://shop.test'); set_setting('marketplace_api_key', 'k');
+ok(admin_set_order_status($adm, $o2, 'shipped', 'DHL', 'ADM1') !== null, 'unreachable marketplace: nothing changes');
+eq(db()->val('SELECT fulfilment FROM order_items WHERE id = ?', [$i2]), 'placed', 'still placed');
+$sent = [];
+$GLOBALS['vh_market_stub'] = function ($path, $method, $body) use (&$sent) { $sent[] = $body; return ['ok' => true]; };
+eq(seller_set_fulfilment($sid, $i2, 'ready_for_shipping'), null, 'seller packs it');
+eq(count(admin_orders('ready')), 1, 'now ready for pickup');
+eq(admin_set_order_status($adm, $o2, 'shipped', 'DHL', 'ADM1'), null, 'admin ships from the hub');
+eq($sent[count($sent) - 1]['status'], 'shipped', 'marketplace told shipped');
+eq($sent[count($sent) - 1]['tracking_number'], 'ADM1', 'marketplace given tracking');
+eq(db()->val('SELECT tracking_number FROM order_items WHERE id = ?', [$i2]), 'ADM1', 'tracking stored locally');
+ok(admin_set_order_status($adm, $o2, 'cancelled') !== null, 'shipped order cannot be cancelled');
+eq(admin_set_order_status($adm, $o2, 'delivered'), null, 'delivered');
+eq(admin_set_order_status($adm, $o2, 'refunded', '', '', true, 'damaged'), null, 'admin refunds from the hub');
+eq($sent[count($sent) - 1]['status'], 'refunded', 'marketplace told refunded');
+eq(db()->val('SELECT status FROM order_items WHERE id = ?', [$i2]), 'refunded', 'item refunded');
+ok(admin_set_order_status($adm, $o2, 'refunded') !== null, 'cannot refund twice');
+eq(admin_orders('done')[0]['state'] ?? '', 'refunded', 'listed as finished');
+unset($GLOBALS['vh_market_stub']); set_setting('marketplace_url', ''); set_setting('marketplace_api_key', '');
 
 // ---- withdrawals
 eq(add_bank_account($sid, 'GTBank', '0123456789', 'A B'), null, 'bank added');

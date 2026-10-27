@@ -24,7 +24,7 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
         <a href="<?= e($href) ?>" class="<?= $active ? 'active' : '' ?>"><?= e($label) ?><span class="badge-count<?= $badge > 0 ? '' : ' hidden' ?>" data-badge="<?= e($label) ?>"><?= (int) $badge ?></span></a>
       <?php endforeach; ?>
       <span class="nav-user"><?= e($user['email']) ?>
-        <small><?= $user['isAdmin'] ? 'Admin' : ($user['canReview'] ? 'Staff · Product review' : e(STAGE_LABEL[$user['stage']] ?? '')) ?></small></span>
+        <small><?= $user['isAdmin'] ? 'Admin' : ($user['canReview'] || $user['canOrders'] ? 'Staff' : e(STAGE_LABEL[$user['stage']] ?? '')) ?></small></span>
       <form method="post" action="/logout"><?= csrf_field() ?><button class="link-btn" type="submit">Sign out</button></form>
     </nav>
     <?php endif; ?>

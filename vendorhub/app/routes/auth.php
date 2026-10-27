@@ -84,7 +84,7 @@ route('GET', '/api/pulse', function () {
         $events = [];
         foreach ($rows as $r) {
             $mine = ($r['audience'] === 'seller' && $r['seller_id'] === $u['id'])
-                || ($r['audience'] === 'reviewers' && $u['canReview'])
+                || ($r['audience'] === 'reviewers' && $u['canReview']) || ($r['audience'] === 'orders' && $u['canOrders'])
                 || ($r['audience'] === 'admins' && $u['isAdmin']);
             if ($mine) $events[] = ['type' => $r['type'], 'message' => $r['message']];
         }

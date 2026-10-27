@@ -108,10 +108,14 @@ One order, one lifecycle, shared by both systems:
 | New order (paid) | marketplace | `order.paid` |
 | Processing | seller, in Vendor Hub | Vendor Hub calls `POST {marketplace}/wp-json/vendor-hub/v1/order-status` |
 | Ready for shipping | seller, in Vendor Hub | same call |
-| Shipped, Delivered, Completed | admin, in the marketplace | `order.status` |
-| Refunded / Cancelled | admin, in the marketplace | `order.refunded` |
+| Shipped, Delivered, Completed | admin, in **either** Vendor Hub (Orders tab) or WooCommerce | from WooCommerce: `order.status`; from Vendor Hub: the `/order-status` call below |
+| Refunded / Cancelled | admin, in either place | from WooCommerce: `order.refunded`; from Vendor Hub: the `/order-status` call |
 
-Vendor Hub to marketplace (Bearer API key): `{"order_id":"1042","seller_id":"<uuid>","status":"processing"|"ready_for_shipping","product_ids":["<uuid>"]}`.
+Vendor Hub to marketplace (Bearer API key). Seller update: `{"order_id":"1042","seller_id":"<uuid>","status":"processing"|"ready_for_shipping","product_ids":["<uuid>"]}`.
+Admin update from Vendor Hub: `{"order_id":"1042","status":"shipped"|"delivered"|"completed"|"cancelled"|"refunded","carrier":"DHL","tracking_number":"123","restock":true,"by":"admin"}`;
+the plugin sets the WooCommerce order to that status. Refunding here reverses seller earnings but the customer's money is returned through the payment gateway in WooCommerce.
+
+**Payouts follow delivery.** A sale's earnings stay pending until the order is delivered (or completed); they become withdrawable after the hold period (Admin → Settings) counted from that moment.
 If the marketplace cannot be reached the seller sees an error and nothing changes, so the two never disagree. When every seller on an
 order has packed their items the plugin moves the WooCommerce order to **Ready for shipping**.
 

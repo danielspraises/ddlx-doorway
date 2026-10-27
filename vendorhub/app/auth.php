@@ -113,7 +113,11 @@ function user_from_token(string $token): ?array
     $perms = array_values(array_filter(explode(',', (string) ($row['permissions'] ?? ''))));
     $isAdmin = (int) $row['is_admin'] > 0;
     $canReview = $isAdmin || in_array('products', $perms, true);
-    $pending = ['applications' => 0, 'verifications' => 0, 'products' => 0, 'payouts' => 0];
+    $canOrders = $isAdmin || in_array('orders', $perms, true);
+    $pending = ['applications' => 0, 'verifications' => 0, 'products' => 0, 'payouts' => 0, 'orders' => 0];
+    if ($canOrders) {
+        $pending['orders'] = (int) $db->val("SELECT COUNT(DISTINCT order_id) FROM order_items WHERE status = 'paid' AND fulfilment = 'ready_for_shipping' AND order_id NOT IN (SELECT order_id FROM order_items WHERE status = 'paid' AND fulfilment IN ('placed', 'processing'))");
+    }
     if ($canReview) {
         $pending['products'] = (int) $db->val("SELECT COUNT(*) FROM products WHERE status = 'pending_review'");
     }
@@ -129,6 +133,7 @@ function user_from_token(string $token): ?array
         'isAdmin' => $isAdmin,
         'isStaff' => count($perms) > 0,
         'canReview' => $canReview,
+        'canOrders' => $canOrders,
         'stage' => seller_stage($row['application_status'], $row['verification_status']),
         'pending' => $pending,
     ];
@@ -137,7 +142,7 @@ function user_from_token(string $token): ?array
 // Where a person should land after signing in or finishing an action.
 function home_path(array $user): string
 {
-    if ($user['isAdmin'] || $user['canReview']) return '/admin';
+    if ($user['isAdmin'] || $user['canReview'] || !empty($user['canOrders'])) return '/admin';
     if ($user['stage'] === 'verified') return '/seller';
     if (str_starts_with($user['stage'], 'verification_')) return '/verification';
     return '/apply';
@@ -166,6 +171,13 @@ function require_reviewer(): array
 {
     $u = require_user();
     if (!$u['canReview']) abort(403, 'You do not have permission to review products.');
+    return $u;
+}
+
+function require_orders(): array
+{
+    $u = require_user();
+    if (!$u['canOrders']) abort(403, 'You do not have permission to manage orders.');
     return $u;
 }
 

@@ -1,5 +1,8 @@
 # Vendor Hub
 
+> **Hosting on Namecheap Stellar Plus?** Use the PHP edition in [`vendorhub/`](vendorhub/README.md). It needs only PHP and MySQL. The TypeScript/Postgres app below is kept for reference.
+
+
 You are a programmer, developer, web designer.
 
 Here is my blueprint

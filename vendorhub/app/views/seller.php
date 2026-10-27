@@ -1,0 +1,137 @@
+<?php
+/** @var string $tab @var array $user */
+$m = fn ($x, $c = 'NGN') => money($x, $c);
+?>
+<p class="eyebrow">Seller Center</p>
+<h1><?= e(SELLER_TABS[$tab]) ?></h1>
+<?= tabs_nav(SELLER_TABS, $tab, '/seller') ?>
+
+<?php if (in_array($tab, ['overview', 'sales', 'payouts'], true)):
+    $currencies = array_values(array_unique(array_merge(array_column($balances, 'currency'), array_column($month, 'currency'))));
+    if ($currencies): ?>
+  <?php foreach ($currencies as $c):
+      $b = current(array_filter($balances, fn ($x) => $x['currency'] === $c)) ?: ['available' => 0, 'pending' => 0];
+      $mo = current(array_filter($month, fn ($x) => $x['currency'] === $c)) ?: ['net' => 0, 'units' => 0, 'gross' => 0]; ?>
+    <div class="grid g3" style="margin-top:20px">
+      <div class="stat"><p class="muted small">Available to withdraw</p><p class="n"><?= e($m($b['available'], $c)) ?></p></div>
+      <div class="stat"><p class="muted small">Pending (<?= hold_days() ?>-day hold)</p><p class="n"><?= e($m($b['pending'], $c)) ?></p></div>
+      <div class="stat"><p class="muted small">Last 30 days</p><p class="n"><?= e($m($mo['net'], $c)) ?></p><p class="muted small"><?= (int) $mo['units'] ?> units · <?= e($m($mo['gross'], $c)) ?> sold</p></div>
+    </div>
+  <?php endforeach; ?>
+  <p class="muted small">Your earnings are each sale minus the <?= e(rtrim(rtrim(number_format(commission_percent(), 2), '0'), '.')) ?>% marketplace commission. Sales become available to withdraw after <?= hold_days() ?> days.</p>
+<?php else: ?><p class="notice">No sales yet. When a customer buys one of your products on the marketplace, it shows up here.</p><?php endif; endif; ?>
+
+<?php if ($tab === 'overview'):
+    $live = count(array_filter($products, fn ($p) => $p['live']));
+    $review = count(array_filter($products, fn ($p) => $p['status'] === 'pending_review'));
+    $low = array_filter($products, fn ($p) => in_array(stock_state($p), ['low', 'out'], true));
+    $changes = array_filter($products, fn ($p) => in_array($p['status'], ['changes_requested', 'rejected'], true));
+    $attention = array_slice(array_unique(array_merge(array_values($changes), array_values($low)), SORT_REGULAR), 0, 6); ?>
+  <div class="grid g4" style="margin-top:24px">
+    <div class="stat"><p class="muted small">Products</p><p class="n"><?= count($products) ?></p></div>
+    <div class="stat"><p class="muted small">Live on marketplace</p><p class="n"><?= $live ?></p></div>
+    <div class="stat"><p class="muted small">In review</p><p class="n"><?= $review ?></p></div>
+    <div class="stat"><p class="muted small">Low or out of stock</p><p class="n"><?= count($low) ?></p></div>
+  </div>
+  <div class="row" style="margin-top:24px"><a class="btn" href="/products/edit"><?= $products ? 'Add product' : 'Add your first product' ?></a><a class="btn btn-outline" href="/seller?tab=inventory">Manage inventory</a></div>
+  <?php if ($attention): ?><h2>Needs your attention</h2><ul class="list">
+    <?php foreach ($attention as $p): [$k, $l] = product_visibility($p); ?><li class="row between"><a href="/products/edit?id=<?= e($p['id']) ?>"><strong><?= e($p['name']) ?></strong></a><span><?= pill($k, [], ['live' => 'ok', 'hidden' => 'warn']) ?> <?= stock_state($p) !== 'ok' ? pill(stock_state($p)) : '' ?></span></li><?php endforeach; ?></ul><?php endif; ?>
+<?php endif; ?>
+
+<?php if ($tab === 'products'): ?>
+  <div class="row between" style="margin:18px 0"><span class="muted"><?= count($products) ?> product<?= count($products) === 1 ? '' : 's' ?></span><a class="btn" href="/products/edit">Add product</a></div>
+  <?php if (!$products): ?><p class="notice">You have no products yet. Add one, then submit it for review. Approved products appear on the DDLX marketplace.</p><?php endif; ?>
+  <ul class="list">
+  <?php foreach ($products as $p): [$k, $l] = product_visibility($p); ?>
+    <li><div class="row between">
+      <div class="row" style="flex-wrap:nowrap"><?php if ($p['featured_image']): ?><img class="thumb" src="<?= e(product_image_url($p['featured_image'])) ?>" alt=""><?php else: ?><span class="thumb"></span><?php endif; ?>
+        <div><a href="/products/edit?id=<?= e($p['id']) ?>"><strong><?= e($p['name'] ?: 'Untitled') ?></strong></a>
+          <div class="muted small"><?= e($p['sku']) ?> · <?= e(category_label($p)) ?> · <?= e(price_label($p)) ?><?= $p['product_type'] === 'variable' ? ' · ' . count($p['variations']) . ' variations' : '' ?></div>
+          <div style="margin-top:6px"><?= pill($k, [], ['live' => 'ok', 'hidden' => 'warn']) ?> <span class="muted small"><?= e($l) ?></span> <?= stock_state($p) !== 'ok' ? pill(stock_state($p)) : '' ?></div></div></div>
+      <div class="row">
+        <a class="btn btn-outline btn-sm" href="/products/edit?id=<?= e($p['id']) ?>">Edit</a>
+        <?php if (in_array($p['status'], ['draft', 'changes_requested', 'rejected'], true)): ?><form method="post" action="/products/action"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><button class="btn btn-sm" name="action" value="submit">Submit</button></form><?php endif; ?>
+        <?php if ($p['status'] === 'pending_review'): ?><form method="post" action="/products/action"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><button class="btn btn-outline btn-sm" name="action" value="withdraw">Withdraw</button></form><?php endif; ?>
+      </div></div></li>
+  <?php endforeach; ?></ul>
+<?php endif; ?>
+
+<?php if ($tab === 'inventory'): ?>
+  <p class="muted">Stock changes apply straight away, even on live products.</p>
+  <?php if (!$products): ?><p class="notice">Add a product first.</p><?php endif; ?>
+  <div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th class="t-right">In stock</th><th>Change</th></tr></thead><tbody>
+  <?php foreach ($products as $p):
+      $rows = $p['product_type'] === 'variable' ? $p['variations'] : [['id' => null, 'sku' => $p['sku'], 'options' => [], 'stock' => $p['stock']]];
+      foreach ($rows as $r): $state = $p['product_type'] === 'variable' ? ($r['stock'] <= 0 ? 'out' : ($r['stock'] <= $p['low_stock_threshold'] ? 'low' : 'ok')) : stock_state($p); ?>
+    <tr><td><a href="/products/edit?id=<?= e($p['id']) ?>"><strong><?= e($p['name']) ?></strong></a><?= $r['options'] ? '<br><span class="muted small">' . e(implode(' / ', $r['options'])) . '</span>' : '' ?></td>
+      <td><?= e($r['sku']) ?></td>
+      <td class="t-right"><?= !$p['manage_stock'] && $p['product_type'] === 'simple' ? '<span class="muted">Not tracked</span>' : (int) $r['stock'] . ' ' . ($state !== 'ok' ? pill($state) : '') ?></td>
+      <td><form method="post" action="/inventory/adjust" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><input type="hidden" name="variation_id" value="<?= e((string) $r['id']) ?>">
+        <input type="number" name="value" min="0" max="1000000" style="width:90px" aria-label="Quantity" required>
+        <button class="btn btn-outline btn-sm" name="op" value="add" type="submit">Add</button>
+        <button class="btn btn-outline btn-sm" name="op" value="remove" type="submit">Remove</button>
+        <button class="btn btn-sm" name="op" value="set" type="submit">Set to</button></form></td></tr>
+  <?php endforeach; endforeach; ?></tbody></table></div>
+<?php endif; ?>
+
+<?php if ($tab === 'sales'): ?>
+  <h2>Recent sales</h2>
+  <div class="table-wrap"><table><thead><tr><th>Order</th><th>Item</th><th class="t-right">Qty</th><th class="t-right">Sold for</th><th class="t-right">You earn</th><th>Customer</th></tr></thead><tbody>
+  <?php foreach ($sales as $s): $opts = jdec($s['options'], []); ?>
+    <tr><td><strong><?= $s['order_number'] ? '#' . e($s['order_number']) : 'Order' ?></strong><br><span class="muted small"><?= e(human_date($s['placed_at'])) ?></span></td>
+      <td><strong><?= e($s['name']) ?></strong><br><span class="muted small"><?= e($s['sku']) ?><?= $opts ? ' · ' . e(implode(' / ', $opts)) : '' ?></span></td>
+      <td class="t-right"><?= (int) $s['quantity'] ?></td><td class="t-right"><?= e($m($s['line_total'], $s['currency'])) ?></td>
+      <td class="t-right"><?= $s['status'] === 'refunded' ? pill('refunded') : e($m($s['net'], $s['currency'])) ?></td>
+      <td><?= e($s['customer_name'] ?: '—') ?><br><span class="muted small"><?= e(trim($s['ship_city'] . ', ' . $s['ship_state'], ', ')) ?></span></td></tr>
+  <?php endforeach; if (!$sales): ?><tr><td colspan="6" class="muted" style="text-align:center;padding:40px">Sales will be listed here.</td></tr><?php endif; ?></tbody></table></div>
+<?php endif; ?>
+
+<?php if ($tab === 'payouts'): $cur = $balances[0]['currency'] ?? 'NGN'; ?>
+  <h2>Withdraw money</h2>
+  <?php if (!$accounts): ?><p class="muted">Add a bank account below, then request a withdrawal.</p><?php else: ?>
+  <form method="post" action="/payouts/request" class="card" style="max-width:520px" data-keep><?= csrf_field() ?>
+    <p class="muted small" style="margin-top:0">Smallest withdrawal <?= e($m(min_withdrawal(), $cur)) ?><?= withdrawal_fee() > 0 ? ' · fee ' . e($m(withdrawal_fee(), $cur)) . ' per withdrawal' : '' ?>.</p>
+    <div class="grid g2">
+      <div class="field"><label for="wd-cur">Currency</label><select id="wd-cur" name="currency"><?php foreach (($balances ?: [['currency' => 'NGN', 'available' => 0]]) as $b): ?><option value="<?= e($b['currency']) ?>"><?= e($b['currency']) ?> — <?= e($m($b['available'], $b['currency'])) ?> available</option><?php endforeach; ?></select></div>
+      <?= f_text('amount', 'Amount', '', null, ['inputmode' => 'decimal', 'required' => 1]) ?>
+    </div>
+    <div class="field"><label for="wd-bank">Pay to</label><select id="wd-bank" name="account_id"><?php foreach ($accounts as $a): ?><option value="<?= e($a['id']) ?>"><?= e($a['bank_name'] . ' · ' . $a['account_number'] . ' · ' . $a['account_name']) ?></option><?php endforeach; ?></select></div>
+    <button class="btn" type="submit">Request withdrawal</button>
+  </form><?php endif; ?>
+
+  <h2>Bank accounts</h2>
+  <ul class="list"><?php foreach ($accounts as $a): ?><li class="row between"><div><strong><?= e($a['bank_name']) ?> · <?= e($a['account_number']) ?></strong><div class="muted small"><?= e($a['account_name']) ?></div></div>
+    <form method="post" action="/payouts/bank" data-confirm="Remove this bank account?"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($a['id']) ?>"><button class="btn btn-ghost btn-sm" name="action" value="remove">Remove</button></form></li><?php endforeach; ?>
+    <?php if (!$accounts): ?><li class="muted">No bank accounts yet.</li><?php endif; ?></ul>
+  <?php if (count($accounts) < MAX_BANK_ACCOUNTS): ?>
+  <form method="post" action="/payouts/bank" class="card" style="max-width:520px;margin-top:16px" data-keep><?= csrf_field() ?><h3 style="margin-top:0">Add a bank account</h3>
+    <?= f_text('bank_name', 'Bank', '', null, ['required' => 1, 'placeholder' => 'e.g. GTBank']) ?>
+    <?= f_text('account_number', 'Account number', '', null, ['required' => 1, 'inputmode' => 'numeric', 'maxlength' => 10]) ?>
+    <?= f_text('account_name', 'Account name', '', null, ['required' => 1]) ?>
+    <button class="btn" type="submit">Save account</button></form><?php endif; ?>
+
+  <h2>Withdrawal history</h2>
+  <ul class="list"><?php foreach ($withdrawals as $w): ?><li class="row between"><div><strong><?= e($m($w['amount'], $w['currency'])) ?></strong><?= (float) $w['fee'] > 0 ? ' <span class="muted small">(you receive ' . e($m((float) $w['amount'] - (float) $w['fee'], $w['currency'])) . ')</span>' : '' ?>
+    <div class="muted small"><?= e(human_date($w['requested_at'])) ?> · <?= e($w['bank_name'] . ' ' . $w['account_number']) ?><?= $w['reference'] ? ' · Ref ' . e($w['reference']) : '' ?></div><?= $w['admin_note'] ? '<div class="small">' . e($w['admin_note']) . '</div>' : '' ?></div>
+    <div class="row"><?= pill($w['status'], WITHDRAWAL_LABEL) ?><?php if ($w['status'] === 'requested'): ?><form method="post" action="/payouts/cancel" data-confirm="Cancel this withdrawal?"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($w['id']) ?>"><button class="btn btn-ghost btn-sm">Cancel</button></form><?php endif; ?></div></li><?php endforeach; ?>
+    <?php if (!$withdrawals): ?><li class="muted">No withdrawals yet.</li><?php endif; ?></ul>
+<?php endif; ?>
+
+<?php if ($tab === 'store'): ?>
+  <div class="grid g2" style="margin-top:20px">
+  <?php foreach (['logo' => 'Logo', 'banner' => 'Banner'] as $kind => $label): ?>
+    <div><p class="label"><?= $label ?></p>
+      <div class="imgbox<?= $kind === 'banner' ? ' banner-box' : '' ?>"><?php if ($store[$kind]): ?><img src="/files/store?p=<?= e(rawurlencode($store[$kind])) ?>" alt="<?= e($label) ?>"><?php endif; ?></div>
+      <form method="post" action="/store/image" enctype="multipart/form-data" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="kind" value="<?= $kind ?>"><input type="file" name="file" accept="image/jpeg,image/png,image/webp" required><button class="btn btn-outline btn-sm" name="action" value="upload">Upload</button><?php if ($store[$kind]): ?><button class="btn btn-ghost btn-sm" name="action" value="remove" formnovalidate>Remove</button><?php endif; ?></form></div>
+  <?php endforeach; ?></div>
+  <form method="post" action="/store/save" style="max-width:700px;margin-top:24px" data-keep><?= csrf_field() ?>
+    <?= f_text('tagline', 'Tagline', $store['tagline'], null, ['maxlength' => 160]) ?>
+    <?= f_area('description', 'About your store', $store['description'], null, ['rows' => 5, 'maxlength' => 3000]) ?>
+    <div class="grid g2"><?= f_text('phone', 'Store phone', $store['phone'], null, ['type' => 'tel', 'maxlength' => 30]) ?><?= f_text('support_email', 'Support email', $store['support_email'], null, ['type' => 'email']) ?></div>
+    <?= f_area('shipping_policy', 'Shipping policy', $store['shipping_policy'], null, ['rows' => 4, 'maxlength' => 3000]) ?>
+    <?= f_area('return_policy', 'Return policy', $store['return_policy'], null, ['rows' => 4, 'maxlength' => 3000]) ?>
+    <div class="card"><?= f_check('vacation', 'Vacation mode — hide all my products from the marketplace until I switch it off', $store['vacation']) ?>
+      <?= f_text('vacation_message', 'Message to customers', $store['vacation_message'], null, ['maxlength' => 300]) ?></div>
+    <p><button class="btn" type="submit">Save store</button></p>
+  </form>
+<?php endif; ?>

@@ -200,17 +200,26 @@ CREATE TABLE order_items (
   commission DECIMAL(12,2) NOT NULL,
   net DECIMAL(12,2) NOT NULL,
   status VARCHAR(10) NOT NULL DEFAULT 'paid',
-  fulfilment VARCHAR(12) NOT NULL DEFAULT 'pending',
+  fulfilment VARCHAR(20) NOT NULL DEFAULT 'placed',
   carrier VARCHAR(80) NOT NULL DEFAULT '',
   tracking_number VARCHAR(100) NOT NULL DEFAULT '',
-  shipped_at DATETIME(3) NULL,
-  delivered_at DATETIME(3) NULL,
   created_at DATETIME(3) NOT NULL,
   CONSTRAINT oi_order_fk FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
   CONSTRAINT oi_seller_fk FOREIGN KEY (seller_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX order_items_seller_idx ON order_items (seller_id, created_at);
 CREATE INDEX order_items_order_idx ON order_items (order_id);
+
+CREATE TABLE order_item_log (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  order_item_id CHAR(36) NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  source VARCHAR(12) NOT NULL,
+  note VARCHAR(250) NOT NULL DEFAULT '',
+  created_at DATETIME(3) NOT NULL,
+  CONSTRAINT oil_item_fk FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX order_item_log_idx ON order_item_log (order_item_id, created_at);
 
 CREATE TABLE bank_accounts (
   id CHAR(36) NOT NULL PRIMARY KEY,

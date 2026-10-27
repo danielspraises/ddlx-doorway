@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -35,6 +35,10 @@ final class Verola_Connector {
 		add_action(self::CRON, [__CLASS__, 'sync']);
 		add_action(self::SEND, [__CLASS__, 'send_order'], 10, 3);
 		add_action('plugins_loaded', [__CLASS__, 'boot']);
+		add_action('init', [__CLASS__, 'register_statuses']);
+		add_filter('wc_order_statuses', [__CLASS__, 'order_statuses']);
+		add_filter('woocommerce_reports_order_statuses', [__CLASS__, 'report_statuses']);
+		add_filter('woocommerce_order_is_paid_statuses', [__CLASS__, 'paid_statuses']);
 		register_activation_hook(__FILE__, [__CLASS__, 'activate']);
 		register_deactivation_hook(__FILE__, [__CLASS__, 'deactivate']);
 	}
@@ -56,6 +60,11 @@ final class Verola_Connector {
 		add_action('woocommerce_order_status_processing', [__CLASS__, 'order_paid']);
 		add_action('woocommerce_order_status_completed', [__CLASS__, 'order_paid']);
 		add_action('woocommerce_order_status_refunded', [__CLASS__, 'order_refunded']);
+		add_action('woocommerce_order_status_cancelled', [__CLASS__, 'order_cancelled']);
+		// Delivery statuses are run by the marketplace; Vendor Hub is told about each change.
+		add_action('woocommerce_order_status_changed', [__CLASS__, 'order_status_changed'], 10, 3);
+		add_action('woocommerce_admin_order_data_after_shipping_address', [__CLASS__, 'handoff_fields']);
+		add_action('woocommerce_process_shop_order_meta', [__CLASS__, 'save_handoff_fields']);
 		if (!wp_next_scheduled(self::CRON)) {
 			wp_schedule_event(time() + 60, 'verola_minute', self::CRON);
 		}
@@ -187,7 +196,109 @@ final class Verola_Connector {
 
 	// ------------------------------------------------------------------ SKUs (Vendor Hub asks this store)
 
+	// ------------------------------------------------------------------ delivery statuses
+
+	const STATUSES = ['ready-shipping' => 'Ready for shipping', 'shipped' => 'Shipped', 'delivered' => 'Delivered'];
+
+	public static function register_statuses() {
+		foreach (self::STATUSES as $slug => $label) {
+			register_post_status('wc-' . $slug, [
+				'label' => $label,
+				'public' => true,
+				'exclude_from_search' => false,
+				'show_in_admin_all_list' => true,
+				'show_in_admin_status_list' => true,
+				/* translators: %s: number of orders */
+				'label_count' => _n_noop($label . ' <span class="count">(%s)</span>', $label . ' <span class="count">(%s)</span>'),
+			]);
+		}
+	}
+
+	public static function order_statuses($statuses) {
+		$out = [];
+		foreach ($statuses as $key => $label) {
+			$out[$key] = $label;
+			if ($key === 'wc-processing') {
+				foreach (self::STATUSES as $slug => $l) {
+					$out['wc-' . $slug] = $l;
+				}
+			}
+		}
+		return $out;
+	}
+
+	public static function report_statuses($statuses) {
+		return array_merge((array) $statuses, array_keys(self::STATUSES));
+	}
+
+	public static function paid_statuses($statuses) {
+		return array_merge((array) $statuses, array_keys(self::STATUSES));
+	}
+
+	// Carrier and tracking number, typed by the admin when the parcel is picked up.
+	public static function handoff_fields($order) {
+		echo '<div class="address"><p><strong>Vendor Hub handoff</strong></p></div><div class="edit_address">';
+		woocommerce_wp_text_input(['id' => '_vh_carrier', 'label' => 'Carrier', 'value' => $order->get_meta('_vh_carrier'), 'wrapper_class' => 'form-field-wide']);
+		woocommerce_wp_text_input(['id' => '_vh_tracking', 'label' => 'Tracking number', 'value' => $order->get_meta('_vh_tracking'), 'wrapper_class' => 'form-field-wide']);
+		echo '</div>';
+	}
+
+	public static function save_handoff_fields($order_id) {
+		$order = wc_get_order($order_id);
+		if (!$order) {
+			return;
+		}
+		// phpcs:ignore WordPress.Security.NonceVerification -- WooCommerce verifies the nonce for this hook.
+		foreach (['_vh_carrier', '_vh_tracking'] as $key) {
+			if (isset($_POST[$key])) {
+				$order->update_meta_data($key, sanitize_text_field(wp_unslash($_POST[$key])));
+			}
+		}
+		$order->save_meta_data();
+	}
+
+	// A seller told Vendor Hub their part of an order is processing or packed. Mirror it on the order, and once every
+	// seller on the order is packed move it to "Ready for shipping" so the admin knows it can be collected.
+	public static function rest_order_status($request) {
+		$order = wc_get_order((int) $request->get_param('order_id'));
+		$status = (string) $request->get_param('status');
+		$seller = sanitize_text_field((string) $request->get_param('seller_id'));
+		if (!$order || !in_array($status, ['processing', 'ready_for_shipping'], true) || $seller === '') {
+			return new WP_REST_Response(['error' => 'Unknown order or status.'], 404);
+		}
+		$ready = (array) $order->get_meta('_vh_ready_sellers');
+		$name = $seller;
+		$users = get_users(['meta_key' => '_verola_seller_id', 'meta_value' => $seller, 'number' => 1]);
+		if ($users) {
+			$name = $users[0]->display_name ?: $seller;
+		}
+		if ($status === 'ready_for_shipping' && !in_array($seller, $ready, true)) {
+			$ready[] = $seller;
+			$order->update_meta_data('_vh_ready_sellers', $ready);
+		}
+		$order->add_order_note(sprintf('Vendor %s: %s.', $name, $status === 'ready_for_shipping' ? 'packed, ready for shipping' : 'started processing'));
+		$order->save();
+		if ($status === 'ready_for_shipping' && $order->has_status('processing')) {
+			$sellers = [];
+			foreach ($order->get_items() as $line) {
+				$product = $line->get_product();
+				if ($product) {
+					$pid = $product->is_type('variation') ? $product->get_parent_id() : $product->get_id();
+					$sid = get_post_meta($pid, '_verola_seller_id', true);
+					if ($sid) {
+						$sellers[$sid] = true;
+					}
+				}
+			}
+			if ($sellers && !array_diff(array_keys($sellers), $ready)) {
+				$order->update_status('ready-shipping', 'All sellers have packed their items. ');
+			}
+		}
+		return ['ok' => true];
+	}
+
 	public static function register_rest() {
+		register_rest_route('vendor-hub/v1', '/order-status', ['methods' => 'POST', 'callback' => [__CLASS__, 'rest_order_status'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
 		register_rest_route('vendor-hub/v1', '/sku/next', ['methods' => 'GET', 'callback' => [__CLASS__, 'rest_sku_next'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
 		register_rest_route('vendor-hub/v1', '/sku/check', ['methods' => 'POST', 'callback' => [__CLASS__, 'rest_sku_check'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
 	}
@@ -624,7 +735,24 @@ final class Verola_Connector {
 		self::queue($order_id, 'order.refunded');
 	}
 
-	private static function queue($order_id, $event) {
+	// A cancelled order only matters to Vendor Hub if it had been paid.
+	public static function order_cancelled($order_id) {
+		$order = wc_get_order($order_id);
+		if ($order && $order->get_date_paid()) {
+			self::queue($order_id, 'order.refunded');
+		}
+	}
+
+	// Reports delivery progress. The hub must already know the order, so an order that skipped "processing" is reported as paid first.
+	public static function order_status_changed($order_id, $from, $to) {
+		if (!in_array($to, ['ready-shipping', 'shipped', 'delivered', 'completed'], true)) {
+			return;
+		}
+		self::queue($order_id, 'order.paid');
+		self::queue($order_id, 'order.status:' . ($to === 'ready-shipping' ? 'ready_for_shipping' : $to), 60);
+	}
+
+	private static function queue($order_id, $event, $delay = 5) {
 		$order = wc_get_order($order_id);
 		// Dokan splits a multi-seller order into one sub-order per seller. The parent order already holds every
 		// item, so only parent orders are reported; reporting the sub-orders as well would pay sellers twice.
@@ -632,10 +760,21 @@ final class Verola_Connector {
 			return;
 		}
 		// Send in the background so checkout is never slowed down or broken by Vendor Hub being offline.
-		wp_schedule_single_event(time() + 5, self::SEND, [(int) $order_id, $event, 1]);
+		wp_schedule_single_event(time() + $delay, self::SEND, [(int) $order_id, $event, 1]);
 	}
 
 	private static function payload($order, $event) {
+		if (strpos($event, 'order.status:') === 0) {
+			return [
+				'event' => 'order.status',
+				'order' => [
+					'id' => (string) $order->get_id(),
+					'status' => substr($event, strlen('order.status:')),
+					'carrier' => (string) $order->get_meta('_vh_carrier'),
+					'tracking_number' => (string) $order->get_meta('_vh_tracking'),
+				],
+			];
+		}
 		$items = [];
 		foreach ($order->get_items() as $line) {
 			$product = $line->get_product();
@@ -712,7 +851,8 @@ final class Verola_Connector {
 		}
 		$why = is_wp_error($res) ? $res->get_error_message() : 'status ' . $code . ' ' . wp_remote_retrieve_body($res);
 		// Bad data will not fix itself; a wrong key, a downed server or a network error will.
-		$permanent = in_array($code, [400, 404, 422], true);
+		// A status report can arrive before the hub has recorded the sale, so a 404 is worth retrying for those.
+		$permanent = in_array($code, strpos($event, 'order.status:') === 0 ? [400, 422] : [400, 404, 422], true);
 		if ($permanent || $attempt >= 8) {
 			$order->add_order_note('Could not report to Vendor Hub (' . $event . '): ' . $why . '. Not retrying.');
 			$order->save();

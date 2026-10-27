@@ -117,16 +117,38 @@ eq(count(seller_sales($sid)), 2, 'two sale lines');
 // hold: nothing available yet? order was 10 days ago and hold is 7 -> available
 eq($bal['available'], 18000.0, 'available after hold');
 
-// ---- fulfilment
+// ---- fulfilment (shared with the marketplace)
 $itemId = (string) db()->val('SELECT id FROM order_items WHERE seller_id = ? ORDER BY created_at LIMIT 1', [$sid]);
-ok(update_fulfilment($sid, $itemId, 'deliver') !== null, 'cannot deliver before shipping');
-ok(update_fulfilment($sid, $itemId, 'ship', 'Nope', 'X1') !== null, 'unknown carrier rejected');
-ok(update_fulfilment($sid, $itemId, 'ship', 'DHL', '') !== null, 'tracking required');
-ok(update_fulfilment('other-seller', $itemId, 'ship', 'DHL', 'X1') !== null, 'other seller cannot ship');
-eq(update_fulfilment($sid, $itemId, 'ship', 'DHL', 'X1'), null, 'shipped');
-ok(update_fulfilment($sid, $itemId, 'ship', 'DHL', 'X2') !== null, 'cannot ship twice');
-eq(update_fulfilment($sid, $itemId, 'deliver'), null, 'delivered');
-eq(db()->val('SELECT fulfilment FROM order_items WHERE id = ?', [$itemId]), 'delivered', 'fulfilment stored');
+$mk = (string) db()->val('SELECT o.marketplace_order_id FROM orders o JOIN order_items i ON i.order_id = o.id WHERE i.id = ?', [$itemId]);
+eq(db()->val('SELECT fulfilment FROM order_items WHERE id = ?', [$itemId]), 'placed', 'new order is placed');
+ok(seller_set_fulfilment('other-seller', $itemId, 'processing') !== null, 'other seller cannot move it');
+ok(seller_set_fulfilment($sid, $itemId, 'shipped') !== null, 'seller cannot ship');
+$pushed = [];
+$GLOBALS['vh_market_stub'] = function ($path, $method, $body) use (&$pushed) { $pushed[] = [$path, $body]; return ['ok' => true]; };
+set_setting('marketplace_url', 'https://shop.test'); set_setting('marketplace_api_key', 'k');
+eq(seller_set_fulfilment($sid, $itemId, 'processing'), null, 'processing');
+eq(count($pushed), 1, 'marketplace told about processing');
+eq(seller_set_fulfilment($sid, $itemId, 'ready_for_shipping'), null, 'ready for shipping');
+eq($pushed[1][1]['status'], 'ready_for_shipping', 'marketplace told ready_for_shipping');
+eq($pushed[1][1]['order_id'], $mk, 'marketplace told which order');
+ok(seller_set_fulfilment($sid, $itemId, 'processing') !== null, 'cannot go backwards');
+ok(seller_set_fulfilment($sid, $itemId, 'ready_for_shipping') !== null, 'cannot repeat');
+$GLOBALS['vh_market_stub'] = fn () => null;
+$other = (string) db()->val("SELECT id FROM order_items WHERE seller_id = ? AND fulfilment = 'placed' LIMIT 1", [$sid]);
+if ($other) { ok(seller_set_fulfilment($sid, $other, 'processing') !== null, 'marketplace unreachable: refused'); eq(db()->val('SELECT fulfilment FROM order_items WHERE id = ?', [$other]), 'placed', 'unreachable: nothing changed'); }
+unset($GLOBALS['vh_market_stub']); set_setting('marketplace_url', ''); set_setting('marketplace_api_key', '');
+ok(is_string(parse_status_event(['order' => ['id' => $mk, 'status' => 'bogus']])), 'bad status rejected');
+ok(is_string(parse_status_event(['order' => ['id' => $mk, 'status' => 'processing']])), 'processing is not a marketplace status');
+eq(apply_marketplace_status(['id' => 'nope', 'status' => 'shipped', 'carrier' => '', 'tracking' => '', 'note' => '']), false, 'unknown order');
+$st = fn ($s, $c = '', $t = '') => parse_status_event(['order' => ['id' => $mk, 'status' => $s, 'carrier' => $c, 'tracking_number' => $t]]);
+ok(apply_marketplace_status($st('shipped', 'DHL', 'TRK1')), 'shipped applied');
+eq(db()->val('SELECT tracking_number FROM order_items WHERE id = ?', [$itemId]), 'TRK1', 'tracking stored');
+apply_marketplace_status($st('ready_for_shipping'));
+eq(db()->val('SELECT fulfilment FROM order_items WHERE id = ?', [$itemId]), 'shipped', 'status never goes backwards');
+apply_marketplace_status($st('delivered'));
+apply_marketplace_status($st('completed'));
+eq(db()->val('SELECT fulfilment FROM order_items WHERE id = ?', [$itemId]), 'completed', 'completed');
+ok(count(item_history([$itemId])[$itemId]) >= 5, 'history recorded');
 
 // ---- withdrawals
 eq(add_bank_account($sid, 'GTBank', '0123456789', 'A B'), null, 'bank added');

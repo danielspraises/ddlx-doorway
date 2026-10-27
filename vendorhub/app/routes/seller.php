@@ -9,7 +9,7 @@ route('GET', '/seller', function () {
     $vars = ['title' => SELLER_TABS[$tab], 'tab' => $tab, 'user' => $u, 'live_refresh' => in_array($tab, ['overview', 'sales', 'payouts', 'products', 'inventory'], true)];
     if (in_array($tab, ['overview', 'products', 'inventory'], true)) $vars['products'] = seller_products($u['id']);
     if (in_array($tab, ['overview', 'sales', 'payouts'], true)) { $vars['balances'] = wallet_balances($u['id']); $vars['month'] = sales_last_30d($u['id']); }
-    if ($tab === 'sales') $vars['sales'] = seller_sales($u['id']);
+    if ($tab === 'sales') { $vars['sales'] = seller_sales($u['id']); $vars['history'] = item_history(array_column($vars['sales'], 'id')); }
     if ($tab === 'payouts') { $vars['accounts'] = bank_accounts($u['id']); $vars['withdrawals'] = seller_withdrawals($u['id']); }
     if ($tab === 'store') $vars['store'] = store_profile($u['id']);
     render('seller', $vars);
@@ -19,8 +19,9 @@ route('GET', '/seller', function () {
 
 route('POST', '/orders/fulfil', function () {
     $u = require_seller();
-    $err = update_fulfilment($u['id'], input('id'), input('action'), input('carrier'), input('tracking'));
-    redirect('/seller?tab=sales', $err ?? (input('action') === 'ship' ? 'Marked as shipped.' : 'Marked as delivered.'), $err ? 'error' : 'ok');
+    $to = input('to');
+    $err = seller_set_fulfilment($u['id'], input('id'), $to);
+    redirect('/seller?tab=sales', $err ?? ($to === 'processing' ? 'Order is being processed.' : 'Marked ready for shipping. The marketplace has been told.'), $err ? 'error' : 'ok');
 });
 
 // ---------------------------------------------------------------- payouts

@@ -246,8 +246,7 @@ function str_limit(string $s, int $n): string
 
 function setting(string $key, mixed $default = null): mixed
 {
-    static $cache = null;
-    if ($cache === null) {
+    if (!isset($GLOBALS['vh_settings'])) {
         $cache = [];
         try {
             foreach (db()->all('SELECT k, v FROM settings') as $r) {
@@ -256,7 +255,9 @@ function setting(string $key, mixed $default = null): mixed
         } catch (Throwable) {
             return $default;
         }
+        $GLOBALS['vh_settings'] = $cache;
     }
+    $cache = $GLOBALS['vh_settings'];
     return array_key_exists($key, $cache) && $cache[$key] !== '' ? $cache[$key] : $default;
 }
 
@@ -269,6 +270,7 @@ function set_setting(string $key, string $value): void
             $db->exec('INSERT INTO settings (k, v) VALUES (?, ?)', [$key, $value]);
         }
     });
+    unset($GLOBALS['vh_settings']);
 }
 
 function commission_percent(): float

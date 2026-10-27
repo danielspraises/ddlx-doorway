@@ -47,34 +47,94 @@ function sales_last_30d(string $sellerId): array
 
 function seller_sales(string $sellerId, int $limit = 200): array
 {
-    return db()->all('SELECT i.id, o.number AS order_number, o.placed_at, i.name, i.sku, i.options, i.quantity, i.unit_price, i.line_total, i.commission, i.net, o.currency, i.status, i.fulfilment, i.carrier, i.tracking_number, i.shipped_at, i.delivered_at, o.customer_name, o.ship_city, o.ship_state FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.seller_id = ? ORDER BY o.placed_at DESC, i.created_at DESC LIMIT ' . (int) $limit, [$sellerId]);
+    return db()->all('SELECT i.id, o.number AS order_number, o.placed_at, i.name, i.sku, i.options, i.quantity, i.unit_price, i.line_total, i.commission, i.net, o.currency, i.status, i.fulfilment, i.carrier, i.tracking_number, o.customer_name, o.ship_city, o.ship_state FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.seller_id = ? ORDER BY o.placed_at DESC, i.created_at DESC LIMIT ' . (int) $limit, [$sellerId]);
 }
 
-const CARRIERS = ['DHL', 'GIG Logistics', 'FedEx', 'UPS', 'Kwik', 'Sendbox', 'Own delivery', 'Other'];
-const FULFILMENT_LABEL = ['pending' => 'To ship', 'shipped' => 'Shipped', 'delivered' => 'Delivered'];
+// Order lifecycle, shared with the marketplace:
+//   placed -> processing -> ready_for_shipping   (the seller moves these, Vendor Hub tells the marketplace)
+//   -> shipped -> delivered -> completed         (the marketplace moves these, it tells Vendor Hub)
+// Refunds and cancellations come from the marketplace too (order_items.status = 'refunded').
+const FULFILMENT_LABEL = ['placed' => 'New order', 'processing' => 'Processing', 'ready_for_shipping' => 'Ready for shipping', 'shipped' => 'Shipped',
+    'delivered' => 'Delivered', 'completed' => 'Completed'];
+const FULFILMENT_RANK = ['placed' => 0, 'processing' => 1, 'ready_for_shipping' => 2, 'shipped' => 3, 'delivered' => 4, 'completed' => 5];
 
-// Seller moves an item along: pending -> shipped -> delivered. Returns an error message or null.
-function update_fulfilment(string $sellerId, string $itemId, string $action, string $carrier = '', string $tracking = ''): ?string
+function log_item_status(string $itemId, string $status, string $source, string $note = ''): void
+{
+    db()->insert('order_item_log', ['id' => uuid(), 'order_item_id' => $itemId, 'status' => $status, 'source' => $source, 'note' => str_limit($note, 250), 'created_at' => now_db()]);
+}
+
+function item_history(array $itemIds): array
+{
+    if (!$itemIds) return [];
+    $out = [];
+    foreach (db()->all('SELECT order_item_id, status, source, note, created_at FROM order_item_log WHERE order_item_id IN (' . db()->placeholders($itemIds) . ') ORDER BY created_at, id', $itemIds) as $r) $out[$r['order_item_id']][] = $r;
+    return $out;
+}
+
+// The seller moves their items in one order forward. The marketplace is told first; if it cannot be reached nothing changes,
+// so the two sides never disagree. Returns an error message or null.
+function seller_set_fulfilment(string $sellerId, string $itemId, string $to): ?string
 {
     $db = db();
-    $it = $db->one('SELECT id, status, fulfilment FROM order_items WHERE id = ? AND seller_id = ?', [$itemId, $sellerId]);
+    if (!in_array($to, ['processing', 'ready_for_shipping'], true)) return 'Unknown action.';
+    $it = $db->one('SELECT i.id, i.order_id, i.fulfilment, i.status, o.marketplace_order_id, o.number FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.id = ? AND i.seller_id = ?', [$itemId, $sellerId]);
     if (!$it) return 'Order item not found.';
-    if ($it['status'] === 'refunded') return 'This item was refunded.';
-    $now = now_db();
-    if ($action === 'ship') {
-        if ($it['fulfilment'] !== 'pending') return 'This item is already marked as shipped.';
-        $carrier = trim($carrier); $tracking = trim($tracking);
-        if (!in_array($carrier, CARRIERS, true)) return 'Choose a carrier.';
-        if ($carrier !== 'Own delivery' && $tracking === '') return 'Enter the tracking number.';
-        if (mb_strlen($tracking) > 100) return 'Tracking number is too long.';
-        $db->exec("UPDATE order_items SET fulfilment = 'shipped', carrier = ?, tracking_number = ?, shipped_at = ? WHERE id = ?", [$carrier, $tracking, $now, $itemId]);
-    } elseif ($action === 'deliver') {
-        if ($it['fulfilment'] !== 'shipped') return 'Mark the item as shipped first.';
-        $db->exec("UPDATE order_items SET fulfilment = 'delivered', delivered_at = ? WHERE id = ?", [$now, $itemId]);
-    } else {
-        return 'Unknown action.';
+    if ($it['status'] === 'refunded') return 'This order was refunded or cancelled.';
+    if (FULFILMENT_RANK[$it['fulfilment']] >= FULFILMENT_RANK[$to]) return 'This order has already moved past that step.';
+    if (FULFILMENT_RANK[$it['fulfilment']] >= FULFILMENT_RANK['ready_for_shipping']) return 'The marketplace handles this order from here.';
+    $lines = $db->all("SELECT id, product_id FROM order_items WHERE order_id = ? AND seller_id = ? AND status = 'paid' AND fulfilment IN ('placed', 'processing')", [$it['order_id'], $sellerId]);
+    if (marketplace_connected()) {
+        $r = marketplace_call('/order-status', 'POST', ['order_id' => $it['marketplace_order_id'], 'seller_id' => $sellerId, 'status' => $to,
+            'product_ids' => array_values(array_unique(array_filter(array_column($lines, 'product_id'))))]);
+        if ($r === null) return 'Could not reach the marketplace just now, so nothing was changed. Please try again in a minute.';
     }
+    $db->tx(function () use ($db, $lines, $to) {
+        foreach ($lines as $l) {
+            $db->exec('UPDATE order_items SET fulfilment = ? WHERE id = ?', [$to, $l['id']]);
+            log_item_status($l['id'], $to, 'seller');
+        }
+    });
+    announce('admins', 'order', 'Order ' . ($it['number'] ?: $it['marketplace_order_id']) . ': seller marked ' . strtolower(FULFILMENT_LABEL[$to]));
     return null;
+}
+
+// A status the marketplace reports (shipped, delivered, completed, or ready_for_shipping set on its side). Only moves forward.
+// Returns false when the order is unknown.
+function apply_marketplace_status(array $o): bool
+{
+    $db = db();
+    $sellers = [];
+    $found = $db->tx(function () use ($db, $o, &$sellers) {
+        $order = $db->one('SELECT id, number FROM orders WHERE marketplace_order_id = ?', [$o['id']]);
+        if (!$order) return false;
+        $rank = FULFILMENT_RANK[$o['status']];
+        foreach ($db->all("SELECT id, seller_id, fulfilment FROM order_items WHERE order_id = ? AND status = 'paid'" . $db->lock(), [$order['id']]) as $l) {
+            if (FULFILMENT_RANK[$l['fulfilment']] >= $rank) {
+                if ($l['fulfilment'] === $o['status'] && ($o['carrier'] !== '' || $o['tracking'] !== '')) $db->exec('UPDATE order_items SET carrier = ?, tracking_number = ? WHERE id = ?', [$o['carrier'], $o['tracking'], $l['id']]);
+                continue;
+            }
+            $db->exec('UPDATE order_items SET fulfilment = ?, carrier = CASE WHEN ? <> \'\' THEN ? ELSE carrier END, tracking_number = CASE WHEN ? <> \'\' THEN ? ELSE tracking_number END WHERE id = ?',
+                [$o['status'], $o['carrier'], $o['carrier'], $o['tracking'], $o['tracking'], $l['id']]);
+            log_item_status($l['id'], $o['status'], 'marketplace', $o['note']);
+            $sellers[$l['seller_id']] = $order['number'] ?: $o['id'];
+        }
+        return true;
+    });
+    foreach ($sellers as $sid => $num) announce('seller', 'order', 'Order ' . $num . ' is now ' . strtolower(FULFILMENT_LABEL[$o['status']]), $sid);
+    return $found;
+}
+
+// Validates a decoded order.status body. Returns the cleaned order or a string describing the problem.
+function parse_status_event(mixed $d): array|string
+{
+    $o = is_array($d) ? ($d['order'] ?? null) : null;
+    if (!is_array($o)) return 'Missing order.';
+    $id = trim((string) ($o['id'] ?? ''));
+    if ($id === '' || strlen($id) > 100) return 'Invalid order id.';
+    $status = (string) ($o['status'] ?? '');
+    if (!isset(FULFILMENT_RANK[$status]) || $status === 'placed' || $status === 'processing') return 'Invalid status.';
+    return ['id' => $id, 'status' => $status, 'carrier' => str_limit(trim((string) ($o['carrier'] ?? '')), 80), 'tracking' => str_limit(trim((string) ($o['tracking_number'] ?? '')), 100),
+        'note' => str_limit(trim((string) ($o['note'] ?? '')), 250)];
 }
 
 // ---------------------------------------------------------------- marketplace orders
@@ -152,7 +212,8 @@ function record_paid_order(array $event): array
             $itemId = uuid();
             $db->insert('order_items', ['id' => $itemId, 'order_id' => $orderId, 'seller_id' => $p['seller_id'], 'product_id' => $it['product_id'], 'variation_id' => $it['variation_id'],
                 'name' => $p['name'], 'sku' => $sku, 'options' => jenc((object) $options), 'quantity' => $it['quantity'], 'unit_price' => round2($it['unit_price']), 'line_total' => $line,
-                'commission_rate' => $rate, 'commission' => $commission, 'net' => $net, 'status' => 'paid', 'created_at' => now_db()]);
+                'commission_rate' => $rate, 'commission' => $commission, 'net' => $net, 'status' => 'paid', 'fulfilment' => 'placed', 'created_at' => now_db()]);
+            log_item_status($itemId, 'placed', 'marketplace', 'Order paid');
             $db->insert('wallet_entries', ['id' => uuid(), 'seller_id' => $p['seller_id'], 'kind' => 'sale', 'amount' => $net, 'currency' => $o['currency'], 'order_item_id' => $itemId,
                 'note' => 'Order ' . ($o['number'] ?: $o['id']), 'available_at' => db_plus('+' . $hold . ' days', $o['placed_at']), 'created_at' => now_db()]);
             if ($it['variation_id']) {

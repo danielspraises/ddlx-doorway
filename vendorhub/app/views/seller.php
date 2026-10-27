@@ -83,14 +83,15 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
       <td class="t-right"><?= (int) $s['quantity'] ?></td><td class="t-right"><?= e($m($s['line_total'], $s['currency'])) ?></td>
       <td class="t-right"><?= $s['status'] === 'refunded' ? pill('refunded') : e($m($s['net'], $s['currency'])) ?></td>
       <td><?= e($s['customer_name'] ?: '—') ?><br><span class="muted small"><?= e(trim($s['ship_city'] . ', ' . $s['ship_state'], ', ')) ?></span></td>
-      <td><?php if ($s['status'] === 'refunded'): ?><span class="muted small">—</span>
-        <?php elseif ($s['fulfilment'] === 'pending'): ?>
-          <form method="post" action="/orders/fulfil" class="stack" style="min-width:170px"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($s['id']) ?>"><input type="hidden" name="action" value="ship">
-            <select name="carrier" aria-label="Carrier"><?php foreach (CARRIERS as $c): ?><option><?= e($c) ?></option><?php endforeach; ?></select>
-            <input name="tracking" maxlength="100" placeholder="Tracking number" aria-label="Tracking number">
-            <button class="btn btn-sm" type="submit">Mark shipped</button></form>
-        <?php else: ?><?= pill($s['fulfilment'], FULFILMENT_LABEL) ?><br><span class="muted small"><?= e($s['carrier']) ?><?= $s['tracking_number'] ? ' · ' . e($s['tracking_number']) : '' ?></span>
-          <?php if ($s['fulfilment'] === 'shipped'): ?><form method="post" action="/orders/fulfil" style="margin-top:6px"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($s['id']) ?>"><input type="hidden" name="action" value="deliver"><button class="btn btn-outline btn-sm" type="submit" data-confirm="Mark this item as delivered?">Mark delivered</button></form><?php endif; ?>
+      <td><?php if ($s['status'] === 'refunded'): ?><?= pill('refunded') ?>
+        <?php else: ?><?= pill($s['fulfilment'], FULFILMENT_LABEL, ['placed' => 'warn', 'processing' => 'warn', 'ready_for_shipping' => 'warn', 'completed' => 'ok']) ?>
+          <?php if ($s['tracking_number'] || $s['carrier']): ?><br><span class="muted small"><?= e(trim($s['carrier'] . ' ' . $s['tracking_number'])) ?></span><?php endif; ?>
+          <?php if (in_array($s['fulfilment'], ['placed', 'processing'], true)): ?>
+            <form method="post" action="/orders/fulfil" class="row" style="margin-top:6px;gap:6px"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($s['id']) ?>">
+              <?php if ($s['fulfilment'] === 'placed'): ?><button class="btn btn-outline btn-sm" name="to" value="processing" type="submit">Start processing</button><?php endif; ?>
+              <button class="btn btn-sm" name="to" value="ready_for_shipping" type="submit" data-confirm="Tell the marketplace this order is packed and ready to be picked up?">Ready for shipping</button></form>
+          <?php elseif ($s['fulfilment'] === 'ready_for_shipping'): ?><br><span class="muted small">Waiting for DDLX pickup</span><?php endif; ?>
+          <?php if (!empty($history[$s['id']])): ?><details class="small" style="margin-top:6px"><summary class="muted">History</summary><ul class="list"><?php foreach ($history[$s['id']] as $h): ?><li><?= e(FULFILMENT_LABEL[$h['status']] ?? $h['status']) ?> <span class="muted">· <?= e($h['source'] === 'seller' ? 'you' : 'marketplace') ?> · <?= e(human_date($h['created_at'])) ?><?= $h['note'] ? ' · ' . e($h['note']) : '' ?></span></li><?php endforeach; ?></ul></details><?php endif; ?>
         <?php endif; ?></td></tr>
   <?php endforeach; if (!$sales): ?><tr><td colspan="7" class="muted" style="text-align:center;padding:40px">Sales will be listed here.</td></tr><?php endif; ?></tbody></table></div>
 <?php endif; ?>

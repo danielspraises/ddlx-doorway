@@ -125,7 +125,13 @@ route('POST', '/api/marketplace/orders', function () {
     $raw = (string) file_get_contents('php://input');
     if (strlen($raw) > 1000000) market_json(['error' => 'Payload too large.'], 413);
     market_check_signature($raw);
-    $event = parse_order_event(json_decode($raw, true));
+    $json = json_decode($raw, true);
+    if (is_array($json) && ($json['event'] ?? '') === 'order.status') {
+        $st = parse_status_event($json);
+        if (is_string($st)) market_json(['error' => 'Invalid order payload.', 'issues' => [$st]], 400);
+        apply_marketplace_status($st) ? market_json(['ok' => true]) : market_json(['error' => 'Unknown order.'], 404);
+    }
+    $event = parse_order_event($json);
     if (is_string($event)) market_json(['error' => 'Invalid order payload.', 'issues' => [$event]], 400);
     try {
         if ($event['event'] === 'order.paid') {

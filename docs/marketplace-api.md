@@ -99,6 +99,27 @@ X-Verola-Signature: sha256=<hex>
 - A refund reverses every line of the order: `{"event":"order.refunded","order":{"id":"1042","restock":true, ...same fields}}`.
   `restock: true` puts the units back into stock.
 
+### Order status (both directions)
+
+One order, one lifecycle, shared by both systems:
+
+| Status | Who moves it | How the other side hears |
+|---|---|---|
+| New order (paid) | marketplace | `order.paid` |
+| Processing | seller, in Vendor Hub | Vendor Hub calls `POST {marketplace}/wp-json/vendor-hub/v1/order-status` |
+| Ready for shipping | seller, in Vendor Hub | same call |
+| Shipped, Delivered, Completed | admin, in the marketplace | `order.status` |
+| Refunded / Cancelled | admin, in the marketplace | `order.refunded` |
+
+Vendor Hub to marketplace (Bearer API key): `{"order_id":"1042","seller_id":"<uuid>","status":"processing"|"ready_for_shipping","product_ids":["<uuid>"]}`.
+If the marketplace cannot be reached the seller sees an error and nothing changes, so the two never disagree. When every seller on an
+order has packed their items the plugin moves the WooCommerce order to **Ready for shipping**.
+
+Marketplace to Vendor Hub (signed like orders):
+`{"event":"order.status","order":{"id":"1042","status":"shipped","carrier":"DHL","tracking_number":"123","note":""}}`
+with `status` one of `ready_for_shipping`, `shipped`, `delivered`, `completed`. Statuses only move forward; a late or repeated
+message is ignored (carrier and tracking are still updated). `404` means the order is unknown, so send `order.paid` first.
+
 Responses: `200` ok, `400` bad payload, `401` bad key or signature, `404` unknown order (refund), `422` unknown product,
 `503` secrets not configured.
 
@@ -129,7 +150,9 @@ What it does:
   variations, prices, scheduled sale dates, stock, photos, category (the full `category_path` is created as nested WooCommerce categories), tags and brand. Taken-down products become drafts.
 - Each Vendor Hub seller becomes a WordPress user with Dokan's `seller` role and owns their products, so the products
   appear in their Dokan store (`/store/<store-slug>`) with the store name from their application.
-- When an order is paid it reports the Vendor Hub items; when an order is marked refunded it reports the refund.
+- When an order is paid it reports the Vendor Hub items; when an order is marked refunded or cancelled it reports the refund.
+- Adds the order statuses **Ready for shipping**, **Shipped** and **Delivered**. The admin sets Shipped, Delivered and Completed in WooCommerce
+  (with the carrier and tracking number fields on the order screen) and Vendor Hub follows. Sellers set Processing and Ready for shipping in Vendor Hub.
   Sends happen in the background and are retried for a few hours if Vendor Hub is unreachable.
 - Vendor Hub is the source of truth for stock: stock is overwritten from Vendor Hub on each sync.
 

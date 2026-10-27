@@ -33,13 +33,16 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
     <div class="stat"><p class="muted small">In review</p><p class="n"><?= $review ?></p></div>
     <div class="stat"><p class="muted small">Low or out of stock</p><p class="n"><?= count($low) ?></p></div>
   </div>
+  <?php if (!empty($to_process)): ?><p class="notice" style="margin-top:20px"><strong><?= (int) $to_process ?> order<?= $to_process === 1 ? '' : 's' ?> to pack.</strong> <a href="/seller?tab=sales">Open Sales</a> to start processing and mark them ready for shipping.</p><?php endif; ?>
+  <h2>Your earnings, last 30 days</h2>
+  <div class="card"><?= bar_chart($chart['series'], $chart['currency'], 'Your earnings per day') ?></div>
   <div class="row" style="margin-top:24px"><a class="btn" href="/products/edit"><?= $products ? 'Add product' : 'Add your first product' ?></a><a class="btn btn-outline" href="/seller?tab=inventory">Manage inventory</a></div>
   <?php if ($attention): ?><h2>Needs your attention</h2><ul class="list">
     <?php foreach ($attention as $p): [$k, $l] = product_visibility($p); ?><li class="row between"><a href="/products/edit?id=<?= e($p['id']) ?>"><strong><?= e($p['name']) ?></strong></a><span><?= pill($k, [], ['live' => 'ok', 'hidden' => 'warn']) ?> <?= stock_state($p) !== 'ok' ? pill(stock_state($p)) : '' ?></span></li><?php endforeach; ?></ul><?php endif; ?>
 <?php endif; ?>
 
 <?php if ($tab === 'products'): ?>
-  <div class="row between" style="margin:18px 0"><span class="muted"><?= count($products) ?> product<?= count($products) === 1 ? '' : 's' ?></span><a class="btn" href="/products/edit">Add product</a></div>
+  <div class="row between" style="margin:18px 0"><span class="muted"><?= count($products) ?> product<?= count($products) === 1 ? '' : 's' ?> · <a href="/seller/export?kind=products">Download CSV</a></span><a class="btn" href="/products/edit">Add product</a></div>
   <?php if (!$products): ?><p class="notice">You have no products yet. Add one, then submit it for review. Approved products appear on the DDLX marketplace.</p><?php endif; ?>
   <ul class="list">
   <?php foreach ($products as $p): [$k, $l] = product_visibility($p); ?>
@@ -75,7 +78,8 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 <?php endif; ?>
 
 <?php if ($tab === 'sales'): ?>
-  <h2>Recent sales</h2>
+  <div class="row between" style="align-items:flex-end;margin-top:20px"><h2 style="margin:0">Recent sales</h2>
+    <form method="get" action="/seller/export" class="row" data-keep><input type="hidden" name="kind" value="sales"><label class="small muted" for="se-from">From</label><input id="se-from" type="date" name="from" style="width:auto"><label class="small muted" for="se-to">to</label><input id="se-to" type="date" name="to" style="width:auto"><button class="btn btn-outline btn-sm" type="submit">Download CSV</button></form></div>
   <div class="table-wrap"><table><thead><tr><th>Order</th><th>Item</th><th class="t-right">Qty</th><th class="t-right">Sold for</th><th class="t-right">You earn</th><th>Customer</th><th>Delivery</th></tr></thead><tbody>
   <?php foreach ($sales as $s): $opts = jdec($s['options'], []); ?>
     <tr><td><strong><?= $s['order_number'] ? '#' . e($s['order_number']) : 'Order' ?></strong><br><span class="muted small"><?= e(human_date($s['placed_at'])) ?></span></td>
@@ -97,6 +101,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 <?php endif; ?>
 
 <?php if ($tab === 'payouts'): $cur = $balances[0]['currency'] ?? 'NGN'; ?>
+  <p class="small"><a href="/seller/export?kind=payouts">Download my wallet history (CSV)</a></p>
   <h2>Withdraw money</h2>
   <?php if (!$accounts): ?><p class="muted">Add a bank account below, then request a withdrawal.</p><?php else: ?>
   <form method="post" action="/payouts/request" class="card" style="max-width:520px" data-keep><?= csrf_field() ?>

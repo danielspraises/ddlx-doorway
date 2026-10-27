@@ -2,6 +2,7 @@ CREATE TABLE users (
   id CHAR(36) NOT NULL PRIMARY KEY,
   email VARCHAR(255) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  email_alerts TINYINT NOT NULL DEFAULT 1,
   created_at DATETIME(3) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE UNIQUE INDEX users_email_unique ON users (email);
@@ -284,6 +285,19 @@ CREATE TABLE store_profiles (
   updated_at DATETIME(3) NOT NULL,
   CONSTRAINT store_seller_fk FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE notifications (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  type VARCHAR(20) NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  body VARCHAR(1000) NOT NULL DEFAULT '',
+  link VARCHAR(250) NOT NULL DEFAULT '',
+  read_at DATETIME(3) NULL,
+  created_at DATETIME(3) NOT NULL,
+  CONSTRAINT notif_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX notifications_user_idx ON notifications (user_id, created_at);
 
 CREATE TABLE events (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,

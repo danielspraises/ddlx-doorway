@@ -155,6 +155,43 @@ apply_marketplace_status($st('completed'));
 eq(db()->val('SELECT fulfilment FROM order_items WHERE id = ?', [$itemId]), 'completed', 'completed');
 ok(count(item_history([$itemId])[$itemId]) >= 5, 'history recorded');
 
+// ---- notifications
+$unread = notifications_unread($sid);
+ok($unread >= 3, "seller has notifications for sale/status/product ($unread)");
+$titles = array_column(notifications_list($sid), 'title');
+ok(count(array_filter($titles, fn ($t) => str_starts_with($t, 'New order'))) >= 1, 'new order notification');
+ok(count(array_filter($titles, fn ($t) => str_contains($t, 'is now shipped'))) >= 1, 'shipped notification');
+ok(count(array_filter($GLOBALS['vh_mail_outbox'] ?? [], fn ($m) => $m['to'] === 's@x.test' && str_starts_with($m['subject'], 'New order'))) >= 1, 'new order email sent');
+$mailsBefore = count($GLOBALS['vh_mail_outbox'] ?? []);
+db()->exec('UPDATE users SET email_alerts = 0 WHERE id = ?', [$sid]);
+notify($sid, 'test', 'Quiet one');
+eq(count($GLOBALS['vh_mail_outbox'] ?? []), $mailsBefore, 'no email when alerts are off');
+db()->exec('UPDATE users SET email_alerts = 1 WHERE id = ?', [$sid]);
+notifications_mark_read($sid);
+eq(notifications_unread($sid), 0, 'mark all read');
+notify($other, 'test', 'Not yours');
+notifications_mark_read($sid);
+eq(notifications_unread($other), 1, 'cannot clear another user\'s inbox');
+
+// ---- reports and exports
+[$h, $rows] = export_seller_sales($sid, null, null);
+ok(count($rows) >= 2 && count($rows[0]) === count($h), 'sales export has rows matching the header');
+[$h, $rows] = export_seller_products($sid);
+ok(count($rows) >= 1 && count($rows[0]) === count($h), 'products export');
+[$h, $rows] = export_seller_payouts($sid);
+ok(count($rows) >= 1 && count($rows[0]) === count($h), 'payouts export');
+$ch = seller_daily_earnings($sid);
+eq(count($ch['series']), 30, '30 days charted');
+ok(array_sum($ch['series']) > 0, 'earnings charted');
+ok(str_contains(bar_chart($ch['series'], $ch['currency']), '<svg'), 'chart renders');
+ok(str_contains(bar_chart(array_fill_keys(array_keys($ch['series']), 0.0)), 'No sales'), 'empty chart message');
+$ov = admin_overview();
+ok(count($ov['sales']) >= 1 && $ov['sales'][0]['gross'] > 0, 'overview sales');
+eq(admin_overview()['live_products'] >= 1, true, 'overview live products');
+[$f, $t] = range_from_input('2026-01-01', 'bad');
+ok($f !== null && $t === null, 'date range parsing');
+eq(csv_line(['=HYPERLINK("x")', '-5', 'ok', 'a,b']), "\"'=HYPERLINK(\"\"x\"\")\",\"-5\",\"ok\",\"a,b\"\r\n", 'csv defuses formulas, keeps numbers, quotes commas');
+
 // ---- admin moves orders from Vendor Hub
 $adm = ['id' => $admin, 'isAdmin' => true];
 $ev2 = parse_order_event(['event' => 'order.paid', 'order' => ['id' => 'WC-2', 'number' => '1002', 'currency' => 'NGN', 'placed_at' => gmdate('c', time() - 86400), 'customer_name' => 'Bo',

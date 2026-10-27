@@ -109,3 +109,5 @@ dialog iframe,dialog img{width:100%;height:100%;border:0;object-fit:contain}
 .ptabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:18px 0;overflow-x:auto}
 .pane{display:none}.pane.on{display:block}
 .pw{position:relative}.pw button{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--muted);font-weight:700;cursor:pointer;padding:8px}
+
+.chart{width:100%;height:auto;display:block}.chart rect{fill:var(--accent)}.chart rect.zero{fill:var(--line)}.chart .axis{fill:var(--muted);font-size:11px}

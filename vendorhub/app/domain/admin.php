@@ -16,6 +16,7 @@ function review_application(array $admin, string $id, string $status, string $co
     if ($a) {
         $subject = ['approved' => 'Your seller application was approved', 'rejected' => 'Update on your seller application', 'needs_corrections' => 'Your seller application needs corrections'][$status];
         $to = $a['applicant_email'] ?: db()->val('SELECT email FROM users WHERE id = ?', [$a['user_id']]);
+        notify($a['user_id'], 'application', $subject, trim($comment), '/apply', false);
         if ($to) send_mail((string) $to, $subject, ($status === 'approved' ? "Good news: your application was approved. Sign in to continue with verification:\n" : "Please sign in to see our feedback:\n") . base_url() . "/apply\n" . ($comment ? "\nNote from our team:\n" . $comment . "\n" : ''));
     }
     return null;
@@ -31,8 +32,10 @@ function review_verification(array $admin, string $id, string $status, string $c
         [$status, $comment ?: null, $admin['id'], $now, $now, $id, $expectedRaw]);
     if (!$n) return 'This verification was already decided or has changed. Refresh and try again.';
     $to = db()->val('SELECT u.email FROM seller_verifications v JOIN users u ON u.id = v.user_id WHERE v.id = ?', [$id]);
+    $vu = db()->val('SELECT user_id FROM seller_verifications WHERE id = ?', [$id]);
     if ($to) {
         $subject = ['approved' => 'You are verified: start selling on DDLX', 'rejected' => 'Update on your seller verification', 'needs_corrections' => 'Your seller verification needs corrections'][$status];
+        if ($vu) notify((string) $vu, 'verification', $subject, trim($comment), $status === 'approved' ? '/seller' : '/verification', false);
         send_mail((string) $to, $subject, ($status === 'approved' ? "You are now a verified seller. Open your Seller Center:\n" . base_url() . "/seller\n" : "Please sign in to see our feedback:\n" . base_url() . "/verification\n") . ($comment ? "\nNote from our team:\n" . $comment . "\n" : ''));
     }
     return null;

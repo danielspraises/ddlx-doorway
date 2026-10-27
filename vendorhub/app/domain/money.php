@@ -129,7 +129,10 @@ function apply_marketplace_status(array $o, string $source = 'marketplace'): boo
         }
         return true;
     });
-    foreach ($sellers as $sid => $num) announce('seller', 'order', 'Order ' . $num . ' is now ' . strtolower(FULFILMENT_LABEL[$o['status']]), $sid);
+    foreach ($sellers as $sid => $num) {
+        announce('seller', 'order', 'Order ' . $num . ' is now ' . strtolower(FULFILMENT_LABEL[$o['status']]), $sid);
+        notify($sid, 'order', 'Order ' . $num . ' is now ' . strtolower(FULFILMENT_LABEL[$o['status']]), $o['tracking'] !== '' ? trim($o['carrier'] . ' ' . $o['tracking']) : '', '/seller?tab=sales', in_array($o['status'], ['shipped', 'delivered'], true));
+    }
     return $found;
 }
 
@@ -191,7 +194,9 @@ function record_paid_order(array $event): array
     if (!$o['items']) throw new OrderRejected('The order has no items.');
     $rate = commission_percent();
     $sellers = [];
-    $result = $db->tx(function () use ($db, $o, $rate, &$sellers) {
+    $names = [];
+    $touched = [];
+    $result = $db->tx(function () use ($db, $o, $rate, &$sellers, &$names, &$touched) {
         if ($db->val('SELECT id FROM orders WHERE marketplace_order_id = ?', [$o['id']])) return ['duplicate' => true];
         $orderId = uuid();
         try {
@@ -231,12 +236,23 @@ function record_paid_order(array $event): array
             }
             $db->exec('UPDATE products SET updated_at = ? WHERE id = ?', [now_db(), $it['product_id']]);
             $sellers[$p['seller_id']] = round2(($sellers[$p['seller_id']] ?? 0) + $net);
+            $names[$p['seller_id']][] = $it['quantity'] . ' × ' . $p['name'] . ($options ? ' (' . implode(' / ', $options) . ')' : '');
+            $touched[$it['product_id']] = $p['seller_id'];
         }
         return ['duplicate' => false];
     });
     if (!$result['duplicate']) {
         announce('orders', 'order', 'New order ' . ($o['number'] ?: $o['id']));
-        foreach ($sellers as $sid => $net) announce('seller', 'sale', 'New sale: ' . $o['currency'] . ' ' . number_format($net, 2) . ' earned', $sid);
+        foreach ($sellers as $sid => $net) {
+            announce('seller', 'sale', 'New sale: ' . $o['currency'] . ' ' . number_format($net, 2) . ' earned', $sid);
+            notify($sid, 'sale', 'New order ' . ($o['number'] ?: $o['id']) . ': ' . $o['currency'] . ' ' . number_format($net, 2) . ' earned', implode("\n", $names[$sid]) . "\n\nStart processing it and mark it ready for shipping when it is packed.", '/seller?tab=sales');
+        }
+        foreach ($touched as $pid => $sid) {
+            $p = $db->one('SELECT name, manage_stock, stock, low_stock_threshold, product_type FROM products WHERE id = ?', [$pid]);
+            if ($p && (int) $p['manage_stock'] === 1 && $p['product_type'] === 'simple' && (int) $p['stock'] <= (int) $p['low_stock_threshold']) {
+                notify($sid, 'stock', ((int) $p['stock'] === 0 ? 'Out of stock: ' : 'Low stock: ') . $p['name'] . ((int) $p['stock'] === 0 ? '' : ' (' . (int) $p['stock'] . ' left)'), 'Add stock so customers can keep buying it.', '/seller?tab=inventory');
+            }
+        }
     }
     return $result;
 }
@@ -267,7 +283,10 @@ function record_refund(array $event): array
         }
         return true;
     });
-    foreach (array_keys($sellers) as $sid) announce('seller', 'refund', 'Order ' . ($o['number'] ?: $o['id']) . ' was refunded', $sid);
+    foreach (array_keys($sellers) as $sid) {
+        announce('seller', 'refund', 'Order ' . ($o['number'] ?: $o['id']) . ' was refunded', $sid);
+        notify($sid, 'refund', 'Order ' . ($o['number'] ?: $o['id']) . ' was refunded or cancelled', 'Your earnings for it were taken back.', '/seller?tab=sales');
+    }
     return ['found' => $found];
 }
 
@@ -388,7 +407,11 @@ function decide_withdrawal(array $admin, string $id, string $decision, string $t
         $seller = $w['seller_id'];
         return null;
     });
-    if ($err === null && $seller) announce('seller', 'payout', $decision === 'paid' ? 'Your withdrawal has been paid' : 'Your withdrawal was rejected and refunded to your wallet', $seller);
+    if ($err === null && $seller) {
+        $msg = $decision === 'paid' ? 'Your withdrawal has been paid' : 'Your withdrawal was rejected and refunded to your wallet';
+        announce('seller', 'payout', $msg, $seller);
+        notify($seller, 'payout', $msg, $decision === 'paid' ? 'Reference: ' . $text : trim($text), '/seller?tab=payouts');
+    }
     return $err;
 }
 

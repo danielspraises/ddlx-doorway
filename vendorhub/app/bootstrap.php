@@ -21,19 +21,26 @@ function route(string $method, string $path, callable $handler, array $opts = []
 function nav_items(array $u): array
 {
     $p = $u['pending'];
+    $inbox = ['Notifications', '/notifications', $p['notifications'] ?? 0];
     if ($u['isAdmin']) {
         return [
+            ['Overview', '/admin?tab=overview', 0],
             ['Applications', '/admin?tab=applications', $p['applications']],
             ['Verifications', '/admin?tab=verifications', $p['verifications']],
             ['Products', '/admin?tab=products', $p['products']],
+            ['Orders', '/admin?tab=orders', $p['orders'] ?? 0],
             ['Payouts', '/admin?tab=payouts', $p['payouts']],
             ['Categories', '/admin?tab=categories', 0],
             ['Staff', '/admin?tab=staff', 0],
             ['Settings', '/admin?tab=settings', 0],
+            $inbox,
         ];
     }
-    if ($u['canReview']) {
-        return [['Product review', '/admin?tab=products', $p['products']]];
+    if ($u['canReview'] || $u['canOrders']) {
+        $items = [];
+        if ($u['canReview']) $items[] = ['Product review', '/admin?tab=products', $p['products']];
+        if ($u['canOrders']) $items[] = ['Orders', '/admin?tab=orders', $p['orders'] ?? 0];
+        return array_merge($items, [$inbox]);
     }
     $s = $u['stage'];
     $items = [['Application', '/apply', 0]];
@@ -48,6 +55,7 @@ function nav_items(array $u): array
             ['Sales', '/seller?tab=sales', 0],
             ['Payouts', '/seller?tab=payouts', 0],
             ['Store', '/seller?tab=store', 0],
+            $inbox,
         );
     }
     return $items;

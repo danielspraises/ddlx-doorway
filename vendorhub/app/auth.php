@@ -114,7 +114,7 @@ function user_from_token(string $token): ?array
     $isAdmin = (int) $row['is_admin'] > 0;
     $canReview = $isAdmin || in_array('products', $perms, true);
     $canOrders = $isAdmin || in_array('orders', $perms, true);
-    $pending = ['applications' => 0, 'verifications' => 0, 'products' => 0, 'payouts' => 0, 'orders' => 0];
+    $pending = ['applications' => 0, 'verifications' => 0, 'products' => 0, 'payouts' => 0, 'orders' => 0, 'notifications' => (int) $db->val('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL', [$row['id']])];
     if ($canOrders) {
         $pending['orders'] = (int) $db->val("SELECT COUNT(DISTINCT order_id) FROM order_items WHERE status = 'paid' AND fulfilment = 'ready_for_shipping' AND order_id NOT IN (SELECT order_id FROM order_items WHERE status = 'paid' AND fulfilment IN ('placed', 'processing'))");
     }

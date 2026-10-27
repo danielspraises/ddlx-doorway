@@ -4,6 +4,7 @@ declare(strict_types=1);
 function admin_tabs(array $u): array
 {
     $tabs = [];
+    if ($u['isAdmin']) $tabs['overview'] = 'Overview';
     if ($u['isAdmin']) $tabs += ['applications' => 'Applications', 'verifications' => 'Verifications'];
     if ($u['canReview']) $tabs['products'] = 'Products';
     if ($u['canOrders']) $tabs['orders'] = 'Orders';
@@ -21,6 +22,7 @@ route('GET', '/admin', function () {
         case 'applications': $vars['items'] = application_review_list(); break;
         case 'verifications': $vars['items'] = verification_review_list(); break;
         case 'products': $vars['items'] = review_queue(); break;
+        case 'overview': $vars['o'] = admin_overview(); $vars['live_refresh'] = true; break;
         case 'orders': $f = array_key_exists(input('filter'), ADMIN_ORDER_FILTERS) ? input('filter') : 'open'; $vars['items'] = admin_orders($f); $vars['filter'] = $f; $vars['history'] = []; break;
         case 'payouts': $vars['items'] = withdrawal_review_list(); break;
         case 'categories': $vars['all'] = categories_all(true); break;
@@ -28,6 +30,16 @@ route('GET', '/admin', function () {
         case 'settings': break;
     }
     render('admin', $vars);
+});
+
+route('GET', '/admin/export', function () {
+    $u = require_user();
+    $kind = input('kind');
+    [$from, $to] = range_from_input(input('from'), input('to'));
+    if ($kind === 'orders') { require_orders(); [$h, $rows] = export_admin_orders($from, $to); }
+    elseif ($kind === 'payouts') { require_admin(); [$h, $rows] = export_admin_payouts(); }
+    else abort(404);
+    csv_out('vendor-hub-' . $kind . '-' . gmdate('Y-m-d') . '.csv', $h, $rows);
 });
 
 route('POST', '/admin/order', function () {

@@ -25,6 +25,31 @@ $docLinks = function (array $docs): string {
 <h1><?= e($tabs[$tab]) ?></h1>
 <?= tabs_nav($nav, $tab, '/admin', ['applications' => $badges['applications'], 'verifications' => $badges['verifications'], 'products' => $badges['products'], 'payouts' => $badges['payouts'], 'orders' => $badges['orders'] ?? 0]) ?>
 
+<?php if ($tab === 'overview'): $top = $o['sales'][0] ?? null; $cur = $top['currency'] ?? 'NGN'; ?>
+  <p class="muted">The last 30 days across the whole marketplace.</p>
+  <div class="grid g4" style="margin-top:16px">
+    <div class="stat"><p class="muted small">Sales (<?= e($cur) ?>)</p><p class="n"><?= e($m($top['gross'] ?? 0, $cur)) ?></p></div>
+    <div class="stat"><p class="muted small">Your commission</p><p class="n"><?= e($m($top['commission'] ?? 0, $cur)) ?></p></div>
+    <div class="stat"><p class="muted small">Orders</p><p class="n"><?= (int) ($top['orders'] ?? 0) ?></p></div>
+    <div class="stat"><p class="muted small">Verified sellers</p><p class="n"><?= (int) $o['sellers'] ?></p></div>
+  </div>
+  <h2>Sales per day</h2>
+  <div class="card"><?= bar_chart($o['chart']['series'], $o['chart']['currency']) ?></div>
+  <h2>Needs you</h2>
+  <div class="grid g4">
+    <a class="stat" href="/admin?tab=applications"><p class="muted small">Applications</p><p class="n"><?= (int) $badges['applications'] ?></p></a>
+    <a class="stat" href="/admin?tab=verifications"><p class="muted small">Verifications</p><p class="n"><?= (int) $badges['verifications'] ?></p></a>
+    <a class="stat" href="/admin?tab=products"><p class="muted small">Products to review</p><p class="n"><?= (int) $badges['products'] ?></p></a>
+    <a class="stat" href="/admin?tab=orders&filter=ready"><p class="muted small">Orders to pick up</p><p class="n"><?= (int) $badges['orders'] ?></p></a>
+    <a class="stat" href="/admin?tab=orders"><p class="muted small">New, not yet processed</p><p class="n"><?= (int) $o['new_orders'] ?></p></a>
+    <a class="stat" href="/admin?tab=payouts"><p class="muted small">Withdrawals waiting</p><p class="n"><?= (int) $badges['payouts'] ?></p></a>
+    <div class="stat"><p class="muted small">Owed to sellers</p><p class="n"><?= e($m($o['owed'][$cur] ?? 0, $cur)) ?></p></div>
+    <div class="stat"><p class="muted small">Live products</p><p class="n"><?= (int) $o['live_products'] ?></p></div>
+  </div>
+  <?php if ($o['top']): ?><h2>Best sellers</h2><div class="table-wrap"><table><thead><tr><th>Product</th><th class="t-right">Units</th><th class="t-right">Revenue</th></tr></thead><tbody>
+    <?php foreach ($o['top'] as $t): ?><tr><td><?= e($t['name']) ?></td><td class="t-right"><?= (int) $t['units'] ?></td><td class="t-right"><?= e($m($t['revenue'], $t['currency'])) ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
+<?php endif; ?>
+
 <?php if ($tab === 'applications'):
     $filters = ['pending' => 'Under review', 'all' => 'All'];
     $f = $filter ?: 'pending';
@@ -95,6 +120,7 @@ $docLinks = function (array $docs): string {
 
 <?php if ($tab === 'orders'): ?>
   <p class="muted">Move orders from here or from WooCommerce. Either way both places stay in step. Sellers pack their items in Vendor Hub; you collect, ship and close the order.</p>
+  <form method="get" action="/admin/export" class="row" style="margin:8px 0" data-keep><input type="hidden" name="kind" value="orders"><label class="small muted" for="oe-from">Download as spreadsheet, from</label><input id="oe-from" type="date" name="from" style="width:auto"><label class="small muted" for="oe-to">to</label><input id="oe-to" type="date" name="to" style="width:auto"><button class="btn btn-outline btn-sm" type="submit">Download CSV</button></form>
   <div class="row" style="margin:16px 0"><?php foreach (ADMIN_ORDER_FILTERS as $k => $l): ?><a class="btn btn-sm <?= $filter === $k ? '' : 'btn-outline' ?>" href="/admin?tab=orders&filter=<?= $k ?>"><?= e($l) ?></a><?php endforeach; ?></div>
   <ul class="list"><?php foreach ($items as $o): $state = $o['state']; ?><li>
     <div class="row between" style="align-items:flex-start;gap:16px"><div>
@@ -127,7 +153,7 @@ $docLinks = function (array $docs): string {
 <?php endif; ?>
 
 <?php if ($tab === 'payouts'): ?>
-  <p class="muted">Pay the seller from your bank or Paystack dashboard, then enter the transfer reference here.</p>
+  <p class="muted">Pay the seller from your bank or Paystack dashboard, then enter the transfer reference here. <a href="/admin/export?kind=payouts">Download all withdrawals (CSV)</a></p>
   <ul class="list"><?php foreach ($items as $w): ?><li>
     <div class="row between"><div><strong><?= e($w['store_name']) ?></strong> <span class="muted">· <?= e($w['seller_email']) ?></span>
       <div>Pay <strong><?= e($m((float) $w['amount'] - (float) $w['fee'], $w['currency'])) ?></strong><?= (float) $w['fee'] > 0 ? ' <span class="muted small">(' . e($m($w['amount'], $w['currency'])) . ' less ' . e($m($w['fee'], $w['currency'])) . ' fee)</span>' : '' ?></div>

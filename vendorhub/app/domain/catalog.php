@@ -678,6 +678,7 @@ function review_product(array $reviewer, string $id, string $decision, string $c
     }
     if ($oldPaths) remove_unreferenced($id, $oldPaths);
     announce('seller', 'product', $message, $p['seller_id']);
+    notify($p['seller_id'], 'product', $message, $decision === 'approve' ? '' : trim($comment), '/products/edit?id=' . $id);
     announce('reviewers', 'review_queue');
     return null;
 }

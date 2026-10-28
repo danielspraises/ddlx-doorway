@@ -6,6 +6,7 @@ declare(strict_types=1);
 // Seller login: seller@demo.test / password123
 
 $root = dirname(__DIR__);
+if (!is_file($root . '/config/config.php')) { fwrite(STDERR, "Run  php dev/setup.php  first (it creates the local database).\n"); exit(1); }
 define('VH_TESTING', true);
 require $root . '/app/bootstrap.php';
 $GLOBALS['vh_config'] = require $root . '/config/config.php';

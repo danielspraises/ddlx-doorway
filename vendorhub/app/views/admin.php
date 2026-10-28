@@ -21,9 +21,9 @@ $docLinks = function (array $docs): string {
     return $out;
 };
 ?>
-<p class="eyebrow"><?= $user['isAdmin'] ? 'Staff review queue' : 'Product review' ?></p>
+<p class="eyebrow"><?= $user['isAdmin'] ? 'Admin' : 'Staff desk' ?></p>
 <h1><?= e($tabs[$tab]) ?></h1>
-<?= tabs_nav($nav, $tab, '/admin', ['applications' => $badges['applications'], 'verifications' => $badges['verifications'], 'products' => $badges['products'], 'payouts' => $badges['payouts'], 'orders' => $badges['orders'] ?? 0]) ?>
+<?= tabs_nav($nav, $tab, '/admin', ['applications' => $badges['applications'], 'verifications' => $badges['verifications'], 'products' => $badges['products'], 'payouts' => $badges['payouts'], 'orders' => $badges['orders'] ?? 0, 'returns' => $badges['returns'] ?? 0]) ?>
 
 <?php if ($tab === 'overview'): $top = $o['sales'][0] ?? null; $cur = $top['currency'] ?? 'NGN'; ?>
   <p class="muted">The last 30 days across the whole marketplace.</p>

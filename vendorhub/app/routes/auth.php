@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 route('GET', '/', function () {
     $u = current_user();
-    redirect($u ? home_path($u) : '/auth');
+    if ($u) redirect(home_path($u));
+    render('home', ['title' => 'Become a DDLX Seller', 'user' => null, 'full' => true, 'footer' => true]);
 });
 
 route('GET', '/auth', function () {

@@ -124,4 +124,30 @@
     setInterval(tick, 12000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) tick(); });
   }
+
+  // Landing page: the five application steps
+  var cards = document.querySelectorAll('[data-step]');
+  if (cards.length) {
+    cards.forEach(function (c) {
+      c.addEventListener('click', function () {
+        var n = c.getAttribute('data-step');
+        cards.forEach(function (o) { o.setAttribute('aria-pressed', o === c ? 'true' : 'false'); });
+        document.querySelectorAll('[data-detail]').forEach(function (d) { d.classList.toggle('on', d.getAttribute('data-detail') === n); });
+      });
+    });
+  }
+
+  // The tote bag leans gently towards the pointer
+  var tote = document.querySelector('[data-parallax]');
+  if (tote && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    window.addEventListener('pointermove', function (e) {
+      var x = e.clientX / window.innerWidth - 0.5, y = e.clientY / window.innerHeight - 0.5;
+      tote.style.transform = 'translate(' + (x * 18).toFixed(1) + 'px,' + (y * 10).toFixed(1) + 'px) rotateY(' + (x * 14).toFixed(1) + 'deg)';
+    }, { passive: true });
+  }
+
+  // Close the account menu when clicking elsewhere
+  document.addEventListener('click', function (e) {
+    document.querySelectorAll('details.account[open]').forEach(function (d) { if (!d.contains(e.target)) d.removeAttribute('open'); });
+  });
 })();

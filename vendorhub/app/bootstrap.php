@@ -18,48 +18,15 @@ function route(string $method, string $path, callable $handler, array $opts = []
     $GLOBALS['vh_routes'][$method][$path] = [$handler, $opts];
 }
 
+// The top bar only holds where you are; each area has its own tabs underneath.
 function nav_items(array $u): array
 {
-    $p = $u['pending'];
-    $inbox = ['Notifications', '/notifications', $p['notifications'] ?? 0];
-    if ($u['isAdmin']) {
-        return [
-            ['Overview', '/admin?tab=overview', 0],
-            ['Applications', '/admin?tab=applications', $p['applications']],
-            ['Verifications', '/admin?tab=verifications', $p['verifications']],
-            ['Products', '/admin?tab=products', $p['products']],
-            ['Orders', '/admin?tab=orders', $p['orders'] ?? 0],
-            ['Returns', '/admin?tab=returns', $p['returns'] ?? 0],
-            ['Payouts', '/admin?tab=payouts', $p['payouts']],
-            ['Categories', '/admin?tab=categories', 0],
-            ['Staff', '/admin?tab=staff', 0],
-            ['Settings', '/admin?tab=settings', 0],
-            $inbox,
-        ];
-    }
-    if ($u['canReview'] || $u['canOrders']) {
-        $items = [];
-        if ($u['canReview']) $items[] = ['Product review', '/admin?tab=products', $p['products']];
-        if ($u['canOrders']) { $items[] = ['Orders', '/admin?tab=orders', $p['orders'] ?? 0]; $items[] = ['Returns', '/admin?tab=returns', $p['returns'] ?? 0]; }
-        return array_merge($items, [$inbox]);
-    }
+    if ($u['isAdmin']) return [['Admin', '/admin', 0]];
+    if ($u['canReview'] || $u['canOrders']) return [['Staff desk', '/admin', 0]];
     $s = $u['stage'];
     $items = [['Application', '/apply', 0]];
-    if (str_starts_with($s, 'verification_') || $s === 'verified') {
-        $items[] = ['Verification', '/verification', 0];
-    }
-    if ($s === 'verified') {
-        array_push($items,
-            ['Seller Center', '/seller?tab=overview', 0],
-            ['Products', '/seller?tab=products', 0],
-            ['Inventory', '/seller?tab=inventory', 0],
-            ['Sales', '/seller?tab=sales', 0],
-            ['Returns', '/seller?tab=returns', $p['returns'] ?? 0],
-            ['Payouts', '/seller?tab=payouts', 0],
-            ['Store', '/seller?tab=store', 0],
-            $inbox,
-        );
-    }
+    if (str_starts_with($s, 'verification_') || $s === 'verified') $items[] = ['Verification', '/verification', 0];
+    if ($s === 'verified') $items[] = ['Seller Center', '/seller?tab=overview', 0];
     return $items;
 }
 
@@ -68,7 +35,7 @@ function vh_security_headers(): void
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: SAMEORIGIN');
     header('Referrer-Policy: same-origin');
-    header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'");
+    header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'");
     if (is_https()) {
         header('Strict-Transport-Security: max-age=31536000');
     }

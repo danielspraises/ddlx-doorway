@@ -4,7 +4,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 ?>
 <p class="eyebrow">Seller Center</p>
 <h1><?= e(SELLER_TABS[$tab]) ?></h1>
-<?= tabs_nav(SELLER_TABS, $tab, '/seller') ?>
+<?= tabs_nav(SELLER_TABS, $tab, '/seller', ['returns' => $user['pending']['returns'] ?? 0]) ?>
 
 <?php if (in_array($tab, ['overview', 'sales', 'payouts'], true)):
     $currencies = array_values(array_unique(array_merge(array_column($balances, 'currency'), array_column($month, 'currency'))));

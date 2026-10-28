@@ -7,7 +7,7 @@ function admin_tabs(array $u): array
     if ($u['isAdmin']) $tabs['overview'] = 'Overview';
     if ($u['isAdmin']) $tabs += ['applications' => 'Applications', 'verifications' => 'Verifications'];
     if ($u['canReview']) $tabs['products'] = 'Products';
-    if ($u['canOrders']) $tabs['orders'] = 'Orders';
+    if ($u['canOrders']) { $tabs['orders'] = 'Orders'; $tabs['returns'] = 'Returns'; }
     if ($u['isAdmin']) $tabs += ['payouts' => 'Payouts', 'categories' => 'Categories', 'staff' => 'Staff', 'settings' => 'Settings'];
     return $tabs;
 }
@@ -23,6 +23,7 @@ route('GET', '/admin', function () {
         case 'verifications': $vars['items'] = verification_review_list(); break;
         case 'products': $vars['items'] = review_queue(); break;
         case 'overview': $vars['o'] = admin_overview(); $vars['live_refresh'] = true; break;
+        case 'returns': $f = array_key_exists(input('filter'), ['open' => 1, 'done' => 1, 'all' => 1]) ? input('filter') : 'open'; $vars['items'] = admin_returns($f); $vars['filter'] = $f; break;
         case 'orders': $f = array_key_exists(input('filter'), ADMIN_ORDER_FILTERS) ? input('filter') : 'open'; $vars['items'] = admin_orders($f); $vars['filter'] = $f; $vars['history'] = []; break;
         case 'payouts': $vars['items'] = withdrawal_review_list(); break;
         case 'categories': $vars['all'] = categories_all(true); break;
@@ -40,6 +41,19 @@ route('GET', '/admin/export', function () {
     elseif ($kind === 'payouts') { require_admin(); [$h, $rows] = export_admin_payouts(); }
     else abort(404);
     csv_out('vendor-hub-' . $kind . '-' . gmdate('Y-m-d') . '.csv', $h, $rows);
+});
+
+route('POST', '/admin/return/open', function () {
+    $u = require_orders();
+    $err = open_return($u, input('item_id'), input('reason'), input_raw('details'));
+    redirect('/admin?tab=' . ($err ? 'orders' : 'returns'), $err ?? 'Return case opened. The seller has been told.', $err ? 'error' : 'ok');
+});
+
+route('POST', '/admin/return/resolve', function () {
+    $u = require_orders();
+    $d = input('decision');
+    $err = resolve_return($u, input('id'), $d, input('restock') === 'yes', input_raw('note'));
+    redirect('/admin?tab=returns', $err ?? ($d === 'refund' ? 'Refund recorded and the seller\'s earnings reversed. Refund the customer in WooCommerce.' : 'Case rejected.'), $err ? 'error' : 'ok');
 });
 
 route('POST', '/admin/order', function () {

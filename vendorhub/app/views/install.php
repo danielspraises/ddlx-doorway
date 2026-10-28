@@ -13,6 +13,7 @@
 <?php else: ?>
   <h1>Install Vendor Hub</h1>
   <p class="muted">Create an empty MySQL database and user in cPanel (MySQL® Databases) first, then fill this in. It takes a few seconds.</p>
+  <p class="notice small"><strong>Testing on your own computer?</strong> You do not need MySQL. Close this page and run <code>php dev/setup.php</code> in the <code>vendorhub</code> folder instead (see README, “Test on your own computer”). Use this form only on your real hosting.</p>
   <?php if (!empty($error)): ?><p class="err" role="alert"><?= e($error) ?></p><?php endif; ?>
   <form method="post" action="/install">
     <h2>Database</h2>

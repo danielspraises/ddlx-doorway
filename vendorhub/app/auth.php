@@ -114,8 +114,9 @@ function user_from_token(string $token): ?array
     $isAdmin = (int) $row['is_admin'] > 0;
     $canReview = $isAdmin || in_array('products', $perms, true);
     $canOrders = $isAdmin || in_array('orders', $perms, true);
-    $pending = ['applications' => 0, 'verifications' => 0, 'products' => 0, 'payouts' => 0, 'orders' => 0, 'notifications' => (int) $db->val('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL', [$row['id']])];
+    $pending = ['applications' => 0, 'verifications' => 0, 'products' => 0, 'payouts' => 0, 'orders' => 0, 'returns' => 0, 'notifications' => (int) $db->val('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL', [$row['id']])];
     if ($canOrders) {
+        $pending['returns'] = (int) $db->val("SELECT COUNT(*) FROM return_cases WHERE status IN ('seller_accepted', 'seller_disputed')");
         $pending['orders'] = (int) $db->val("SELECT COUNT(DISTINCT order_id) FROM order_items WHERE status = 'paid' AND fulfilment = 'ready_for_shipping' AND order_id NOT IN (SELECT order_id FROM order_items WHERE status = 'paid' AND fulfilment IN ('placed', 'processing'))");
     }
     if ($canReview) {
@@ -125,6 +126,9 @@ function user_from_token(string $token): ?array
         $pending['applications'] = (int) $db->val("SELECT COUNT(*) FROM seller_applications WHERE status = 'submitted'");
         $pending['verifications'] = (int) $db->val("SELECT COUNT(*) FROM seller_verifications WHERE status = 'submitted'");
         $pending['payouts'] = (int) $db->val("SELECT COUNT(*) FROM withdrawals WHERE status = 'requested'");
+    }
+    if (!$isAdmin && !$canOrders) {
+        $pending['returns'] = (int) $db->val("SELECT COUNT(*) FROM return_cases WHERE seller_id = ? AND status = 'open'", [$row['id']]);
     }
     $GLOBALS['vh_csrf'] = $row['csrf'];
     return [

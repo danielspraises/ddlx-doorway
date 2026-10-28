@@ -286,6 +286,26 @@ CREATE TABLE store_profiles (
   CONSTRAINT store_seller_fk FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE return_cases (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  order_item_id CHAR(36) NOT NULL,
+  seller_id CHAR(36) NOT NULL,
+  opened_by CHAR(36) NOT NULL,
+  reason VARCHAR(40) NOT NULL,
+  details TEXT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'open',
+  seller_response TEXT NOT NULL,
+  resolution_note TEXT NOT NULL,
+  resolved_by CHAR(36) NULL,
+  resolved_at DATETIME(3) NULL,
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL,
+  CONSTRAINT rc_item_fk FOREIGN KEY (order_item_id) REFERENCES order_items(id),
+  CONSTRAINT rc_seller_fk FOREIGN KEY (seller_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX return_cases_seller_idx ON return_cases (seller_id, status);
+CREATE INDEX return_cases_status_idx ON return_cases (status, created_at);
+
 CREATE TABLE notifications (
   id CHAR(36) NOT NULL PRIMARY KEY,
   user_id CHAR(36) NOT NULL,

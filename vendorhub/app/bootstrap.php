@@ -29,6 +29,7 @@ function nav_items(array $u): array
             ['Verifications', '/admin?tab=verifications', $p['verifications']],
             ['Products', '/admin?tab=products', $p['products']],
             ['Orders', '/admin?tab=orders', $p['orders'] ?? 0],
+            ['Returns', '/admin?tab=returns', $p['returns'] ?? 0],
             ['Payouts', '/admin?tab=payouts', $p['payouts']],
             ['Categories', '/admin?tab=categories', 0],
             ['Staff', '/admin?tab=staff', 0],
@@ -39,7 +40,7 @@ function nav_items(array $u): array
     if ($u['canReview'] || $u['canOrders']) {
         $items = [];
         if ($u['canReview']) $items[] = ['Product review', '/admin?tab=products', $p['products']];
-        if ($u['canOrders']) $items[] = ['Orders', '/admin?tab=orders', $p['orders'] ?? 0];
+        if ($u['canOrders']) { $items[] = ['Orders', '/admin?tab=orders', $p['orders'] ?? 0]; $items[] = ['Returns', '/admin?tab=returns', $p['returns'] ?? 0]; }
         return array_merge($items, [$inbox]);
     }
     $s = $u['stage'];
@@ -53,6 +54,7 @@ function nav_items(array $u): array
             ['Products', '/seller?tab=products', 0],
             ['Inventory', '/seller?tab=inventory', 0],
             ['Sales', '/seller?tab=sales', 0],
+            ['Returns', '/seller?tab=returns', $p['returns'] ?? 0],
             ['Payouts', '/seller?tab=payouts', 0],
             ['Store', '/seller?tab=store', 0],
             $inbox,

@@ -20,7 +20,7 @@ function admin_orders(string $filter = 'open', int $limit = 300): array
         $o ??= ['id' => $r['id'], 'marketplace_order_id' => $r['marketplace_order_id'], 'number' => $r['number'], 'currency' => $r['currency'], 'customer_name' => $r['customer_name'],
             'ship_city' => $r['ship_city'], 'ship_state' => $r['ship_state'], 'placed_at' => $r['placed_at'], 'items' => [], 'total' => 0.0, 'sellers' => [], 'stage' => null,
             'carrier' => '', 'tracking' => '', 'refunded' => 0, 'live' => 0];
-        $o['items'][] = ['name' => $r['name'], 'quantity' => (int) $r['quantity'], 'seller_id' => $r['seller_id'], 'fulfilment' => $r['fulfilment'], 'status' => $r['status']];
+        $o['items'][] = ['id' => $r['item_id'], 'name' => $r['name'], 'quantity' => (int) $r['quantity'], 'seller_id' => $r['seller_id'], 'fulfilment' => $r['fulfilment'], 'status' => $r['status']];
         $o['sellers'][$r['seller_id']] = true;
         if ($r['status'] === 'refunded') { $o['refunded']++; continue; }
         $o['live']++;

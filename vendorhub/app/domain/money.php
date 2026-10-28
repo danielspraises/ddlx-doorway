@@ -257,6 +257,25 @@ function record_paid_order(array $event): array
     return $result;
 }
 
+// Takes the listed paid lines back: earnings reversed (on the same availability date) and, if asked, stock returned.
+function refund_lines(Db $db, string $currency, array $lines, string $label, bool $restock, array &$sellers): void
+{
+    foreach ($lines as $l) {
+        $db->exec("UPDATE order_items SET status = 'refunded' WHERE id = ?", [$l['id']]);
+        $sale = $db->one("SELECT available_at FROM wallet_entries WHERE order_item_id = ? AND kind = 'sale'", [$l['id']]);
+        if ($sale && !$db->val("SELECT 1 FROM wallet_entries WHERE order_item_id = ? AND kind = 'refund'", [$l['id']])) {
+            $db->insert('wallet_entries', ['id' => uuid(), 'seller_id' => $l['seller_id'], 'kind' => 'refund', 'amount' => -((float) $l['net']), 'currency' => $currency,
+                'order_item_id' => $l['id'], 'note' => 'Refund ' . $label, 'available_at' => $sale['available_at'], 'created_at' => now_db()]);
+        }
+        if ($restock) {
+            if ($l['variation_id']) $db->exec('UPDATE product_variations SET stock = CASE WHEN stock + ? > 1000000 THEN 1000000 ELSE stock + ? END WHERE id = ?', [$l['quantity'], $l['quantity'], $l['variation_id']]);
+            elseif ($l['product_id']) $db->exec('UPDATE products SET stock = CASE WHEN stock + ? > 1000000 THEN 1000000 ELSE stock + ? END WHERE id = ? AND manage_stock = 1', [$l['quantity'], $l['quantity'], $l['product_id']]);
+            if ($l['product_id']) $db->exec('UPDATE products SET updated_at = ? WHERE id = ?', [now_db(), $l['product_id']]);
+        }
+        $sellers[$l['seller_id']] = true;
+    }
+}
+
 // Reverses every line of an order: the credit is taken back (on the same availability date) and, if asked, the stock returns.
 function record_refund(array $event): array
 {
@@ -267,20 +286,7 @@ function record_refund(array $event): array
         $order = $db->one('SELECT id, currency FROM orders WHERE marketplace_order_id = ?' . $db->lock(), [$o['id']]);
         if (!$order) return false;
         $lines = $db->all("SELECT id, seller_id, product_id, variation_id, quantity, net FROM order_items WHERE order_id = ? AND status = 'paid'" . $db->lock(), [$order['id']]);
-        foreach ($lines as $l) {
-            $db->exec("UPDATE order_items SET status = 'refunded' WHERE id = ?", [$l['id']]);
-            $sale = $db->one("SELECT available_at FROM wallet_entries WHERE order_item_id = ? AND kind = 'sale'", [$l['id']]);
-            if ($sale && !$db->val("SELECT 1 FROM wallet_entries WHERE order_item_id = ? AND kind = 'refund'", [$l['id']])) {
-                $db->insert('wallet_entries', ['id' => uuid(), 'seller_id' => $l['seller_id'], 'kind' => 'refund', 'amount' => -((float) $l['net']), 'currency' => $order['currency'],
-                    'order_item_id' => $l['id'], 'note' => 'Refund ' . ($o['number'] ?: $o['id']), 'available_at' => $sale['available_at'], 'created_at' => now_db()]);
-            }
-            if ($o['restock']) {
-                if ($l['variation_id']) $db->exec('UPDATE product_variations SET stock = CASE WHEN stock + ? > 1000000 THEN 1000000 ELSE stock + ? END WHERE id = ?', [$l['quantity'], $l['quantity'], $l['variation_id']]);
-                elseif ($l['product_id']) $db->exec('UPDATE products SET stock = CASE WHEN stock + ? > 1000000 THEN 1000000 ELSE stock + ? END WHERE id = ? AND manage_stock = 1', [$l['quantity'], $l['quantity'], $l['product_id']]);
-                if ($l['product_id']) $db->exec('UPDATE products SET updated_at = ? WHERE id = ?', [now_db(), $l['product_id']]);
-            }
-            $sellers[$l['seller_id']] = true;
-        }
+        refund_lines($db, $order['currency'], $lines, $o['number'] ?: $o['id'], (bool) $o['restock'], $sellers);
         return true;
     });
     foreach (array_keys($sellers) as $sid) {

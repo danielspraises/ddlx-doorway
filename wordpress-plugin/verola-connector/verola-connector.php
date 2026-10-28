@@ -265,6 +265,10 @@ final class Verola_Connector {
 		if ($order && in_array($status, ['shipped', 'delivered', 'completed', 'cancelled', 'refunded'], true)) {
 			return self::admin_order_status($order, $status, $request);
 		}
+		if ($order && $status === 'note') {
+			$order->add_order_note('Vendor Hub: ' . sanitize_text_field((string) $request->get_param('note')));
+			return ['ok' => true];
+		}
 		$seller = sanitize_text_field((string) $request->get_param('seller_id'));
 		if (!$order || !in_array($status, ['processing', 'ready_for_shipping'], true) || $seller === '') {
 			return new WP_REST_Response(['error' => 'Unknown order or status.'], 404);

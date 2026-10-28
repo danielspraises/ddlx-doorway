@@ -118,6 +118,24 @@ $docLinks = function (array $docs): string {
   <?php endif; ?>
 <?php endif; ?>
 
+<?php if ($tab === 'returns'): ?>
+  <p class="muted">Customer complaints. Open a case from the Orders tab; the seller answers here, you decide.</p>
+  <div class="row" style="margin:16px 0"><?php foreach (['open' => 'Open', 'done' => 'Closed', 'all' => 'All'] as $k => $l): ?><a class="btn btn-sm <?= $filter === $k ? '' : 'btn-outline' ?>" href="/admin?tab=returns&filter=<?= $k ?>"><?= e($l) ?></a><?php endforeach; ?></div>
+  <ul class="list"><?php foreach ($items as $c): ?><li>
+    <div class="row between" style="align-items:flex-start;gap:16px"><div>
+      <strong><?= e($c['item_name']) ?></strong> · order <?= e($c['number'] ?: $c['marketplace_order_id']) ?> · <?= e($m($c['line_total'], $c['currency'])) ?> <?= pill($c['status'], RETURN_LABEL, RETURN_KINDS) ?>
+      <div class="muted small"><?= e($c['seller_email']) ?> · <?= e($c['customer_name'] ?: 'Customer') ?> · opened <?= e(human_date($c['created_at'], true)) ?></div>
+      <div class="small" style="margin-top:6px"><strong><?= e($c['reason']) ?></strong><?= $c['details'] !== '' ? ' — ' . e($c['details']) : '' ?></div>
+      <?php if ($c['seller_response'] !== ''): ?><div class="small" style="margin-top:6px"><span class="muted">Seller:</span> <?= e($c['seller_response']) ?></div><?php endif; ?>
+      <?php if ($c['resolution_note'] !== ''): ?><div class="small" style="margin-top:6px"><span class="muted">Decision:</span> <?= e($c['resolution_note']) ?></div><?php endif; ?></div>
+    <?php if (!in_array($c['status'], RETURN_FINAL, true)): ?><form method="post" action="/admin/return/resolve" class="stack" style="min-width:260px" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>">
+      <input name="note" maxlength="500" placeholder="Note to the seller (required to reject)" aria-label="Note">
+      <label class="check"><input type="checkbox" name="restock" value="yes"><span>Item comes back to stock</span></label>
+      <div class="row"><button class="btn btn-sm" name="decision" value="refund" type="submit" data-confirm="Refund this item and take the earnings back from the seller?">Refund</button><button class="btn btn-sm btn-outline" name="decision" value="reject" type="submit" data-confirm="Reject this case?">Reject</button></div>
+      <span class="muted small">Refund reverses the seller's earnings. Return the customer's money in WooCommerce.</span></form><?php endif; ?></div></li><?php endforeach; ?>
+    <?php if (!$items): ?><li class="muted">No cases here.</li><?php endif; ?></ul>
+<?php endif; ?>
+
 <?php if ($tab === 'orders'): ?>
   <p class="muted">Move orders from here or from WooCommerce. Either way both places stay in step. Sellers pack their items in Vendor Hub; you collect, ship and close the order.</p>
   <form method="get" action="/admin/export" class="row" style="margin:8px 0" data-keep><input type="hidden" name="kind" value="orders"><label class="small muted" for="oe-from">Download as spreadsheet, from</label><input id="oe-from" type="date" name="from" style="width:auto"><label class="small muted" for="oe-to">to</label><input id="oe-to" type="date" name="to" style="width:auto"><button class="btn btn-outline btn-sm" type="submit">Download CSV</button></form>
@@ -141,6 +159,12 @@ $docLinks = function (array $docs): string {
       <?php elseif ($state === 'delivered'): ?>
         <form method="post" action="/admin/order" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($o['id']) ?>"><input type="hidden" name="to" value="completed"><input type="hidden" name="filter" value="<?= e($filter) ?>"><button class="btn btn-sm" type="submit" data-confirm="Close this order as completed?">Mark completed</button></form>
       <?php endif; ?>
+      <details style="margin-top:8px"><summary class="muted small">Open a return case</summary>
+        <form method="post" action="/admin/return/open" class="stack" data-keep style="margin-top:8px"><?= csrf_field() ?>
+          <select name="item_id" aria-label="Item"><?php foreach ($o['items'] as $it): if ($it['status'] === 'refunded') continue; ?><option value="<?= e($it['id']) ?>"><?= e($it['name']) ?></option><?php endforeach; ?></select>
+          <select name="reason" aria-label="Reason"><?php foreach (RETURN_REASONS as $rr): ?><option><?= e($rr) ?></option><?php endforeach; ?></select>
+          <textarea name="details" rows="2" maxlength="2000" placeholder="What the customer reported" aria-label="Details"></textarea>
+          <button class="btn btn-sm btn-outline" type="submit">Open case and tell the seller</button></form></details>
       <details style="margin-top:8px"><summary class="muted small"><?= FULFILMENT_RANK[$state] < FULFILMENT_RANK['shipped'] ? 'Cancel or refund' : 'Refund' ?></summary>
         <form method="post" action="/admin/order" class="stack" data-keep style="margin-top:8px"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($o['id']) ?>"><input type="hidden" name="filter" value="<?= e($filter) ?>">
           <input name="note" maxlength="200" placeholder="Reason (optional)" aria-label="Reason">

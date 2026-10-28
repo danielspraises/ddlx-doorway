@@ -1,19 +1,26 @@
 <?php
 declare(strict_types=1);
 
-const SELLER_TABS = ['overview' => 'Overview', 'products' => 'Products', 'inventory' => 'Inventory', 'sales' => 'Sales', 'payouts' => 'Payouts', 'store' => 'Store'];
+const SELLER_TABS = ['overview' => 'Overview', 'products' => 'Products', 'inventory' => 'Inventory', 'sales' => 'Sales', 'returns' => 'Returns', 'payouts' => 'Payouts', 'store' => 'Store'];
 
 route('GET', '/seller', function () {
     $u = require_seller();
     $tab = array_key_exists(input('tab'), SELLER_TABS) ? input('tab') : 'overview';
-    $vars = ['title' => SELLER_TABS[$tab], 'tab' => $tab, 'user' => $u, 'live_refresh' => in_array($tab, ['overview', 'sales', 'payouts', 'products', 'inventory'], true)];
+    $vars = ['title' => SELLER_TABS[$tab], 'tab' => $tab, 'user' => $u, 'live_refresh' => in_array($tab, ['overview', 'sales', 'payouts', 'products', 'inventory', 'returns'], true)];
     if (in_array($tab, ['overview', 'products', 'inventory'], true)) $vars['products'] = seller_products($u['id']);
     if ($tab === 'overview') { $vars['chart'] = seller_daily_earnings($u['id']); $vars['to_process'] = seller_to_process($u['id']); }
     if (in_array($tab, ['overview', 'sales', 'payouts'], true)) { $vars['balances'] = wallet_balances($u['id']); $vars['month'] = sales_last_30d($u['id']); }
     if ($tab === 'sales') { $vars['sales'] = seller_sales($u['id']); $vars['history'] = item_history(array_column($vars['sales'], 'id')); }
     if ($tab === 'payouts') { $vars['accounts'] = bank_accounts($u['id']); $vars['withdrawals'] = seller_withdrawals($u['id']); }
+    if ($tab === 'returns') $vars['cases'] = seller_returns($u['id']);
     if ($tab === 'store') $vars['store'] = store_profile($u['id']);
     render('seller', $vars);
+});
+
+route('POST', '/returns/respond', function () {
+    $u = require_seller();
+    $err = seller_respond_return($u['id'], input('id'), input('action'), input_raw('response'));
+    redirect('/seller?tab=returns', $err ?? 'Your reply was sent.', $err ? 'error' : 'ok');
 });
 
 // ---------------------------------------------------------------- exports

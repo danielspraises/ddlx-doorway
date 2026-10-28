@@ -193,7 +193,7 @@ ok($f !== null && $t === null, 'date range parsing');
 eq(csv_line(['=HYPERLINK("x")', '-5', 'ok', 'a,b']), "\"'=HYPERLINK(\"\"x\"\")\",\"-5\",\"ok\",\"a,b\"\r\n", 'csv defuses formulas, keeps numbers, quotes commas');
 
 // ---- admin moves orders from Vendor Hub
-$adm = ['id' => $admin, 'isAdmin' => true];
+$adm = $admin;
 $ev2 = parse_order_event(['event' => 'order.paid', 'order' => ['id' => 'WC-2', 'number' => '1002', 'currency' => 'NGN', 'placed_at' => gmdate('c', time() - 86400), 'customer_name' => 'Bo',
     'items' => [['product_id' => $pid, 'quantity' => 1, 'unit_price' => 10000]]]]);
 record_paid_order($ev2);
@@ -222,6 +222,30 @@ eq(db()->val('SELECT status FROM order_items WHERE id = ?', [$i2]), 'refunded', 
 ok(admin_set_order_status($adm, $o2, 'refunded') !== null, 'cannot refund twice');
 eq(admin_orders('done')[0]['state'] ?? '', 'refunded', 'listed as finished');
 unset($GLOBALS['vh_market_stub']); set_setting('marketplace_url', ''); set_setting('marketplace_api_key', '');
+
+// ---- returns and disputes
+record_paid_order(parse_order_event(['event' => 'order.paid', 'order' => ['id' => 'WC-3', 'number' => '1003', 'currency' => 'NGN', 'placed_at' => gmdate('c'), 'customer_name' => 'Cy',
+    'items' => [['product_id' => $pid, 'quantity' => 2, 'unit_price' => 8000]]]]));
+$i3 = (string) db()->val("SELECT i.id FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.marketplace_order_id = 'WC-3'");
+$stock0 = (int) load_product($pid)['stock'];
+ok(open_return($adm, $i3, 'Nonsense', '') !== null, 'reason must be from the list');
+eq(open_return($adm, $i3, 'Damaged or defective', 'Zip broken'), null, 'case opened');
+ok(open_return($adm, $i3, 'Wrong item sent', '') !== null, 'one open case per item');
+$case = (string) db()->val('SELECT id FROM return_cases WHERE order_item_id = ?', [$i3]);
+ok(seller_respond_return($other, $case, 'accept', '') !== null, 'other seller cannot answer');
+ok(seller_respond_return($sid, $case, 'dispute', '') !== null, 'dispute needs an explanation');
+eq(seller_respond_return($sid, $case, 'dispute', 'Item was fine when packed'), null, 'seller disputes');
+ok(seller_respond_return($sid, $case, 'accept', '') !== null, 'cannot answer twice');
+ok(resolve_return($adm, $case, 'reject', false, '') !== null, 'rejecting needs a note');
+$bal0 = wallet_balances($sid)[0]['total'];
+eq(resolve_return($adm, $case, 'refund', true, 'Photos show a broken zip'), null, 'admin refunds');
+eq(db()->val('SELECT status FROM order_items WHERE id = ?', [$i3]), 'refunded', 'item refunded');
+eq(round($bal0 - wallet_balances($sid)[0]['total'], 2), 14400.0, 'earnings reversed');
+eq((int) load_product($pid)['stock'], $stock0 + 2, 'stock restored');
+ok(resolve_return($adm, $case, 'refund', false, '') !== null, 'closed case cannot be decided again');
+eq(count(admin_returns('open')), 0, 'no open cases left');
+eq(count(admin_returns('done')), 1, 'one closed case');
+ok(count(seller_returns($sid)) === 1 && count(seller_returns($other)) === 0, 'sellers see only their cases');
 
 // ---- withdrawals
 eq(add_bank_account($sid, 'GTBank', '0123456789', 'A B'), null, 'bank added');

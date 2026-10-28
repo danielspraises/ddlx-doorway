@@ -17,7 +17,7 @@ route('GET', '/api/pulse', function () {
         }
     }
     $p = $u['pending'];
-    json_out(['last' => $last, 'events' => $events, 'counts' => ['Applications' => $p['applications'], 'Verifications' => $p['verifications'], 'Products' => $p['products'], 'Product review' => $p['products'], 'Payouts' => $p['payouts'], 'Orders' => $p['orders'], 'Notifications' => $p['notifications']]]);
+    json_out(['last' => $last, 'events' => $events, 'counts' => ['Applications' => $p['applications'], 'Verifications' => $p['verifications'], 'Products' => $p['products'], 'Product review' => $p['products'], 'Payouts' => $p['payouts'], 'Orders' => $p['orders'], 'Returns' => $p['returns'], 'Notifications' => $p['notifications']]]);
 }, ['api' => true]);
 
 // ---------------------------------------------------------------- marketplace: pull the catalogue

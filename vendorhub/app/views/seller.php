@@ -100,6 +100,20 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
   <?php endforeach; if (!$sales): ?><tr><td colspan="7" class="muted" style="text-align:center;padding:40px">Sales will be listed here.</td></tr><?php endif; ?></tbody></table></div>
 <?php endif; ?>
 
+<?php if ($tab === 'returns'): ?>
+  <p class="muted">When a customer complains, DDLX opens a case here. Accept it, or explain why you disagree. DDLX makes the final decision.</p>
+  <ul class="list"><?php foreach ($cases as $c): ?><li>
+    <div class="row between"><strong><?= e($c['item_name']) ?></strong> <?= pill($c['status'], RETURN_LABEL, RETURN_KINDS) ?></div>
+    <div class="muted small">Order <?= e($c['number'] ?: $c['marketplace_order_id']) ?> · <?= e($m($c['line_total'], $c['currency'])) ?> · opened <?= e(human_date($c['created_at'], true)) ?></div>
+    <div class="small" style="margin-top:6px"><strong><?= e($c['reason']) ?></strong><?= $c['details'] !== '' ? ' — ' . e($c['details']) : '' ?></div>
+    <?php if ($c['seller_response'] !== ''): ?><div class="small" style="margin-top:6px"><span class="muted">You:</span> <?= e($c['seller_response']) ?></div><?php endif; ?>
+    <?php if ($c['resolution_note'] !== ''): ?><div class="small" style="margin-top:6px"><span class="muted">DDLX:</span> <?= e($c['resolution_note']) ?></div><?php endif; ?>
+    <?php if ($c['status'] === 'open'): ?><form method="post" action="/returns/respond" class="stack" style="margin-top:10px" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>">
+      <textarea name="response" rows="2" maxlength="2000" placeholder="Your reply (required if you disagree)" aria-label="Your reply"></textarea>
+      <div class="row"><button class="btn btn-sm" name="action" value="accept" type="submit" data-confirm="Accept this return? DDLX may refund the customer and take the earnings back.">I agree</button><button class="btn btn-sm btn-outline" name="action" value="dispute" type="submit">I disagree</button></div></form><?php endif; ?></li><?php endforeach; ?>
+    <?php if (!$cases): ?><li class="muted">No return cases. Good.</li><?php endif; ?></ul>
+<?php endif; ?>
+
 <?php if ($tab === 'payouts'): $cur = $balances[0]['currency'] ?? 'NGN'; ?>
   <p class="small"><a href="/seller/export?kind=payouts">Download my wallet history (CSV)</a></p>
   <h2>Withdraw money</h2>

@@ -396,3 +396,13 @@ CREATE TABLE messages (
   CONSTRAINT messages_thread_fk FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX messages_thread_idx ON messages (thread_id, created_at);
+
+CREATE TABLE assistant_messages (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  role VARCHAR(10) NOT NULL,
+  body TEXT NOT NULL,
+  created_at DATETIME(3) NOT NULL,
+  CONSTRAINT assistant_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX assistant_user_idx ON assistant_messages (user_id, created_at);

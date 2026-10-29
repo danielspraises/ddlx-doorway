@@ -27,6 +27,7 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
       <?php endforeach; ?>
     </nav>
     <div class="nav-end">
+      <a class="bell" href="/assistant" aria-label="Ask DDLX"><?= icon('spark') ?></a>
       <a class="bell" href="/messages" aria-label="Messages"><?= icon('mail') ?><span class="badge-count<?= ($user['pending']['messages'] ?? 0) > 0 ? '' : ' hidden' ?>" data-badge="Messages"><?= (int) ($user['pending']['messages'] ?? 0) ?></span></a>
       <a class="bell" href="/notifications" aria-label="Notifications"><?= icon('bell') ?><span class="badge-count<?= ($user['pending']['notifications'] ?? 0) > 0 ? '' : ' hidden' ?>" data-badge="Notifications"><?= (int) ($user['pending']['notifications'] ?? 0) ?></span></a>
       <details class="account"><summary><span class="who"><?= e($user['email']) ?></span><span class="avatar"><?= e(strtoupper(substr($user['email'], 0, 1))) ?></span></summary>

@@ -129,5 +129,15 @@ function save_settings(array $in): ?string
     set_setting('marketplace_url', rtrim($url, '/'));
     set_setting('app_url', rtrim($app, '/'));
     set_setting('mail_from', $mail);
+    set_setting('ai_enabled', ($in['ai_enabled'] ?? '') === 'yes' ? '1' : '0');
+    $model = trim((string) ($in['ai_model'] ?? ''));
+    if ($model !== '' && !preg_match('/^[A-Za-z0-9._:-]{3,80}$/', $model)) return 'The AI model name looks wrong.';
+    set_setting('ai_model', $model !== '' ? $model : 'claude-sonnet-5-5');
+    $key = trim((string) ($in['ai_api_key'] ?? ''));
+    if (($in['ai_clear_key'] ?? '') === 'yes') set_setting('ai_api_key', '');
+    elseif ($key !== '') {
+        if (!preg_match('/^[A-Za-z0-9_-]{20,200}$/', $key)) return 'That does not look like an Anthropic API key.';
+        set_setting('ai_api_key', $key);
+    }
     return null;
 }

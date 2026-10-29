@@ -416,6 +416,33 @@ ok(!import_stock($other, "sku,stock\n$skuA,5\n")['ok'], 'cannot update another s
 $cur = array_values(array_filter(seller_products($sid), fn ($p) => $p['sku'] === $skuA))[0]['stock'];
 eq($cur, 42, 'bad file changed nothing');
 
+// ---- assistant
+$u = ['id' => $sid, 'email' => 's@x.test', 'stage' => 'verified', 'isAdmin' => false, 'canReview' => false, 'canOrders' => false, 'canMessages' => false];
+ok(str_contains(assistant_fallback('how do I withdraw money'), 'withdrawal'), 'fallback finds payouts');
+ok(str_contains(assistant_fallback('qqq zzz'), 'not sure'), 'fallback admits when unsure');
+ok(str_contains(assistant_system_prompt($u), 'Products:'), 'prompt includes seller summary');
+ok(!assistant_ask($u, '   ')['ok'], 'empty question refused');
+$r = assistant_ask($u, 'How do I add many products?');
+ok($r['ok'] && !$r['ai'] && str_contains($r['reply'], 'CSV'), 'no key: built-in answer');
+set_setting('ai_api_key', 'sk-ant-test-key-aaaaaaaaaaaaaaaaaaaa');
+$seen = null;
+$GLOBALS['vh_ai_stub'] = function ($system, $msgs) use (&$seen) { $seen = [$system, $msgs]; return 'Stub answer'; };
+$r = assistant_ask($u, 'Second question');
+ok($r['ok'] && $r['ai'] && $r['reply'] === 'Stub answer', 'AI answer used when key set');
+ok(str_contains($seen[0], 'FACTS ABOUT VENDOR HUB'), 'AI gets the facts');
+eq($seen[1][count($seen[1]) - 1], ['role' => 'user', 'content' => 'Second question'], 'AI gets the question last');
+eq($seen[1][0]['role'], 'user', 'conversation starts with the person');
+$GLOBALS['vh_ai_stub'] = fn () => null;
+$r = assistant_ask($u, 'when is payout released');
+ok($r['ok'] && !$r['ai'], 'AI failure falls back to built-in help');
+unset($GLOBALS['vh_ai_stub']);
+eq(count(assistant_history($sid)), 6, 'history kept');
+db()->exec("DELETE FROM assistant_messages WHERE user_id = ?", [$sid]);
+for ($i = 0; $i < AI_DAILY_LIMIT; $i++) db()->insert('assistant_messages', ['id' => uuid(), 'user_id' => $sid, 'role' => 'user', 'body' => 'q', 'created_at' => now_db()]);
+ok(!assistant_ask($u, 'one more')['ok'], 'daily limit enforced');
+db()->exec("DELETE FROM assistant_messages WHERE user_id = ?", [$sid]);
+eq(save_settings(['commission_percent' => '10', 'payout_hold_days' => '7', 'min_withdrawal' => '1000', 'withdrawal_fee' => '0', 'ai_api_key' => 'bad key!']), 'That does not look like an Anthropic API key.', 'bad AI key rejected');
+
 // ---- system check
 $chk = system_checks(false);
 ok(count($chk) > 10, 'system check returns rows');

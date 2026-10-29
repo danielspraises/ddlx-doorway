@@ -300,3 +300,5 @@ dialog iframe,dialog img{width:100%;height:100%;border:0;object-fit:contain}
 .pick{max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);padding:8px 14px;background:var(--bg)}
 .pick .check{margin:8px 0}
 [hidden]{display:none!important}
+.chip{display:inline-block;padding:8px 14px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:.9rem;text-decoration:none;color:var(--ink);transition:border-color .15s,background .15s}
+.chip:hover{border-color:var(--accent);background:#fff5f2}

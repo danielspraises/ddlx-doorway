@@ -240,6 +240,12 @@ $docLinks = function (array $docs): string {
     <?= f_text('app_url', 'Vendor Hub address', (string) setting('app_url', ''), null, ['type' => 'url', 'placeholder' => 'https://vendor.ddlx.shop']) ?>
     <?= f_text('marketplace_url', 'Marketplace address', (string) setting('marketplace_url', ''), null, ['type' => 'url', 'placeholder' => 'https://ddlx.shop', 'hint' => 'Used to check SKUs against the store. Leave blank to skip.']) ?>
     <?= f_text('mail_from', 'Email sender address', (string) setting('mail_from', ''), null, ['type' => 'email', 'placeholder' => 'no-reply@ddlx.shop']) ?>
+    <h3>Ask DDLX assistant</h3>
+    <p class="muted small">An AI helper for sellers and staff. Create a key at console.anthropic.com and paste it here. Without a key the assistant still answers from built-in help.</p>
+    <label class="check"><input type="checkbox" name="ai_enabled" value="yes" <?= setting('ai_enabled', '1') === '1' ? 'checked' : '' ?>><span>Use the AI assistant</span></label>
+    <?= f_text('ai_api_key', 'Anthropic API key', '', null, ['type' => 'password', 'autocomplete' => 'off', 'placeholder' => setting('ai_api_key', '') !== '' ? 'Saved (ends ' . substr((string) setting('ai_api_key', ''), -4) . '). Paste a new key to replace it.' : 'sk-ant-...']) ?>
+    <?php if (setting('ai_api_key', '') !== ''): ?><label class="check"><input type="checkbox" name="ai_clear_key" value="yes"><span>Remove the saved key</span></label><?php endif; ?>
+    <?= f_text('ai_model', 'Model', (string) setting('ai_model', 'claude-sonnet-5-5'), null, ['hint' => 'Leave as is unless told otherwise.']) ?>
     <button class="btn">Save settings</button>
   </form>
   <p style="max-width:640px"><a class="btn btn-outline" href="/admin/health">Run system check</a> <span class="muted small">Checks PHP, the database, folders, HTTPS, email and the marketplace connection.</span></p>

@@ -153,3 +153,15 @@ route('GET', '/admin/health', function () {
     require_admin();
     render('health', ['title' => 'System check', 'user' => current_user(), 'rows' => system_checks(input('skip') !== 'market')]);
 });
+
+route('POST', '/admin/backup', function () use ($adminBack) {
+    $u = require_admin();
+    if (!password_verify(input_raw('password'), (string) db()->val('SELECT password_hash FROM users WHERE id = ?', [$u['id']]))) $adminBack('settings', 'Password is not correct.', '');
+    audit($u, 'settings', 'Downloaded a database backup');
+    @set_time_limit(300);
+    header('Content-Type: application/sql; charset=utf-8');
+    header('Content-Disposition: attachment; filename="ddlx-vendorhub-backup-' . gmdate('Y-m-d-His') . '.sql"');
+    header('Cache-Control: no-store');
+    backup_stream(function (string $chunk) { echo $chunk; flush(); });
+    exit;
+});

@@ -5,6 +5,7 @@ define('VH_TESTING', true);
 require __DIR__ . '/../app/bootstrap.php';
 
 $tmp = sys_get_temp_dir() . '/vh-test-' . getmypid();
+if (is_dir($tmp)) { foreach (glob($tmp . '/*') ?: [] as $f) is_file($f) && unlink($f); }
 @mkdir($tmp, 0775, true);
 $GLOBALS['vh_config'] = ['db' => ['driver' => 'sqlite', 'path' => $tmp . '/t.db'], 'storage_dir' => $tmp . '/storage'];
 run_schema(db());
@@ -442,6 +443,13 @@ for ($i = 0; $i < AI_DAILY_LIMIT; $i++) db()->insert('assistant_messages', ['id'
 ok(!assistant_ask($u, 'one more')['ok'], 'daily limit enforced');
 db()->exec("DELETE FROM assistant_messages WHERE user_id = ?", [$sid]);
 eq(save_settings(['commission_percent' => '10', 'payout_hold_days' => '7', 'min_withdrawal' => '1000', 'withdrawal_fee' => '0', 'ai_api_key' => 'bad key!']), 'That does not look like an Anthropic API key.', 'bad AI key rejected');
+
+// ---- backup
+$dump = '';
+backup_stream(function ($c) use (&$dump) { $dump .= $c; });
+ok(str_contains($dump, 'INSERT INTO `users`') && str_contains($dump, 's@x.test'), 'backup contains data');
+ok(!str_contains($dump, 'INSERT INTO `sessions`'), 'backup skips sessions');
+ok(!in_array('sessions', backup_tables(), true) && in_array('products', backup_tables(), true), 'backup table list');
 
 // ---- system check
 $chk = system_checks(false);

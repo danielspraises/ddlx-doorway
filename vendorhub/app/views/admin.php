@@ -249,6 +249,9 @@ $docLinks = function (array $docs): string {
     <button class="btn">Save settings</button>
   </form>
   <p style="max-width:640px"><a class="btn btn-outline" href="/admin/health">Run system check</a> <span class="muted small">Checks PHP, the database, folders, HTTPS, email and the marketplace connection.</span></p>
+  <h2>Backup</h2>
+  <p class="muted" style="max-width:640px">Download a copy of all sellers, products, orders and balances. Do this weekly and before any update. Uploaded photos and documents are in the <code>storage</code> folder; download that from cPanel File Manager too. Keep backups private: they contain personal data.</p>
+  <form method="post" action="/admin/backup" class="row" data-keep><?= csrf_field() ?><input type="password" name="password" placeholder="Your password" autocomplete="current-password" required style="max-width:240px"><button class="btn btn-outline" type="submit">Download database backup</button></form>
   <h2>Connect the marketplace</h2>
   <p class="muted">Paste these into WordPress under WooCommerce → Vendor Hub. Treat them like passwords.</p>
   <dl class="dl">

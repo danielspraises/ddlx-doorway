@@ -14,6 +14,8 @@ It covers seller application, verification, product management with admin approv
 6. Turn on **AutoSSL** for the subdomain, then open `https://vendor.ddlx.shop/install`. Enter the database details, the admin email and password, and the addresses. Save the **API key** and **webhook secret** it shows (they are always in Admin → Settings).
 7. The installer refuses to run again once `config/config.php` exists.
 
+Go-live checklist: `../docs/go-live-checklist.md`. After installing, run **Admin → Settings → Run system check**.
+
 Backups: use cPanel → Backup (database) and download `storage/` occasionally; it holds uploaded images and verification documents.
 
 ## Test on your own computer (Windows)

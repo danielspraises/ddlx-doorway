@@ -231,6 +231,7 @@ $docLinks = function (array $docs): string {
     <?= f_text('mail_from', 'Email sender address', (string) setting('mail_from', ''), null, ['type' => 'email', 'placeholder' => 'no-reply@ddlx.shop']) ?>
     <button class="btn">Save settings</button>
   </form>
+  <p style="max-width:640px"><a class="btn btn-outline" href="/admin/health">Run system check</a> <span class="muted small">Checks PHP, the database, folders, HTTPS, email and the marketplace connection.</span></p>
   <h2>Connect the marketplace</h2>
   <p class="muted">Paste these into WordPress under WooCommerce → Vendor Hub. Treat them like passwords.</p>
   <dl class="dl">

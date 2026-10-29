@@ -131,3 +131,8 @@ route('POST', '/admin/settings', function () use ($adminBack) {
     }
     $adminBack('settings', save_settings($_POST), 'Settings saved.');
 });
+
+route('GET', '/admin/health', function () {
+    require_admin();
+    render('health', ['title' => 'System check', 'user' => current_user(), 'rows' => system_checks(input('skip') !== 'market')]);
+});

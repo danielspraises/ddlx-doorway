@@ -318,5 +318,11 @@ eq((int) db()->val('SELECT COUNT(*) FROM products WHERE seller_id = ?', [$sid]),
 ok(!import_products($sid, "$hdr\n" . $line(['sku' => 'ZZ-1'] + $good) . "\n" . $line(['sku' => 'zz-1'] + $good) . "\n")['ok'], 'duplicate sku in file rejected');
 ok(!import_products($sid, "name,category\nx,y\n")['ok'], 'missing columns rejected');
 
+// ---- system check
+$chk = system_checks(false);
+ok(count($chk) > 10, 'system check returns rows');
+eq(count(array_filter($chk, fn ($r) => $r[0] === 'Tables' && $r[1] === 'ok')), 1, 'system check sees all tables');
+eq(ini_bytes('8M'), 8388608, 'ini_bytes');
+
 echo "$pass passed, $fail failed\n";
 exit($fail ? 1 : 0);

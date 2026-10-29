@@ -22,7 +22,7 @@ function route(string $method, string $path, callable $handler, array $opts = []
 function nav_items(array $u): array
 {
     if ($u['isAdmin']) return [['Admin', '/admin', 0]];
-    if ($u['canReview'] || $u['canOrders']) return [['Staff desk', '/admin', 0]];
+    if ($u['canReview'] || $u['canOrders'] || $u['canMessages']) return [['Staff desk', '/admin', 0]];
     $s = $u['stage'];
     $items = [['Application', '/apply', 0]];
     if (str_starts_with($s, 'verification_') || $s === 'verified') $items[] = ['Verification', '/verification', 0];

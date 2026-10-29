@@ -37,7 +37,7 @@ route('POST', '/login/2fa', function () {
         render('auth', ['title' => 'Two-step sign-in', 'mode' => 'twofa', 'challenge' => $token, 'error' => $r['error']], 'bare');
         return;
     }
-    redirect(home_path(current_user() ?? ['isAdmin' => false, 'canReview' => false, 'canOrders' => false, 'stage' => 'no_application']));
+    redirect(home_path(current_user() ?? ['isAdmin' => false, 'canReview' => false, 'canOrders' => false, 'canMessages' => false, 'stage' => 'no_application']));
 });
 
 route('GET', '/account/security', function () {
@@ -121,7 +121,7 @@ route('GET', '/api/pulse', function () {
         $events = [];
         foreach ($rows as $r) {
             $mine = ($r['audience'] === 'seller' && $r['seller_id'] === $u['id'])
-                || ($r['audience'] === 'reviewers' && $u['canReview']) || ($r['audience'] === 'orders' && $u['canOrders'])
+                || ($r['audience'] === 'reviewers' && $u['canReview']) || ($r['audience'] === 'orders' && $u['canOrders']) || ($r['audience'] === 'messages' && $u['canMessages'])
                 || ($r['audience'] === 'admins' && $u['isAdmin']);
             if ($mine) $events[] = ['type' => $r['type'], 'message' => $r['message']];
         }

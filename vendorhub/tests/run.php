@@ -341,6 +341,42 @@ eq((int) setting('schema_version'), SCHEMA_VERSION, 'upgrade stamps version');
 migrate_if_needed();
 ok(commission_by_category(db_plus('-30 days')) !== null, 'commission report runs');
 
+// ---- messages
+$msgOther = uuid(); db()->insert('users', ['id' => $msgOther, 'email' => 'm@x.test', 'password_hash' => 'x', 'created_at' => now_db()]);
+$adm2 = ['id' => $admin['id'], 'email' => $admin['email'] ?? 'a@x.test', 'isAdmin' => true, 'canMessages' => true];
+$selU = ['id' => $sid, 'email' => 's@x.test', 'isAdmin' => false, 'canMessages' => false];
+$othU = ['id' => $msgOther, 'email' => 'o@x.test', 'isAdmin' => false, 'canMessages' => false];
+ok(!inbox_seller_start($sid, '', 'hi')['ok'], 'subject required');
+ok(!inbox_seller_start($sid, 'Help', '   ')['ok'], 'body required');
+$st = inbox_seller_start($sid, 'Payout question', "Where is my money?\nThanks");
+ok($st['ok'], 'seller starts thread');
+$th = inbox_thread($st['id']);
+eq((int) $th['team_unread'], 1, 'team sees it unread');
+eq(inbox_reply($othU, $st['id'], 'sneaky'), 'Conversation not found.', 'other seller cannot reply');
+eq(inbox_reply($adm2, $st['id'], 'On its way'), null, 'team replies');
+$th = inbox_thread($st['id']);
+eq([(int) $th['team_unread'], (int) $th['seller_unread']], [0, 1], 'unread flips to seller');
+eq(count($th['messages']), 2, 'two messages');
+inbox_mark_seen($th, 'seller');
+eq((int) inbox_thread($st['id'])['seller_unread'], 0, 'seller read it');
+eq(inbox_set_status($st['id'], 'closed'), null, 'close');
+inbox_reply($selU, $st['id'], 'one more thing');
+eq(inbox_thread($st['id'])['status'], 'open', 'seller reply reopens');
+$bc = inbox_send($adm2, 'selected', [$sid, $msgOther], 'Holiday hours', 'We close on Friday.', false);
+ok($bc['ok'] && $bc['count'] === 2, 'announcement to chosen sellers');
+$ann = array_values(array_filter(inbox_threads_for_seller($sid), fn ($t) => $t['subject'] === 'Holiday hours'))[0];
+eq((int) $ann['allow_reply'], 0, 'announcement replies off');
+ok(inbox_reply($selU, $ann['id'], 'ok') !== null, 'cannot reply to announcement');
+ok(!inbox_send($selU, 'everyone', [], 'x', 'y', true)['ok'], 'seller cannot broadcast');
+$single = inbox_send($adm2, 'selected', [$sid], 'Just you', 'Hello', true);
+ok($single['ok'] && $single['count'] === 1, 'message to one seller');
+ok(!inbox_send($adm2, 'selected', [], 'x', 'y', true)['ok'], 'must choose someone');
+$all = inbox_send($adm2, 'everyone', [], 'To all', 'Hi everyone', true);
+ok($all['ok'] && $all['count'] >= 2, 'announcement to everyone');
+ok(!in_array($admin['id'], inbox_audience_ids('everyone', []), true), 'admin is not a recipient');
+ok(count(inbox_threads_team('announcements')) >= 4, 'team sees announcement threads');
+ok(mb_strlen(inbox_clean("a\x07b")) === 2, 'control characters stripped');
+
 // ---- two-step sign-in
 eq(b32_decode(b32_encode('hello world!!')), 'hello world!!', 'base32 round trip');
 eq(totp_at(b32_encode('12345678901234567890'), 1), '287082', 'RFC 6238 test vector (t=59)');

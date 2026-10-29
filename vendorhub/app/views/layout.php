@@ -27,10 +27,11 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
       <?php endforeach; ?>
     </nav>
     <div class="nav-end">
+      <a class="bell" href="/messages" aria-label="Messages"><?= icon('mail') ?><span class="badge-count<?= ($user['pending']['messages'] ?? 0) > 0 ? '' : ' hidden' ?>" data-badge="Messages"><?= (int) ($user['pending']['messages'] ?? 0) ?></span></a>
       <a class="bell" href="/notifications" aria-label="Notifications"><?= icon('bell') ?><span class="badge-count<?= ($user['pending']['notifications'] ?? 0) > 0 ? '' : ' hidden' ?>" data-badge="Notifications"><?= (int) ($user['pending']['notifications'] ?? 0) ?></span></a>
       <details class="account"><summary><span class="who"><?= e($user['email']) ?></span><span class="avatar"><?= e(strtoupper(substr($user['email'], 0, 1))) ?></span></summary>
         <div class="menu">
-          <p class="muted"><?= e($user['email']) ?><br><strong style="color:var(--ink)"><?= $user['isAdmin'] ? 'Admin' : ($user['canReview'] || $user['canOrders'] ? 'Staff' : e(STAGE_LABEL[$user['stage']] ?? '')) ?></strong></p>
+          <p class="muted"><?= e($user['email']) ?><br><strong style="color:var(--ink)"><?= $user['isAdmin'] ? 'Admin' : ($user['canReview'] || $user['canOrders'] || $user['canMessages'] ? 'Staff' : e(STAGE_LABEL[$user['stage']] ?? '')) ?></strong></p>
           <?php foreach (nav_items($user) as [$label, $href]): ?><a class="m-only" href="<?= e($href) ?>"><?= e($label) ?></a><?php endforeach; ?>
           <a href="/notifications">Notifications</a>
           <a href="/account/security">Account security</a>
@@ -43,7 +44,7 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
   </div>
 </header>
 <?php if ($flashMsg): ?><div class="wrap"><p class="flash <?= e($flashMsg['k'] === 'error' ? 'flash-error' : 'flash-ok') ?>" role="status"><?= e($flashMsg['m']) ?></p></div><?php endif; ?>
-<?php if (!empty($user) && empty($user['twofa']) && ($user['isAdmin'] || $user['canReview'] || $user['canOrders']) && ($_SERVER['REQUEST_URI'] ?? '') !== '/account/security'): ?><div class="wrap"><p class="flash flash-error" role="status">Your account can approve products and money. Protect it with <a href="/account/security">two-step sign-in</a>.</p></div><?php endif; ?>
+<?php if (!empty($user) && empty($user['twofa']) && ($user['isAdmin'] || $user['canReview'] || $user['canOrders'] || $user['canMessages']) && ($_SERVER['REQUEST_URI'] ?? '') !== '/account/security'): ?><div class="wrap"><p class="flash flash-error" role="status">Your account can approve products and money. Protect it with <a href="/account/security">two-step sign-in</a>.</p></div><?php endif; ?>
 <main class="<?= !empty($full) ? '' : 'wrap main' ?>" id="main"><?= $content ?></main>
 <?php if (!empty($footer)): ?><footer class="site-footer"><div class="wrap"><strong>DDLX</strong><a href="https://ddlxapparel.com">Marketplace <?= icon('arrow-up-right') ?></a></div></footer><?php endif; ?>
 <div class="toasts" id="toasts" aria-live="polite"></div>

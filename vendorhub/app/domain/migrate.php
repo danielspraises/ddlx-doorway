@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -44,6 +44,18 @@ function migration_steps(): array
             }
             if (!table_exists($db, 'login_challenges')) {
                 $db->exec('CREATE TABLE login_challenges (token_hash CHAR(64) NOT NULL PRIMARY KEY, user_id CHAR(36) NOT NULL, tries INT NOT NULL DEFAULT 0, expires_at DATETIME(3) NOT NULL, created_at DATETIME(3) NOT NULL)' . $engine($db));
+            }
+        },
+        3 => function (Db $db) use ($engine) {
+            if (!table_exists($db, 'broadcasts')) $db->exec('CREATE TABLE broadcasts (id CHAR(36) NOT NULL PRIMARY KEY, subject VARCHAR(160) NOT NULL, body TEXT NOT NULL, audience VARCHAR(20) NOT NULL, recipients INT NOT NULL DEFAULT 0, allow_reply TINYINT NOT NULL DEFAULT 1, sent_by CHAR(36) NULL, created_at DATETIME(3) NOT NULL)' . $engine($db));
+            if (!table_exists($db, 'threads')) {
+                $db->exec('CREATE TABLE threads (id CHAR(36) NOT NULL PRIMARY KEY, seller_id CHAR(36) NOT NULL, subject VARCHAR(160) NOT NULL, broadcast_id CHAR(36) NULL, allow_reply TINYINT NOT NULL DEFAULT 1, status VARCHAR(10) NOT NULL DEFAULT \'open\', team_unread TINYINT NOT NULL DEFAULT 0, seller_unread TINYINT NOT NULL DEFAULT 0, last_message_at DATETIME(3) NOT NULL, created_at DATETIME(3) NOT NULL)' . $engine($db));
+                $db->exec('CREATE INDEX threads_seller_idx ON threads (seller_id, last_message_at)');
+                $db->exec('CREATE INDEX threads_last_idx ON threads (last_message_at)');
+            }
+            if (!table_exists($db, 'messages')) {
+                $db->exec('CREATE TABLE messages (id CHAR(36) NOT NULL PRIMARY KEY, thread_id CHAR(36) NOT NULL, sender_id CHAR(36) NULL, side VARCHAR(10) NOT NULL, body TEXT NOT NULL, created_at DATETIME(3) NOT NULL)' . $engine($db));
+                $db->exec('CREATE INDEX messages_thread_idx ON messages (thread_id, created_at)');
             }
         },
     ];

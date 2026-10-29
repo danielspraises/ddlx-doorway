@@ -7,6 +7,7 @@ function admin_tabs(array $u): array
     if ($u['isAdmin']) $tabs['overview'] = 'Overview';
     if ($u['isAdmin']) $tabs += ['applications' => 'Applications', 'verifications' => 'Verifications'];
     if ($u['canReview']) $tabs['products'] = 'Products';
+    if ($u['canMessages']) $tabs['messages'] = 'Messages';
     if ($u['canOrders']) { $tabs['orders'] = 'Orders'; $tabs['returns'] = 'Returns'; }
     if ($u['isAdmin']) $tabs += ['payouts' => 'Payouts', 'categories' => 'Categories', 'staff' => 'Staff', 'activity' => 'Activity', 'settings' => 'Settings'];
     return $tabs;
@@ -17,6 +18,7 @@ route('GET', '/admin', function () {
     if (!$u['isAdmin'] && !$u['canReview'] && !$u['canOrders']) redirect(home_path($u));
     $tabs = admin_tabs($u);
     $tab = array_key_exists(input('tab'), $tabs) ? input('tab') : array_key_first($tabs);
+    if ($tab === 'messages') redirect('/messages');
     $vars = ['title' => $tabs[$tab], 'tab' => $tab, 'tabs' => $tabs, 'user' => $u, 'sel' => input('id'), 'filter' => input('filter'), 'live_refresh' => !in_array($tab, ['categories', 'staff', 'settings', 'activity'], true)];
     switch ($tab) {
         case 'applications': $vars['items'] = application_review_list(); break;

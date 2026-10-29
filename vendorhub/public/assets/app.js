@@ -36,6 +36,23 @@
     });
   }
 
+  // Message composer: show the seller list only for "chosen sellers", and filter it as you type.
+  document.querySelectorAll('[data-audience]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      var box = document.getElementById('seller-pick');
+      var sel = document.querySelector('[data-audience]:checked');
+      if (box && sel) box.hidden = sel.value !== 'selected';
+    });
+  });
+  document.querySelectorAll('[data-filter-list]').forEach(function (inp) {
+    inp.addEventListener('input', function () {
+      var q = inp.value.toLowerCase();
+      document.querySelectorAll('#' + inp.getAttribute('data-filter-list') + ' [data-filter-item]').forEach(function (el) {
+        el.hidden = q !== '' && el.textContent.toLowerCase().indexOf(q) === -1;
+      });
+    });
+  });
+
   // Show / hide password
   document.querySelectorAll('[data-pw]').forEach(function (btn) {
     btn.addEventListener('click', function () {

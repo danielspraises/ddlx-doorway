@@ -358,3 +358,41 @@ CREATE TABLE audit_log (
   created_at DATETIME(3) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX audit_created_idx ON audit_log (created_at);
+
+CREATE TABLE broadcasts (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  subject VARCHAR(160) NOT NULL,
+  body TEXT NOT NULL,
+  audience VARCHAR(20) NOT NULL,
+  recipients INT NOT NULL DEFAULT 0,
+  allow_reply TINYINT NOT NULL DEFAULT 1,
+  sent_by CHAR(36) NULL,
+  created_at DATETIME(3) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE threads (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  seller_id CHAR(36) NOT NULL,
+  subject VARCHAR(160) NOT NULL,
+  broadcast_id CHAR(36) NULL,
+  allow_reply TINYINT NOT NULL DEFAULT 1,
+  status VARCHAR(10) NOT NULL DEFAULT 'open',
+  team_unread TINYINT NOT NULL DEFAULT 0,
+  seller_unread TINYINT NOT NULL DEFAULT 0,
+  last_message_at DATETIME(3) NOT NULL,
+  created_at DATETIME(3) NOT NULL,
+  CONSTRAINT threads_seller_fk FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX threads_seller_idx ON threads (seller_id, last_message_at);
+CREATE INDEX threads_last_idx ON threads (last_message_at);
+
+CREATE TABLE messages (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  thread_id CHAR(36) NOT NULL,
+  sender_id CHAR(36) NULL,
+  side VARCHAR(10) NOT NULL,
+  body TEXT NOT NULL,
+  created_at DATETIME(3) NOT NULL,
+  CONSTRAINT messages_thread_fk FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX messages_thread_idx ON messages (thread_id, created_at);

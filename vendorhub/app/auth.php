@@ -114,11 +114,15 @@ function user_from_token(string $token): ?array
     $isAdmin = (int) $row['is_admin'] > 0;
     $canReview = $isAdmin || in_array('products', $perms, true);
     $canOrders = $isAdmin || in_array('orders', $perms, true);
-    $pending = ['applications' => 0, 'verifications' => 0, 'products' => 0, 'payouts' => 0, 'orders' => 0, 'returns' => 0, 'notifications' => (int) $db->val('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL', [$row['id']])];
+    $canMessages = $isAdmin || in_array('messages', $perms, true);
+    $pending = ['applications' => 0, 'verifications' => 0, 'products' => 0, 'payouts' => 0, 'orders' => 0, 'returns' => 0, 'messages' => 0, 'notifications' => (int) $db->val('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL', [$row['id']])];
     if ($canOrders) {
         $pending['returns'] = (int) $db->val("SELECT COUNT(*) FROM return_cases WHERE status IN ('seller_accepted', 'seller_disputed')");
         $pending['orders'] = (int) $db->val("SELECT COUNT(DISTINCT order_id) FROM order_items WHERE status = 'paid' AND fulfilment = 'ready_for_shipping' AND order_id NOT IN (SELECT order_id FROM order_items WHERE status = 'paid' AND fulfilment IN ('placed', 'processing'))");
     }
+    $pending['messages'] = $canMessages
+        ? (int) $db->val('SELECT COUNT(*) FROM threads WHERE team_unread = 1')
+        : (int) $db->val('SELECT COUNT(*) FROM threads WHERE seller_id = ? AND seller_unread = 1', [$row['id']]);
     if ($canReview) {
         $pending['products'] = (int) $db->val("SELECT COUNT(*) FROM products WHERE status = 'pending_review'");
     }
@@ -139,6 +143,7 @@ function user_from_token(string $token): ?array
         'isStaff' => count($perms) > 0,
         'canReview' => $canReview,
         'canOrders' => $canOrders,
+        'canMessages' => $canMessages,
         'stage' => seller_stage($row['application_status'], $row['verification_status']),
         'pending' => $pending,
     ];
@@ -147,7 +152,7 @@ function user_from_token(string $token): ?array
 // Where a person should land after signing in or finishing an action.
 function home_path(array $user): string
 {
-    if ($user['isAdmin'] || $user['canReview'] || !empty($user['canOrders'])) return '/admin';
+    if ($user['isAdmin'] || $user['canReview'] || !empty($user['canOrders']) || !empty($user['canMessages'])) return '/admin';
     if ($user['stage'] === 'verified') return '/seller';
     if (str_starts_with($user['stage'], 'verification_')) return '/verification';
     return '/apply';

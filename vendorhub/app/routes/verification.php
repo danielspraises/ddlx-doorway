@@ -23,7 +23,7 @@ function verification_page(array $u, ?array $errors = null, ?int $forceStep = nu
 
 route('GET', '/verification', function () {
     $u = require_user();
-    if ($u['isAdmin'] || $u['canReview'] || $u['canOrders']) redirect(home_path($u));
+    if ($u['isAdmin'] || $u['canReview'] || $u['canOrders'] || $u['canMessages']) redirect(home_path($u));
     verification_page($u);
 });
 

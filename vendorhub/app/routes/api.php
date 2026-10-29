@@ -12,12 +12,12 @@ route('GET', '/api/pulse', function () {
     if ($since !== null && $last > $since) {
         $rows = $db->all('SELECT id, audience, seller_id, type, message FROM events WHERE id > ? ORDER BY id LIMIT 50', [$since]);
         foreach ($rows as $r) {
-            $mine = ($r['audience'] === 'seller' && $r['seller_id'] === $u['id']) || ($r['audience'] === 'reviewers' && $u['canReview']) || ($r['audience'] === 'admins' && $u['isAdmin']) || ($r['audience'] === 'orders' && $u['canOrders']);
+            $mine = ($r['audience'] === 'seller' && $r['seller_id'] === $u['id']) || ($r['audience'] === 'reviewers' && $u['canReview']) || ($r['audience'] === 'admins' && $u['isAdmin']) || ($r['audience'] === 'orders' && $u['canOrders']) || ($r['audience'] === 'messages' && $u['canMessages']);
             if ($mine) $events[] = ['type' => $r['type'], 'message' => $r['message']];
         }
     }
     $p = $u['pending'];
-    json_out(['last' => $last, 'events' => $events, 'counts' => ['Applications' => $p['applications'], 'Verifications' => $p['verifications'], 'Products' => $p['products'], 'Product review' => $p['products'], 'Payouts' => $p['payouts'], 'Orders' => $p['orders'], 'Returns' => $p['returns'], 'Notifications' => $p['notifications']]]);
+    json_out(['last' => $last, 'events' => $events, 'counts' => ['Applications' => $p['applications'], 'Verifications' => $p['verifications'], 'Products' => $p['products'], 'Product review' => $p['products'], 'Payouts' => $p['payouts'], 'Orders' => $p['orders'], 'Returns' => $p['returns'], 'Notifications' => $p['notifications'], 'Messages' => $p['messages']]]);
 }, ['api' => true]);
 
 // ---------------------------------------------------------------- marketplace: pull the catalogue

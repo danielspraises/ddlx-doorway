@@ -270,3 +270,19 @@ route('POST', '/products/import', function () {
     if ($res['ok']) redirect('/seller?tab=products', count($res['created']) . ' products added as drafts. Add photos, then submit them for review.');
     render('import', ['title' => 'Import products', 'user' => $u, 'result' => $res, 'categories' => array_map(fn ($k) => implode(' > ', array_map('ucfirst', explode(' > ', $k))), array_keys(import_category_map()))]);
 });
+
+route('GET', '/inventory/export', function () {
+    $u = require_seller();
+    $rows = stock_template_rows($u['id']);
+    csv_out('ddlx-stock.csv', array_shift($rows), $rows);
+});
+
+route('POST', '/inventory/import', function () {
+    $u = require_seller();
+    $f = $_FILES['file'] ?? null;
+    if (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) redirect('/seller?tab=inventory', 'Choose a CSV file to upload.', 'error');
+    if (($f['size'] ?? 0) > 1024 * 1024) redirect('/seller?tab=inventory', 'That file is too large. Keep it under 1 MB.', 'error');
+    $res = import_stock($u['id'], (string) file_get_contents($f['tmp_name']));
+    if ($res['ok']) redirect('/seller?tab=inventory', 'Stock updated for ' . $res['updated'] . ' item' . ($res['updated'] === 1 ? '' : 's') . '.');
+    render('import', ['title' => 'Update stock', 'user' => $u, 'result' => $res, 'categories' => [], 'stock_mode' => true]);
+});

@@ -124,3 +124,63 @@ function import_products(string $sellerId, string $csv): array
     }
     return ['ok' => true, 'error' => null, 'errors' => [], 'created' => $created];
 }
+
+// ---------------------------------------------------------------- bulk stock update
+// Columns: sku, stock. Matches the seller's own product or variation SKUs and sets the count. Prices are not part of this
+// because price changes go through review.
+
+function stock_template_rows(string $sellerId): array
+{
+    $rows = [['sku', 'name', 'stock']];
+    foreach (seller_products($sellerId) as $p) {
+        if ($p['product_type'] === 'variable') {
+            foreach ($p['variations'] as $v) $rows[] = [$v['sku'], $p['name'] . ($v['options'] ? ' (' . implode(' / ', $v['options']) . ')' : ''), (string) (int) $v['stock']];
+        } elseif ($p['manage_stock']) {
+            $rows[] = [$p['sku'], $p['name'], (string) (int) $p['stock']];
+        }
+    }
+    return $rows;
+}
+
+function import_stock(string $sellerId, string $csv): array
+{
+    $csv = preg_replace('/^\xEF\xBB\xBF/', '', $csv) ?? $csv;
+    $fh = fopen('php://temp', 'r+');
+    fwrite($fh, $csv);
+    rewind($fh);
+    $first = (string) fgets($fh);
+    rewind($fh);
+    $delim = substr_count($first, ';') > substr_count($first, ',') ? ';' : ',';
+    $rows = [];
+    while (($r = fgetcsv($fh, 0, $delim, '"', '')) !== false) if (array_filter($r, fn ($v) => trim((string) $v) !== '')) $rows[] = array_map(fn ($v) => trim((string) $v), $r);
+    fclose($fh);
+    $fail = fn (string $m, array $errs = []) => ['ok' => false, 'error' => $m, 'errors' => $errs, 'updated' => 0];
+    if (count($rows) < 2) return $fail('Add at least one row under the header row.');
+    $head = array_map(fn ($h) => mb_strtolower($h), array_shift($rows));
+    $si = array_search('sku', $head, true);
+    $ti = array_search('stock', $head, true);
+    if ($si === false || $ti === false) return $fail('The file needs "sku" and "stock" columns. Download the current stock list to start from.');
+    if (count($rows) > 1000) return $fail('Update up to 1000 rows at a time.');
+
+    $index = [];
+    foreach (seller_products($sellerId) as $p) {
+        if ($p['product_type'] === 'variable') foreach ($p['variations'] as $v) $index[mb_strtolower($v['sku'])] = [$p['id'], $v['id']];
+        else $index[mb_strtolower($p['sku'])] = [$p['id'], null];
+    }
+    $todo = [];
+    $errs = [];
+    foreach ($rows as $i => $r) {
+        $line = $i + 2;
+        $sku = mb_strtolower($r[$si] ?? '');
+        $n = str_replace([',', ' '], '', $r[$ti] ?? '');
+        if (!isset($index[$sku])) $errs[$line] = ['SKU "' . ($r[$si] ?? '') . '" is not one of your products'];
+        elseif ($n === '' || !ctype_digit($n) || (int) $n > 1000000) $errs[$line] = ['stock must be a whole number (0 or more)'];
+        elseif (isset($todo[$sku])) $errs[$line] = ['SKU appears twice in the file'];
+        else $todo[$sku] = [$index[$sku], (int) $n];
+    }
+    if ($errs) return $fail('Nothing was updated. Fix these rows and upload again.', $errs);
+    foreach ($todo as [[$pid, $vid], $n]) {
+        if ($e = adjust_stock($pid, $sellerId, $vid, 'set', $n)) return $fail($e);
+    }
+    return ['ok' => true, 'error' => null, 'errors' => [], 'updated' => count($todo)];
+}

@@ -92,6 +92,7 @@ function vh_run(): void
     [$handler, $opts] = $match;
 
     if ($installed) {
+        migrate_if_needed();
         $isApi = !empty($opts['api']);
         csrf_boot();
         if ($method === 'POST' && !$isApi) {

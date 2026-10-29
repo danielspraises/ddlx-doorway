@@ -61,6 +61,9 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 
 <?php if ($tab === 'inventory'): ?>
   <p class="muted">Stock changes apply straight away, even on live products.</p>
+  <?php if ($products): ?><details class="card" style="margin:12px 0"><summary><strong>Update many at once (CSV)</strong></summary>
+    <p class="muted small">Download your current stock, change the <code>stock</code> numbers in Excel, and upload it back. Prices are not changed here because price changes go through review.</p>
+    <form method="post" action="/inventory/import" enctype="multipart/form-data" class="row" data-keep><?= csrf_field() ?><a class="btn btn-outline btn-sm" href="/inventory/export">Download stock list</a><input type="file" name="file" accept=".csv,text/csv" required style="max-width:240px"><button class="btn btn-sm" type="submit">Upload</button></form></details><?php endif; ?>
   <?php if (!$products): ?><p class="notice">Add a product first.</p><?php endif; ?>
   <div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th class="t-right">In stock</th><th>Change</th></tr></thead><tbody>
   <?php foreach ($products as $p):

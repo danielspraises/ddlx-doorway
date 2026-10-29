@@ -318,6 +318,42 @@ eq((int) db()->val('SELECT COUNT(*) FROM products WHERE seller_id = ?', [$sid]),
 ok(!import_products($sid, "$hdr\n" . $line(['sku' => 'ZZ-1'] + $good) . "\n" . $line(['sku' => 'zz-1'] + $good) . "\n")['ok'], 'duplicate sku in file rejected');
 ok(!import_products($sid, "name,category\nx,y\n")['ok'], 'missing columns rejected');
 
+// ---- category commission, audit log, upgrade steps
+$topCat = category_chain($cat)[0]['id'];
+eq(commission_rate_for($cat), commission_percent(), 'default commission');
+eq(category_set_commission($topCat, '15'), null, 'set category commission');
+eq(commission_rate_for($cat), 15.0, 'child inherits parent commission');
+eq(category_set_commission($cat, '5'), null, 'set leaf commission');
+eq(commission_rate_for($cat), 5.0, 'leaf overrides parent');
+ok(category_set_commission($cat, '101') !== null, 'commission over 100 rejected');
+ok(category_set_commission($cat, 'abc') !== null, 'commission must be a number');
+eq(category_set_commission($cat, ''), null, 'clear leaf commission');
+eq(commission_rate_for($cat), 15.0, 'back to inherited');
+eq(category_set_commission($topCat, ''), null, 'clear top commission');
+audit($admin, 'settings', 'Test entry');
+eq(audit_list(10, 'settings')[0]['summary'], 'Test entry', 'audit entry saved');
+db()->exec('DROP TABLE audit_log');
+db()->exec('DELETE FROM settings WHERE k = ?', ['schema_version']);
+unset($GLOBALS['vh_settings']);
+migrate_if_needed();
+ok(table_exists(db(), 'audit_log'), 'upgrade recreates missing table');
+eq((int) setting('schema_version'), SCHEMA_VERSION, 'upgrade stamps version');
+migrate_if_needed();
+ok(commission_by_category(db_plus('-30 days')) !== null, 'commission report runs');
+
+// ---- bulk stock update
+$stk = stock_template_rows($sid);
+ok(count($stk) >= 2 && $stk[0] === ['sku', 'name', 'stock'], 'stock template lists products');
+$skuA = $stk[1][0];
+$r1 = import_stock($sid, "sku,stock\n$skuA,42\n");
+ok($r1['ok'] && $r1['updated'] === 1, 'stock csv ok');
+$bad = import_stock($sid, "sku,stock\n$skuA,7\nNOPE-1,3\n");
+ok(!$bad['ok'] && isset($bad['errors'][3]), 'unknown sku reported');
+ok(!import_stock($sid, "sku,stock\n$skuA,-3\n")['ok'], 'negative stock rejected');
+ok(!import_stock($other, "sku,stock\n$skuA,5\n")['ok'], 'cannot update another seller');
+$cur = array_values(array_filter(seller_products($sid), fn ($p) => $p['sku'] === $skuA))[0]['stock'];
+eq($cur, 42, 'bad file changed nothing');
+
 // ---- system check
 $chk = system_checks(false);
 ok(count($chk) > 10, 'system check returns rows');

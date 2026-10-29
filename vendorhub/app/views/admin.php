@@ -46,6 +46,8 @@ $docLinks = function (array $docs): string {
     <div class="stat"><p class="muted small">Owed to sellers</p><p class="n"><?= e($m($o['owed'][$cur] ?? 0, $cur)) ?></p></div>
     <div class="stat"><p class="muted small">Live products</p><p class="n"><?= (int) $o['live_products'] ?></p></div>
   </div>
+  <?php if ($o['by_category']): ?><h2>Commission by category <a class="small" href="/admin/export?kind=commission&from=<?= e(gmdate('Y-m-d', strtotime('-30 days'))) ?>&to=<?= e(gmdate('Y-m-d')) ?>">Download CSV</a></h2><div class="table-wrap"><table><thead><tr><th>Category</th><th class="t-right">Units</th><th class="t-right">Sales</th><th class="t-right">Commission</th></tr></thead><tbody>
+    <?php foreach ($o['by_category'] as $t): ?><tr><td><?= e($t['category']) ?></td><td class="t-right"><?= (int) $t['units'] ?></td><td class="t-right"><?= e($m($t['gross'], $t['currency'])) ?></td><td class="t-right"><?= e($m($t['commission'], $t['currency'])) ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
   <?php if ($o['top']): ?><h2>Best sellers</h2><div class="table-wrap"><table><thead><tr><th>Product</th><th class="t-right">Units</th><th class="t-right">Revenue</th></tr></thead><tbody>
     <?php foreach ($o['top'] as $t): ?><tr><td><?= e($t['name']) ?></td><td class="t-right"><?= (int) $t['units'] ?></td><td class="t-right"><?= e($m($t['revenue'], $t['currency'])) ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
 <?php endif; ?>
@@ -194,9 +196,10 @@ $docLinks = function (array $docs): string {
   <p class="muted"><?= count($all) ?> categories · up to <?= MAX_CATEGORY_DEPTH ?> levels. Sellers pick the most specific one.</p>
   <form method="post" action="/admin/category" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="action" value="create"><input name="name" placeholder="New top-level category" maxlength="80" required style="max-width:300px"><button class="btn">Add</button></form>
   <ul class="tree" style="margin-top:16px"><?php foreach ($flat as $row): $c = $row['category']; $d = $row['depth']; ?>
-    <li style="padding-left:<?= $d * 22 ?>px"><details><summary><span class="name<?= $c['active'] ? '' : ' off' ?>"><?= e($c['name']) ?></span> <span class="muted small"><?= (int) $c['product_count'] ?> product<?= $c['product_count'] === 1 ? '' : 's' ?><?= $c['active'] ? '' : ' · hidden' ?></span></summary>
+    <li style="padding-left:<?= $d * 22 ?>px"><details><summary><span class="name<?= $c['active'] ? '' : ' off' ?>"><?= e($c['name']) ?></span> <span class="muted small"><?= (int) $c['product_count'] ?> product<?= $c['product_count'] === 1 ? '' : 's' ?><?= $c['active'] ? '' : ' · hidden' ?><?= $c['commission_percent'] !== null ? ' · ' . e((string) $c['commission_percent']) . '% commission' : '' ?></span></summary>
       <div class="row" style="margin:10px 0">
         <?php if ($d < MAX_CATEGORY_DEPTH - 1): ?><form method="post" action="/admin/category" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="action" value="create"><input type="hidden" name="parent_id" value="<?= e($c['id']) ?>"><input name="name" placeholder="New sub-category" maxlength="80" required><button class="btn btn-sm btn-outline">Add sub</button></form><?php endif; ?>
+        <form method="post" action="/admin/category" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="action" value="commission"><input type="hidden" name="id" value="<?= e($c['id']) ?>"><input name="commission" value="<?= $c['commission_percent'] === null ? '' : e((string) $c['commission_percent']) ?>" placeholder="<?= e((string) commission_rate_for($c['parent_id'])) ?>% (inherited)" inputmode="decimal" aria-label="Commission percent" style="max-width:150px"><button class="btn btn-sm btn-outline">Set commission</button></form>
         <form method="post" action="/admin/category" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="action" value="rename"><input type="hidden" name="id" value="<?= e($c['id']) ?>"><input name="name" value="<?= e($c['name']) ?>" maxlength="80" required><button class="btn btn-sm btn-outline">Rename</button></form>
         <form method="post" action="/admin/category" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="action" value="move"><input type="hidden" name="id" value="<?= e($c['id']) ?>">
           <select name="to" aria-label="Move to"><option value="root">Top level</option><?php $ban = category_descendant_ids($c['id'], $all); foreach ($flat as $o) { if (in_array($o['category']['id'], $ban, true)) continue; echo '<option value="' . e($o['category']['id']) . '">' . e(str_repeat('— ', $o['depth']) . $o['category']['name']) . '</option>'; } ?></select><button class="btn btn-sm btn-outline">Move</button></form>
@@ -218,6 +221,14 @@ $docLinks = function (array $docs): string {
       <label class="check" style="margin:0"><input type="checkbox" name="active" value="1"<?= $s['active'] ? ' checked' : '' ?>><span>Active</span></label><button class="btn btn-sm btn-outline">Save</button></form>
     <form method="post" action="/admin/staff" class="row" style="margin-top:8px" data-keep><?= csrf_field() ?><input type="hidden" name="action" value="password"><input type="hidden" name="user_id" value="<?= e($s['user_id']) ?>"><input name="password" type="password" minlength="8" placeholder="New password" aria-label="New password" autocomplete="new-password" required><button class="btn btn-sm btn-ghost">Change password</button></form></li><?php endforeach; ?>
     <?php if (!$items): ?><li class="muted">No staff accounts yet.</li><?php endif; ?></ul>
+<?php endif; ?>
+
+<?php if ($tab === 'activity'): ?>
+  <p class="muted">Every decision made in the admin area, newest first.</p>
+  <form method="get" action="/admin" class="row" data-keep><input type="hidden" name="tab" value="activity"><select name="filter" aria-label="Type"><option value="">All activity</option><?php foreach (AUDIT_LABEL as $k => $l): ?><option value="<?= e($k) ?>"<?= $filter === $k ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select><button class="btn btn-sm btn-outline">Filter</button></form>
+  <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>When</th><th>Who</th><th>Type</th><th>What</th></tr></thead><tbody>
+  <?php foreach ($items as $a): ?><tr><td><?= e(human_date($a['created_at'], true)) ?></td><td><?= e($a['actor_email']) ?></td><td><?= e(AUDIT_LABEL[$a['action']] ?? $a['action']) ?></td><td><?= e($a['summary']) ?></td></tr><?php endforeach; ?>
+  <?php if (!$items): ?><tr><td colspan="4" class="muted">Nothing recorded yet.</td></tr><?php endif; ?></tbody></table></div>
 <?php endif; ?>
 
 <?php if ($tab === 'settings'): ?>

@@ -192,11 +192,10 @@ function record_paid_order(array $event): array
     $db = db();
     $o = $event['order'];
     if (!$o['items']) throw new OrderRejected('The order has no items.');
-    $rate = commission_percent();
     $sellers = [];
     $names = [];
     $touched = [];
-    $result = $db->tx(function () use ($db, $o, $rate, &$sellers, &$names, &$touched) {
+    $result = $db->tx(function () use ($db, $o, &$sellers, &$names, &$touched) {
         if ($db->val('SELECT id FROM orders WHERE marketplace_order_id = ?', [$o['id']])) return ['duplicate' => true];
         $orderId = uuid();
         try {
@@ -207,7 +206,7 @@ function record_paid_order(array $event): array
             throw $e;
         }
         foreach ($o['items'] as $it) {
-            $p = $db->one('SELECT seller_id, name, sku, manage_stock, product_type FROM products WHERE id = ?' . $db->lock(), [$it['product_id']]);
+            $p = $db->one('SELECT seller_id, name, sku, manage_stock, product_type, category_id FROM products WHERE id = ?' . $db->lock(), [$it['product_id']]);
             if (!$p) throw new OrderRejected('Unknown product ' . $it['product_id'] . '.');
             $sku = $p['sku'];
             $options = [];
@@ -219,6 +218,7 @@ function record_paid_order(array $event): array
             } elseif ($p['product_type'] === 'variable') {
                 throw new OrderRejected('Product ' . $it['product_id'] . ' needs a variation_id.');
             }
+            $rate = commission_rate_for($p['category_id']);
             $line = round2($it['unit_price'] * $it['quantity']);
             $commission = round2($line * $rate / 100);
             $net = round2($line - $commission);

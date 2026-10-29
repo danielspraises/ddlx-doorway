@@ -8,7 +8,7 @@ function admin_tabs(array $u): array
     if ($u['isAdmin']) $tabs += ['applications' => 'Applications', 'verifications' => 'Verifications'];
     if ($u['canReview']) $tabs['products'] = 'Products';
     if ($u['canOrders']) { $tabs['orders'] = 'Orders'; $tabs['returns'] = 'Returns'; }
-    if ($u['isAdmin']) $tabs += ['payouts' => 'Payouts', 'categories' => 'Categories', 'staff' => 'Staff', 'settings' => 'Settings'];
+    if ($u['isAdmin']) $tabs += ['payouts' => 'Payouts', 'categories' => 'Categories', 'staff' => 'Staff', 'activity' => 'Activity', 'settings' => 'Settings'];
     return $tabs;
 }
 
@@ -17,7 +17,7 @@ route('GET', '/admin', function () {
     if (!$u['isAdmin'] && !$u['canReview'] && !$u['canOrders']) redirect(home_path($u));
     $tabs = admin_tabs($u);
     $tab = array_key_exists(input('tab'), $tabs) ? input('tab') : array_key_first($tabs);
-    $vars = ['title' => $tabs[$tab], 'tab' => $tab, 'tabs' => $tabs, 'user' => $u, 'sel' => input('id'), 'filter' => input('filter'), 'live_refresh' => !in_array($tab, ['categories', 'staff', 'settings'], true)];
+    $vars = ['title' => $tabs[$tab], 'tab' => $tab, 'tabs' => $tabs, 'user' => $u, 'sel' => input('id'), 'filter' => input('filter'), 'live_refresh' => !in_array($tab, ['categories', 'staff', 'settings', 'activity'], true)];
     switch ($tab) {
         case 'applications': $vars['items'] = application_review_list(); break;
         case 'verifications': $vars['items'] = verification_review_list(); break;
@@ -28,6 +28,7 @@ route('GET', '/admin', function () {
         case 'payouts': $vars['items'] = withdrawal_review_list(); break;
         case 'categories': $vars['all'] = categories_all(true); break;
         case 'staff': $vars['items'] = staff_list(); break;
+        case 'activity': $f = array_key_exists(input('filter'), AUDIT_LABEL) ? input('filter') : ''; $vars['items'] = audit_list(200, $f); $vars['filter'] = $f; break;
         case 'settings': break;
     }
     render('admin', $vars);
@@ -39,6 +40,7 @@ route('GET', '/admin/export', function () {
     [$from, $to] = range_from_input(input('from'), input('to'));
     if ($kind === 'orders') { require_orders(); [$h, $rows] = export_admin_orders($from, $to); }
     elseif ($kind === 'payouts') { require_admin(); [$h, $rows] = export_admin_payouts(); }
+    elseif ($kind === 'commission') { require_admin(); [$h, $rows] = export_commission($from, $to); }
     else abort(404);
     csv_out('vendor-hub-' . $kind . '-' . gmdate('Y-m-d') . '.csv', $h, $rows);
 });
@@ -46,6 +48,7 @@ route('GET', '/admin/export', function () {
 route('POST', '/admin/return/open', function () {
     $u = require_orders();
     $err = open_return($u, input('item_id'), input('reason'), input_raw('details'));
+    if (!$err) audit($u, 'return', 'Opened a return case (' . input('reason') . ')', input('item_id'));
     redirect('/admin?tab=' . ($err ? 'orders' : 'returns'), $err ?? 'Return case opened. The seller has been told.', $err ? 'error' : 'ok');
 });
 
@@ -53,6 +56,7 @@ route('POST', '/admin/return/resolve', function () {
     $u = require_orders();
     $d = input('decision');
     $err = resolve_return($u, input('id'), $d, input('restock') === 'yes', input_raw('note'));
+    if (!$err) audit($u, 'return', $d === 'refund' ? 'Approved a refund' : 'Rejected a return', input('id'));
     redirect('/admin?tab=returns', $err ?? ($d === 'refund' ? 'Refund recorded and the seller\'s earnings reversed. Refund the customer in WooCommerce.' : 'Case rejected.'), $err ? 'error' : 'ok');
 });
 
@@ -60,6 +64,7 @@ route('POST', '/admin/order', function () {
     $u = require_orders();
     $to = input('to');
     $err = admin_set_order_status($u, input('id'), $to, input('carrier'), input('tracking'), input('restock') !== 'no', input('note'));
+    if (!$err) audit($u, 'order', 'Set order ' . (string) db()->val('SELECT number FROM orders WHERE id = ?', [input('id')]) . ' to ' . $to, input('id'));
     $done = ['shipped' => 'Marked as shipped. Sellers and the marketplace are updated.', 'delivered' => 'Marked as delivered. The sellers\' payout clock has started.', 'completed' => 'Order completed.',
         'cancelled' => 'Order cancelled and the sellers\' earnings reversed.', 'refunded' => 'Order marked as refunded and the sellers\' earnings reversed.'][$to] ?? 'Saved.';
     redirect('/admin?tab=orders&filter=' . rawurlencode(input('filter') ?: 'open'), $err ?? $done, $err ? 'error' : 'ok');
@@ -72,12 +77,14 @@ $adminBack = function (string $tab, ?string $err, string $done, string $extra = 
 route('POST', '/admin/application', function () use ($adminBack) {
     $u = require_admin();
     $err = review_application($u, input('id'), input('status'), input_raw('comment'), input('expected'));
+    if (!$err) audit($u, 'application', 'Application ' . input('status') . ': ' . (string) db()->val('SELECT email FROM users WHERE id = ?', [input('id')]), input('id'));
     $adminBack('applications', $err, 'Decision saved.', $err ? '&id=' . rawurlencode(input('id')) : '');
 });
 
 route('POST', '/admin/verification', function () use ($adminBack) {
     $u = require_admin();
     $err = review_verification($u, input('id'), input('status'), input_raw('comment'), input('expected'));
+    if (!$err) audit($u, 'verification', 'Verification ' . input('status') . ': ' . (string) db()->val('SELECT email FROM users WHERE id = ?', [input('id')]), input('id'));
     $adminBack('verifications', $err, 'Decision saved.', $err ? '&id=' . rawurlencode(input('id')) : '');
 });
 
@@ -86,17 +93,19 @@ route('POST', '/admin/product', function () use ($adminBack) {
     $decision = input('decision');
     if (!in_array($decision, ['approve', 'request_changes', 'reject', 'take_down'], true)) $adminBack('products', 'Unknown decision.', '');
     $err = review_product($u, input('id'), $decision, input_raw('comment'), input('expected'));
+    if (!$err) audit($u, 'product', ucfirst(str_replace('_', ' ', $decision)) . ': ' . (string) db()->val('SELECT name FROM products WHERE id = ?', [input('id')]), input('id'));
     $adminBack('products', $err, ['approve' => 'Approved and live on the marketplace.', 'request_changes' => 'Changes requested.', 'reject' => 'Product rejected.', 'take_down' => 'Taken off the marketplace.'][$decision], $err ? '&id=' . rawurlencode(input('id')) : '');
 });
 
 route('POST', '/admin/payout', function () use ($adminBack) {
     $u = require_admin();
     $err = decide_withdrawal($u, input('id'), input('decision'), input('text'));
+    if (!$err) { $w = db()->one('SELECT amount, currency FROM withdrawals WHERE id = ?', [input('id')]); audit($u, 'payout', 'Withdrawal ' . input('decision') . ($w ? ': ' . money((float) $w['amount'], $w['currency']) : ''), input('id')); }
     $adminBack('payouts', $err, input('decision') === 'paid' ? 'Marked as paid.' : 'Withdrawal rejected and refunded to the wallet.');
 });
 
 route('POST', '/admin/category', function () use ($adminBack) {
-    require_admin();
+    $actor = require_admin();
     $id = input('id');
     $parent = is_uuid(input('parent_id')) ? input('parent_id') : null;
     [$err, $done] = match (input('action')) {
@@ -106,8 +115,10 @@ route('POST', '/admin/category', function () use ($adminBack) {
         'hide' => [category_set_active($id, false), 'Category hidden.'],
         'show' => [category_set_active($id, true), 'Category shown.'],
         'delete' => [category_delete($id), 'Category deleted.'],
+        'commission' => [category_set_commission($id, input('commission')), 'Commission saved.'],
         default => ['Unknown action.', ''],
     };
+    if (!$err) audit($actor, 'category', 'Category ' . input('action') . ': ' . (input('name') ?: (categories_all()[$id]['name'] ?? '')) . (input('action') === 'commission' ? ' = ' . (input('commission') === '' ? 'marketplace rate' : input('commission') . '%') : ''), $id);
     $adminBack('categories', $err, $done);
 });
 
@@ -120,16 +131,20 @@ route('POST', '/admin/staff', function () use ($adminBack) {
         'password' => staff_set_password(input('user_id'), input_raw('password')),
         default => 'Unknown action.',
     };
+    if (!$err) audit($u, 'staff', 'Staff ' . input('action') . ': ' . (string) db()->val('SELECT email FROM users WHERE id = ?', [input('user_id')] ) . (input('action') === 'create' ? input('email') : ''), input('user_id') ?: null);
     $adminBack('staff', $err, ['create' => 'Staff account created.', 'update' => 'Staff member updated.', 'password' => 'Password changed. They were signed out.'][input('action')] ?? 'Done.');
 });
 
 route('POST', '/admin/settings', function () use ($adminBack) {
-    require_admin();
+    $actor = require_admin();
     if (input('action') === 'regenerate') {
         set_setting(input('which') === 'secret' ? 'marketplace_webhook_secret' : 'marketplace_api_key', bin2hex(random_bytes(24)));
+        audit($actor, 'settings', 'Created a new ' . (input('which') === 'secret' ? 'webhook secret' : 'API key'));
         $adminBack('settings', null, 'New key created. Paste it into the WordPress plugin settings.');
     }
-    $adminBack('settings', save_settings($_POST), 'Settings saved.');
+    $err = save_settings($_POST);
+    if (!$err) audit($actor, 'settings', 'Saved settings (commission ' . setting('commission_percent', '') . '%, hold ' . setting('payout_hold_days', '') . ' days)');
+    $adminBack('settings', $err, 'Settings saved.');
 });
 
 route('GET', '/admin/health', function () {

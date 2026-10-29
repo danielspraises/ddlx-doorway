@@ -65,6 +65,7 @@ function admin_overview(): array
     $waiting = [];
     foreach ($db->all("SELECT currency, SUM(amount) AS total FROM withdrawals WHERE status = 'requested' GROUP BY currency") as $r) $waiting[$r['currency']] = round2((float) $r['total']);
     return [
+        'by_category' => commission_by_category($since),
         'sales' => array_values($per),
         'chart' => daily_by_currency($rows, 'line_total', 30),
         'owed' => $owed,
@@ -182,4 +183,32 @@ function export_admin_payouts(): array
         $rows[] = [human_date($r['requested_at'], true), $r['email'], $r['status'], $r['amount'], $r['fee'], (float) $r['amount'] - (float) $r['fee'], $r['currency'], $r['bank_name'], $r['account_number'], $r['account_name'], $r['reference'], $r['admin_note'], human_date($r['decided_at'], true)];
     }
     return [['Requested', 'Seller', 'Status', 'Amount', 'Fee', 'To pay', 'Currency', 'Bank', 'Account number', 'Account name', 'Reference', 'Note', 'Decided'], $rows];
+}
+
+// Commission earned per top-level category (everything under it counts towards it), per currency.
+function commission_by_category(string $since, ?string $until = null): array
+{
+    $all = categories_all();
+    $sql = "SELECT o.currency, p.category_id, SUM(i.line_total) AS gross, SUM(i.commission) AS commission, SUM(i.quantity) AS units FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id WHERE i.status = 'paid' AND o.placed_at > ?" . ($until ? ' AND o.placed_at <= ?' : '') . ' GROUP BY o.currency, p.category_id';
+    $out = [];
+    foreach (db()->all($sql, $until ? [$since, $until] : [$since]) as $r) {
+        $chain = category_chain($r['category_id'], $all);
+        $name = $chain ? $chain[0]['name'] : 'Uncategorised';
+        $k = $r['currency'] . '|' . $name;
+        $out[$k] ??= ['currency' => $r['currency'], 'category' => $name, 'gross' => 0.0, 'commission' => 0.0, 'units' => 0];
+        $out[$k]['gross'] += (float) $r['gross'];
+        $out[$k]['commission'] += (float) $r['commission'];
+        $out[$k]['units'] += (int) $r['units'];
+    }
+    foreach ($out as &$o) { $o['gross'] = round2($o['gross']); $o['commission'] = round2($o['commission']); }
+    unset($o);
+    usort($out, fn ($a, $b) => [$a['currency'], $b['commission']] <=> [$b['currency'], $a['commission']]);
+    return $out;
+}
+
+function export_commission(?string $from, ?string $to): array
+{
+    $rows = [];
+    foreach (commission_by_category($from ?? '1970-01-01 00:00:00.000', $to) as $r) $rows[] = [$r['category'], $r['currency'], $r['units'], $r['gross'], $r['commission']];
+    return [['Category', 'Currency', 'Units', 'Sales', 'Commission'], $rows];
 }

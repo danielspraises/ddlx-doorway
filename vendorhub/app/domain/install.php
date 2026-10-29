@@ -18,6 +18,7 @@ function run_schema(Db $db): void
             $db->exec($statement);
         }
     }
+    $db->exec('INSERT INTO settings (k, v) VALUES (?, ?)', ['schema_version', (string) SCHEMA_VERSION]);
 }
 
 // Builds the category tree from database/categories.txt ("Fashion > Men > Clothing > Shirts" per line).

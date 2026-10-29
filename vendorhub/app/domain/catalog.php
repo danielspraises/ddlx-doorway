@@ -17,9 +17,10 @@ function categories_all(bool $fresh = false): array
     static $cache = null;
     if ($cache === null || $fresh) {
         $cache = [];
-        foreach (db()->all('SELECT c.id, c.parent_id, c.name, c.position, c.active, (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id) AS product_count FROM categories c ORDER BY c.position, c.name') as $r) {
+        foreach (db()->all('SELECT c.id, c.parent_id, c.name, c.position, c.active, c.commission_percent, (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id) AS product_count FROM categories c ORDER BY c.position, c.name') as $r) {
             $r['active'] = (int) $r['active'] === 1;
             $r['product_count'] = (int) $r['product_count'];
+            $r['commission_percent'] = $r['commission_percent'] === null ? null : (float) $r['commission_percent'];
             $cache[$r['id']] = $r;
         }
     }
@@ -720,4 +721,26 @@ function price_label(array $p): string
 function category_label(array $p): string
 {
     return $p['category_path'] ? implode(' › ', $p['category_path']) : ($p['category'] ?: 'No category');
+}
+
+// The rate for a category: its own override, else the nearest parent's, else the marketplace-wide rate.
+function commission_rate_for(?string $categoryId): float
+{
+    foreach (array_reverse(category_chain($categoryId)) as $c) {
+        if ($c['commission_percent'] !== null) return (float) $c['commission_percent'];
+    }
+    return commission_percent();
+}
+
+// Blank clears the override so the category inherits again.
+function category_set_commission(string $id, string $value): ?string
+{
+    $all = categories_all(true);
+    if (!isset($all[$id])) return 'Category not found.';
+    $value = trim(str_replace('%', '', $value));
+    if ($value === '') { db()->exec('UPDATE categories SET commission_percent = NULL WHERE id = ?', [$id]); categories_all(true); return null; }
+    if (!is_numeric($value) || (float) $value < 0 || (float) $value > 100) return 'Commission must be a number from 0 to 100.';
+    db()->exec('UPDATE categories SET commission_percent = ? WHERE id = ?', [round((float) $value, 2), $id]);
+    categories_all(true);
+    return null;
 }

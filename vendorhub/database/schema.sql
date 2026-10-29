@@ -100,6 +100,7 @@ CREATE TABLE categories (
   name VARCHAR(80) NOT NULL,
   position INT NOT NULL DEFAULT 0,
   active TINYINT(1) NOT NULL DEFAULT 1,
+  commission_percent DECIMAL(5,2) NULL,
   created_at DATETIME(3) NOT NULL,
   CONSTRAINT cat_parent_fk FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -333,3 +334,14 @@ CREATE TABLE settings (
   k VARCHAR(60) NOT NULL PRIMARY KEY,
   v TEXT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE audit_log (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  actor_id CHAR(36) NULL,
+  actor_email VARCHAR(190) NOT NULL DEFAULT '',
+  action VARCHAR(60) NOT NULL,
+  summary VARCHAR(400) NOT NULL DEFAULT '',
+  target_id CHAR(36) NULL,
+  created_at DATETIME(3) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX audit_created_idx ON audit_log (created_at);

@@ -2,7 +2,7 @@
 
 The seller hub for the DDLX marketplace (WooCommerce + Dokan at ddlx.shop). Plain PHP 8.1+ and MySQL/MariaDB, built for **Namecheap Stellar Plus** shared hosting: no Node, no Postgres, no VPS, no cron, no Composer.
 
-It covers seller application, verification, product management with admin approval, categories (up to 4 levels), inventory, sales, order status shared with WooCommerce, wallet and withdrawals (released after delivery), store profile, staff accounts, settings, the marketplace feed and order webhook, a notifications inbox with optional email alerts, CSV downloads, and sales dashboards for sellers and the admin.
+It covers seller application, verification, product management with admin approval, categories (up to 4 levels), inventory, sales, order status shared with WooCommerce, wallet and withdrawals (released after delivery), store profile, staff accounts, settings, the marketplace feed and order webhook, a notifications inbox with optional email alerts, CSV downloads, bulk product upload by CSV, and sales dashboards for sellers and the admin.
 
 ## Deploy on Namecheap Stellar Plus
 

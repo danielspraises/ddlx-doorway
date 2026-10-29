@@ -44,7 +44,7 @@ export function VendorScene({ subdued = false }: { subdued?: boolean }) {
       const ctx = canvas.getContext("2d");
       if (ctx) {
         ctx.fillStyle = color("--scene-ink"); ctx.textAlign = "center"; ctx.font = "bold 100px Arial";
-        ctx.fillText("DDLX", 256, 135); ctx.font = "22px Arial"; ctx.fillText("APPAREL", 256, 185);
+        ctx.fillText("DDLX", 256, 160);
         const texture = new THREE.CanvasTexture(canvas);
         const label = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.75), new THREE.MeshBasicMaterial({ map: texture, transparent: true }));
         label.position.set(0, -0.15, 0.34); group.add(label);
@@ -83,5 +83,5 @@ export function VendorScene({ subdued = false }: { subdued?: boolean }) {
     return () => { cancelled = true; dispose?.(); };
   }, []);
 
-  return <div ref={host} className={`vendor-scene ${subdued ? "vendor-scene-subdued" : ""}`} aria-hidden="true">{!ready && <span className="scene-fallback font-display">DDLX<span>APPAREL</span></span>}</div>;
+  return <div ref={host} className={`vendor-scene ${subdued ? "vendor-scene-subdued" : ""}`} aria-hidden="true">{!ready && <span className="scene-fallback font-display">DDLX</span>}</div>;
 }

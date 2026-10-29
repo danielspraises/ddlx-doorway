@@ -8,9 +8,9 @@ import { ApplicationSteps } from "@/components/ApplicationSteps";
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
     { title: "Become a DDLX Seller — Vendor Hub" },
-    { name: "description", content: "Bring your clothing, footwear and accessories to DDLX Apparel. Start your seller application." },
+    { name: "description", content: "Bring your clothing, footwear and accessories to DDLX. Start your seller application." },
     { property: "og:title", content: "Become a DDLX Seller" },
-    { property: "og:description", content: "Your brand. The next chapter. Apply to join DDLX Apparel." },
+    { property: "og:description", content: "Your brand. The next chapter. Apply to join DDLX." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary_large_image" },
   ] }),
@@ -47,6 +47,6 @@ function Index() {
         <ApplicationSteps />
       </section>
     </main>
-    <footer className="border-t"><div className="mx-auto grid max-w-[1440px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-7 text-xs text-muted-foreground sm:px-8 lg:px-12"><span className="truncate font-display font-semibold text-foreground">DDLX APPAREL</span><a href="https://ddlxapparel.com" className="flex shrink-0 items-center gap-2">Marketplace <ArrowUpRight className="size-3" /></a></div></footer>
+    <footer className="border-t"><div className="mx-auto grid max-w-[1440px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-7 text-xs text-muted-foreground sm:px-8 lg:px-12"><span className="truncate font-display font-semibold text-foreground">DDLX</span><a href="https://ddlxapparel.com" className="flex shrink-0 items-center gap-2">Marketplace <ArrowUpRight className="size-3" /></a></div></footer>
   </div>;
 }

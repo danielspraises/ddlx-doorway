@@ -42,7 +42,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 <?php endif; ?>
 
 <?php if ($tab === 'products'): ?>
-  <div class="row between" style="margin:18px 0"><span class="muted"><?= count($products) ?> product<?= count($products) === 1 ? '' : 's' ?> · <a href="/seller/export?kind=products">Download CSV</a></span><a class="btn" href="/products/edit">Add product</a></div>
+  <div class="row between" style="margin:18px 0"><span class="muted"><?= count($products) ?> product<?= count($products) === 1 ? '' : 's' ?> · <a href="/seller/export?kind=products">Download CSV</a></span><span class="row"><a class="btn btn-outline" href="/products/import">Import CSV</a><a class="btn" href="/products/edit">Add product</a></span></div>
   <?php if (!$products): ?><p class="notice">You have no products yet. Add one, then submit it for review. Approved products appear on the DDLX marketplace.</p><?php endif; ?>
   <ul class="list">
   <?php foreach ($products as $p): [$k, $l] = product_visibility($p); ?>

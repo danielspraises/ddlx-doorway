@@ -246,3 +246,27 @@ route('GET', '/api/sku/suggest', function () {
     $sku = suggest_sku($u['id']);
     $sku ? json_out(['sku' => $sku]) : json_out(['error' => 'Could not find a free SKU. Type one in instead.'], 503);
 }, ['api' => true]);
+
+route('GET', '/products/import/template', function () {
+    require_seller();
+    $rows = import_template_rows();
+    csv_out('ddlx-products-template.csv', array_shift($rows), $rows);
+});
+
+route('GET', '/products/import', function () {
+    $u = require_seller();
+    render('import', ['title' => 'Import products', 'user' => $u, 'result' => null, 'categories' => array_map(fn ($k) => implode(' > ', array_map('ucfirst', explode(' > ', $k))), array_keys(import_category_map()))]);
+});
+
+route('POST', '/products/import', function () {
+    $u = require_seller();
+    $f = $_FILES['file'] ?? null;
+    $csv = '';
+    $err = null;
+    if (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) $err = 'Choose a CSV file to upload.';
+    elseif (($f['size'] ?? 0) > 1024 * 1024) $err = 'That file is too large. Keep it under 1 MB.';
+    else $csv = (string) file_get_contents($f['tmp_name']);
+    $res = $err ? ['ok' => false, 'error' => $err, 'errors' => [], 'created' => []] : import_products($u['id'], $csv);
+    if ($res['ok']) redirect('/seller?tab=products', count($res['created']) . ' products added as drafts. Add photos, then submit them for review.');
+    render('import', ['title' => 'Import products', 'user' => $u, 'result' => $res, 'categories' => array_map(fn ($k) => implode(' > ', array_map('ucfirst', explode(' > ', $k))), array_keys(import_category_map()))]);
+});

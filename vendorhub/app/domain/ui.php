@@ -149,15 +149,14 @@ function icon(string $name, string $class = ''): string
 // The DDLX tote bag, drawn in SVG so it needs no downloads and cannot fail to load.
 function tote_svg(): string
 {
-    return '<div class="tote-wrap" data-parallax><svg class="tote" viewBox="0 0 320 380" role="img" aria-label="DDLX Apparel tote bag">
+    return '<div class="tote-wrap" data-parallax><svg class="tote" viewBox="0 0 320 380" role="img" aria-label="DDLX tote bag">
   <g class="tote-ring"><ellipse cx="46" cy="270" rx="30" ry="12" fill="none" stroke="#c4cad8" stroke-width="9" transform="rotate(-24 46 270)"/></g>
   <path d="M96 128c0-62 128-62 128 0" fill="none" stroke="#3568f4" stroke-width="13" stroke-linecap="round"/>
   <path d="M118 128c0-44 84-44 84 0" fill="none" stroke="#2a54cc" stroke-width="11" stroke-linecap="round" opacity=".55"/>
   <path d="M66 126h188c8 0 14 6 15 14l22 192c1 10-7 18-17 18H46c-10 0-18-8-17-18l22-192c1-8 7-14 15-14z" fill="#3568f4"/>
   <path d="M66 126h188c8 0 14 6 15 14l3 28H48l3-28c1-8 7-14 15-14z" fill="#4a7bff"/>
   <rect x="86" y="226" width="148" height="76" rx="6" fill="#fff"/>
-  <text x="160" y="272" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-size="40" fill="#111525">DDLX</text>
-  <text x="160" y="292" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="11" letter-spacing="4" fill="#111525">APPAREL</text>
+  <text x="160" y="277" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-size="46" letter-spacing="2" fill="#111525">DDLX</text>
   <g transform="rotate(14 250 150)"><rect x="238" y="140" width="34" height="62" rx="5" fill="#ff5938"/><circle cx="255" cy="152" r="4" fill="#fff"/></g>
 </svg></div>';
 }

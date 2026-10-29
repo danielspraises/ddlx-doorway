@@ -298,5 +298,25 @@ eq(review_product($admin, $r3['id'], 'request_changes', 'fix photo', $cp['update
 eq(load_product($r3['id'])['status'], 'changes_requested', 'status changes_requested');
 eq(delete_product($r3['id'], $sid), null, 'delete draft-ish product');
 
+// ---- CSV import
+$leafPath = implode(' > ', category_path_names($cat));
+$hdr = implode(',', IMPORT_COLUMNS);
+$line = fn (array $c) => implode(',', array_map(fn ($k) => '"' . ($c[$k] ?? '') . '"', IMPORT_COLUMNS));
+$good = ['name' => 'Imp One', 'category' => $leafPath, 'regular_price' => '1,500', 'stock' => '4', 'weight_kg' => '0.3', 'length_cm' => '10', 'width_cm' => '10', 'height_cm' => '2', 'tags' => 'a, b'];
+$csv = "\xEF\xBB\xBF$hdr\n" . $line($good) . "\n" . $line(['name' => 'Imp Two'] + $good) . "\n";
+$before = (int) db()->val('SELECT COUNT(*) FROM products WHERE seller_id = ?', [$sid]);
+$res = import_products($sid, $csv);
+ok($res['ok'], 'csv import ok');
+eq((int) db()->val('SELECT COUNT(*) FROM products WHERE seller_id = ?', [$sid]), $before + 2, 'two drafts created');
+$imp = load_product(array_values($res['created'])[0]);
+eq($imp['status'], 'draft', 'imported as draft');
+eq((float) $imp['regular_price'], 1500.0, 'price parsed');
+ok($imp['sku'] !== '', 'sku auto-assigned');
+$bad = import_products($sid, "$hdr\n" . $line($good) . "\n" . $line(['name' => '', 'category' => 'Nowhere'] + $good) . "\n");
+ok(!$bad['ok'] && isset($bad['errors'][3]), 'bad row reported with row number');
+eq((int) db()->val('SELECT COUNT(*) FROM products WHERE seller_id = ?', [$sid]), $before + 2, 'nothing imported when a row is bad');
+ok(!import_products($sid, "$hdr\n" . $line(['sku' => 'ZZ-1'] + $good) . "\n" . $line(['sku' => 'zz-1'] + $good) . "\n")['ok'], 'duplicate sku in file rejected');
+ok(!import_products($sid, "name,category\nx,y\n")['ok'], 'missing columns rejected');
+
 echo "$pass passed, $fail failed\n";
 exit($fail ? 1 : 0);

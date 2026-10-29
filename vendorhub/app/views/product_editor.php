@@ -15,7 +15,7 @@ $img = function (string $path, string $remove) use ($id, $editable): string {
 };
 ?>
 <p><a href="/seller?tab=products" class="small">← Products</a></p>
-<div class="row between"><h1><?= $saved ? e($saved['name'] ?: 'Product') : 'New product' ?></h1><?= pill($visKind, [], ['live' => 'ok', 'hidden' => 'warn']) ?> <span class="muted small"><?= e($visLabel) ?></span></div>
+<div class="row between"><h1><?= $saved ? e($saved['name'] ?: 'Product') : 'New product' ?></h1><?= pill($visKind, [], ['live' => 'ok', 'hidden' => 'warn']) ?> <?php if ($saved): ?><span class="muted small"><?= e($visLabel) ?></span><?php endif; ?></div>
 
 <?php if ($error): ?><p class="flash flash-error" role="alert"><?= e($error) ?></p><?php endif; ?>
 <?php if ($notice): ?><p class="flash flash-ok" role="status"><?= e($notice) ?></p><?php endif; ?>
@@ -25,7 +25,7 @@ $img = function (string $path, string $remove) use ($id, $editable): string {
 <?php if ($locked): ?><div class="notice"><h3>In review</h3><p>You can't edit this product while it is being reviewed. Withdraw it from review to make changes.</p></div><?php endif; ?>
 <?php if ($saved && $saved['live'] && $status !== 'approved'): ?><div class="notice"><h3>Customers still see the last approved version</h3><p>Your new changes go live only after the review team approves them. Stock changes apply at once.</p></div><?php endif; ?>
 
-<form method="post" action="/products/save" data-keep><?= csrf_field() ?>
+<form method="post" action="/products/save" data-keep class="editor"><?= csrf_field() ?>
   <input type="hidden" name="id" value="<?= e((string) $id) ?>"><input type="hidden" name="expected" value="<?= e($v('expected')) ?>">
   <fieldset<?= $dis ?> style="border:0;padding:0;margin:0">
   <h2>General</h2>
@@ -108,9 +108,10 @@ $img = function (string $path, string $remove) use ($id, $editable): string {
   <?php endif; ?>
   </fieldset>
 
-  <div class="row" style="margin:24px 0">
+  <div class="savebar">
     <?php if ($editable): ?>
-      <button class="btn" type="submit" name="action" value="save">Save</button>
+      <span class="muted small savebar-note"><?= $ready ? e(count($ready)) . ' thing' . (count($ready) === 1 ? '' : 's') . ' left before you can submit' : ($saved ? 'Ready to submit' : 'Save first, then add photos') ?></span>
+      <button class="btn btn-outline" type="submit" name="action" value="save">Save</button>
       <?php if (in_array($status, ['draft', 'changes_requested', 'rejected'], true) || !$saved): ?><button class="btn btn-accent" type="submit" name="action" value="submit" data-confirm="Save and send this product for review?">Save and submit for review</button><?php endif; ?>
     <?php endif; ?>
   </div>

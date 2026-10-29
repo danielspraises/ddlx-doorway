@@ -19,14 +19,16 @@ $v = fn (string $k) => (string) ($data[$k] ?? '');
   <?php else: ?>
     <div class="notice"><h3>Application not approved</h3><p>See the feedback above. Contact support if you think this is a mistake.</p></div>
   <?php endif; ?>
+  <div class="sumgrid">
   <?php for ($n = 1; $n <= 4; $n++): ?>
-    <h2><?= e(APP_STEPS[$n][1]) ?></h2>
-    <dl class="dl"><?php foreach (summary_rows($n, $app[APP_STEPS[$n][0]] ?? []) as [$k, $val]): ?><dt><?= e($k) ?></dt><dd><?= e($val) ?></dd><?php endforeach; ?></dl>
+    <section class="card"><h2 class="sec-title"><span class="sec-num"><?= $n ?></span><?= e(APP_STEPS[$n][1]) ?></h2>
+    <dl class="dl"><?php foreach (summary_rows($n, $app[APP_STEPS[$n][0]] ?? []) as [$k, $val]): ?><dt><?= e($k) ?></dt><dd><?= e($val) ?></dd><?php endforeach; ?></dl></section>
   <?php endfor; ?>
+  </div>
 <?php else: ?>
   <ol class="steps" aria-label="Application progress">
     <?php foreach (APP_STEPS as $n => [, $title]): ?>
-      <li><a href="/apply?step=<?= $n ?>" class="<?= $n === $step ? 'active' : '' ?>" <?= $n === $step ? 'aria-current="step"' : '' ?>><span class="num">0<?= $n ?></span><?= e($title) ?></a></li>
+      <li><a href="/apply?step=<?= $n ?>" class="<?= $n === $step ? 'active' : ($n < $step ? 'done' : '') ?>" <?= $n === $step ? 'aria-current="step"' : '' ?>><span class="num">0<?= $n ?></span><?= e($title) ?></a></li>
     <?php endforeach; ?>
   </ol>
   <h2 style="margin-top:0"><?= e(APP_STEPS[$step][1]) ?></h2>

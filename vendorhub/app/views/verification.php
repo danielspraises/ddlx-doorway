@@ -30,7 +30,7 @@ $docLink = function (string $kind, string $title) use ($docs): string {
     </dl>
   <?php else: ?>
     <ol class="steps" aria-label="Verification progress">
-      <?php foreach (VERIFY_STEPS as $n => $s): ?><li><a href="/verification?step=<?= $n ?>" class="<?= $n === $step ? 'active' : '' ?>" <?= $n === $step ? 'aria-current="step"' : '' ?>><span class="num">0<?= $n ?></span><?= e($s['title']) ?></a></li><?php endforeach; ?>
+      <?php foreach (VERIFY_STEPS as $n => $s): ?><li><a href="/verification?step=<?= $n ?>" class="<?= $n === $step ? 'active' : ($n < $step ? 'done' : '') ?>" <?= $n === $step ? 'aria-current="step"' : '' ?>><span class="num">0<?= $n ?></span><?= e($s['title']) ?></a></li><?php endforeach; ?>
     </ol>
     <p class="muted small">Step <?= $step ?> of 8</p>
     <h2 style="margin-top:4px"><?= e($def['title']) ?></h2>

@@ -22,7 +22,43 @@ route('POST', '/login', function () {
         render('auth', ['title' => 'Sign in', 'mode' => 'login', 'error' => $r['error'], 'email' => $email], 'bare');
         return;
     }
+    if (!empty($r['challenge'])) {
+        render('auth', ['title' => 'Two-step sign-in', 'mode' => 'twofa', 'challenge' => $r['challenge']], 'bare');
+        return;
+    }
     redirect(home_path(current_user() ?? ['isAdmin' => false, 'canReview' => false, 'stage' => 'no_application']));
+});
+
+route('POST', '/login/2fa', function () {
+    $token = input('challenge');
+    $r = login_challenge_finish($token, input('code'));
+    if (!$r['ok']) {
+        if (!empty($r['restart'])) { render('auth', ['title' => 'Sign in', 'mode' => 'login', 'error' => $r['error']], 'bare'); return; }
+        render('auth', ['title' => 'Two-step sign-in', 'mode' => 'twofa', 'challenge' => $token, 'error' => $r['error']], 'bare');
+        return;
+    }
+    redirect(home_path(current_user() ?? ['isAdmin' => false, 'canReview' => false, 'canOrders' => false, 'stage' => 'no_application']));
+});
+
+route('GET', '/account/security', function () {
+    $u = require_user();
+    $on = twofa_enabled($u['id']);
+    $secret = $on ? null : ((string) (twofa_row($u['id'])['totp_secret'] ?? '') ?: twofa_begin($u['id']));
+    render('security', ['title' => 'Account security', 'user' => $u, 'on' => $on, 'secret' => $secret, 'uri' => $secret ? totp_uri($u['email'], $secret) : '', 'codes' => null, 'left' => $on ? twofa_codes_left($u['id']) : 0, 'error' => null]);
+});
+
+route('POST', '/account/security', function () {
+    $u = require_user();
+    $act = input('action');
+    $show = function (?string $error = null, ?array $codes = null) use ($u) {
+        $on = twofa_enabled($u['id']);
+        $secret = $on ? null : ((string) (twofa_row($u['id'])['totp_secret'] ?? '') ?: twofa_begin($u['id']));
+        render('security', ['title' => 'Account security', 'user' => $u, 'on' => $on, 'secret' => $secret, 'uri' => $secret ? totp_uri($u['email'], $secret) : '', 'codes' => $codes, 'left' => $on ? twofa_codes_left($u['id']) : 0, 'error' => $error]);
+    };
+    if ($act === 'enable') { $r = twofa_enable($u['id'], input('code')); $show($r['error'], $r['ok'] ? $r['codes'] : null); return; }
+    if ($act === 'disable') { $e = twofa_disable($u['id'], input_raw('password')); if ($e) { $show($e); return; } redirect('/account/security', 'Two-step sign-in is off.'); }
+    if ($act === 'codes') { $r = twofa_new_recovery($u['id'], input_raw('password')); $show($r['ok'] ? null : 'Password is not correct.', $r['ok'] ? $r['codes'] : null); return; }
+    redirect('/account/security');
 });
 
 route('POST', '/register', function () {

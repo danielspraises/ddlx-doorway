@@ -341,6 +341,32 @@ eq((int) setting('schema_version'), SCHEMA_VERSION, 'upgrade stamps version');
 migrate_if_needed();
 ok(commission_by_category(db_plus('-30 days')) !== null, 'commission report runs');
 
+// ---- two-step sign-in
+eq(b32_decode(b32_encode('hello world!!')), 'hello world!!', 'base32 round trip');
+eq(totp_at(b32_encode('12345678901234567890'), 1), '287082', 'RFC 6238 test vector (t=59)');
+eq(totp_check(b32_encode('12345678901234567890'), '287082', 0, 59), 1, 'totp accepts current code');
+eq(totp_check(b32_encode('12345678901234567890'), '287082', 1, 59), null, 'totp code cannot be reused');
+eq(totp_check(b32_encode('12345678901234567890'), '000000', 0, 59), null, 'totp rejects wrong code');
+ok(!twofa_enabled($sid), '2fa off by default');
+$sec = twofa_begin($sid);
+ok(!twofa_enable($sid, '000000')['ok'], 'enable needs a valid code');
+$en = twofa_enable($sid, totp_at($sec, intdiv(time(), 30)));
+ok($en['ok'] && count($en['codes']) === 8, 'enable ok with backup codes');
+ok(twofa_enabled($sid), '2fa on');
+db()->exec('UPDATE users SET password_hash = ? WHERE id = ?', [password_hash('Passw0rd!x', PASSWORD_DEFAULT), $sid]);
+$lg = attempt_login('s@x.test', 'Passw0rd!x');
+ok(!empty($lg['challenge']), 'login with 2fa asks for a challenge');
+{
+    ok(!login_challenge_finish($lg['challenge'], '111111')['ok'], 'wrong 2fa code refused');
+    $bc = $en['codes'][0];
+    ok(login_challenge_finish($lg['challenge'], $bc)['ok'], 'backup code signs in');
+    eq(twofa_codes_left($sid), 7, 'backup code is used up');
+    ok(!twofa_verify($sid, $bc), 'backup code works once');
+}
+ok(twofa_disable($sid, 'wrong') !== null, 'disable needs password');
+eq(twofa_disable($sid, 'Passw0rd!x'), null, 'disable with password');
+ok(!twofa_enabled($sid), '2fa off again');
+
 // ---- bulk stock update
 $stk = stock_template_rows($sid);
 ok(count($stk) >= 2 && $stk[0] === ['sku', 'name', 'stock'], 'stock template lists products');

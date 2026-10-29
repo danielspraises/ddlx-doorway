@@ -9,6 +9,15 @@
     <div class="field"><label for="confirm">Confirm password</label><input id="confirm" name="confirm" type="password" autocomplete="new-password" required></div>
     <button class="btn" type="submit">Save password</button>
   </form>
+<?php elseif ($mode === 'twofa'): ?>
+  <h1>Enter your code</h1>
+  <p class="muted">Open your authenticator app and type the 6-digit code for DDLX Vendor Hub. Lost your phone? Use one of your backup codes instead.</p>
+  <form method="post" action="/login/2fa"><?= csrf_field() ?>
+    <input type="hidden" name="challenge" value="<?= e($challenge) ?>">
+    <?php if (!empty($error)): ?><p class="err" role="alert"><?= e($error) ?></p><?php endif; ?>
+    <div class="field"><label for="code">Code</label><input id="code" name="code" inputmode="text" autocomplete="one-time-code" autofocus required></div>
+    <button class="btn" type="submit">Continue</button> <a class="btn btn-ghost" href="/auth">Cancel</a>
+  </form>
 <?php elseif ($mode === 'forgot'): ?>
   <h1>Reset your password</h1>
   <?php if (!empty($sent)): ?>

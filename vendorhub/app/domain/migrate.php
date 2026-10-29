@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -36,6 +36,14 @@ function migration_steps(): array
             if (!table_exists($db, 'audit_log')) {
                 $db->exec('CREATE TABLE audit_log (id CHAR(36) NOT NULL PRIMARY KEY, actor_id CHAR(36) NULL, actor_email VARCHAR(190) NOT NULL DEFAULT \'\', action VARCHAR(60) NOT NULL, summary VARCHAR(400) NOT NULL DEFAULT \'\', target_id CHAR(36) NULL, created_at DATETIME(3) NOT NULL)' . $engine($db));
                 $db->exec('CREATE INDEX audit_created_idx ON audit_log (created_at)');
+            }
+        },
+        2 => function (Db $db) use ($engine) {
+            foreach (['totp_secret VARCHAR(64) NULL', 'totp_enabled TINYINT NOT NULL DEFAULT 0', 'totp_last_step BIGINT NOT NULL DEFAULT 0', 'totp_recovery TEXT NULL'] as $def) {
+                if (!column_exists($db, 'users', explode(' ', $def)[0])) $db->exec('ALTER TABLE users ADD COLUMN ' . $def);
+            }
+            if (!table_exists($db, 'login_challenges')) {
+                $db->exec('CREATE TABLE login_challenges (token_hash CHAR(64) NOT NULL PRIMARY KEY, user_id CHAR(36) NOT NULL, tries INT NOT NULL DEFAULT 0, expires_at DATETIME(3) NOT NULL, created_at DATETIME(3) NOT NULL)' . $engine($db));
             }
         },
     ];

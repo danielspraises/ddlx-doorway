@@ -3,6 +3,10 @@ CREATE TABLE users (
   email VARCHAR(255) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   email_alerts TINYINT NOT NULL DEFAULT 1,
+  totp_secret VARCHAR(64) NULL,
+  totp_enabled TINYINT NOT NULL DEFAULT 0,
+  totp_last_step BIGINT NOT NULL DEFAULT 0,
+  totp_recovery TEXT NULL,
   created_at DATETIME(3) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE UNIQUE INDEX users_email_unique ON users (email);
@@ -16,6 +20,15 @@ CREATE TABLE sessions (
   CONSTRAINT sessions_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX sessions_user_idx ON sessions (user_id);
+
+CREATE TABLE login_challenges (
+  token_hash CHAR(64) NOT NULL PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  tries INT NOT NULL DEFAULT 0,
+  expires_at DATETIME(3) NOT NULL,
+  created_at DATETIME(3) NOT NULL,
+  CONSTRAINT challenge_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE password_resets (
   token_hash CHAR(64) NOT NULL PRIMARY KEY,

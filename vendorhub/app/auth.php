@@ -96,7 +96,7 @@ function user_from_token(string $token): ?array
 {
     $db = db();
     $row = $db->one(
-        'SELECT s.csrf, u.id, u.email,
+        'SELECT s.csrf, u.id, u.email, u.totp_enabled,
            (SELECT COUNT(*) FROM user_roles r WHERE r.user_id = u.id AND r.role = \'admin\') AS is_admin,
            sm.permissions AS permissions, sm.active AS staff_active,
            a.status AS application_status, v.status AS verification_status
@@ -134,6 +134,7 @@ function user_from_token(string $token): ?array
     return [
         'id' => $row['id'],
         'email' => $row['email'],
+        'twofa' => (int) $row['totp_enabled'] === 1,
         'isAdmin' => $isAdmin,
         'isStaff' => count($perms) > 0,
         'canReview' => $canReview,
@@ -270,6 +271,7 @@ function attempt_login(string $email, string $password): array
     if (password_needs_rehash($hash, PASSWORD_DEFAULT)) {
         db()->exec('UPDATE users SET password_hash = ? WHERE id = ?', [password_hash($password, PASSWORD_DEFAULT), $u['id']]);
     }
+    if (twofa_enabled($u['id'])) return ['ok' => true, 'challenge' => login_challenge_make($u['id'])];
     create_session($u['id']);
     return ['ok' => true];
 }

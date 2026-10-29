@@ -31,6 +31,8 @@ $v = fn (string $k) => (string) ($data[$k] ?? '');
       <li><a href="/apply?step=<?= $n ?>" class="<?= $n === $step ? 'active' : ($n < $step ? 'done' : '') ?>" <?= $n === $step ? 'aria-current="step"' : '' ?>><span class="num">0<?= $n ?></span><?= e($title) ?></a></li>
     <?php endforeach; ?>
   </ol>
+<?php $tips = [1=>['Why we ask','We use your details to check you are who you say you are and to contact you about your store. Your ID number is never shown to customers.'],2=>['Business details','Tell us how you trade. Registered or not, we only need accurate information. You can change it until you submit.'],3=>['Your storefront','This is what customers see: store name, description and photos. A clear name and a short, honest description build trust.'],4=>['Registration','Add your CAC and tax details if you have them. They speed up verification later. Unregistered sellers can still apply.'],5=>['Before you submit','Check each step. After you submit, the team reviews within a few working days and writes to you here if anything needs fixing.']]; ?>
+  <div class="split"><div class="split-main">
   <h2 style="margin-top:0"><?= e(APP_STEPS[$step][1]) ?></h2>
   <?php if (!empty($error)): ?><p class="err" role="alert"><?= e($error) ?></p><?php endif; ?>
   <form method="post" action="/apply" data-keep novalidate><?= csrf_field() ?>
@@ -111,4 +113,9 @@ $v = fn (string $k) => (string) ($data[$k] ?? '');
       <?php else: ?><button class="btn btn-accent" name="action" value="submit" type="submit" data-confirm="Submit your application for review?">Submit application</button><?php endif; ?>
     </div>
   </form>
+  </div>
+  <aside class="split-side"><div class="card tip"><p class="eyebrow" style="margin:0 0 6px"><?= e($tips[$step][0]) ?></p><p class="muted" style="margin:0"><?= e($tips[$step][1]) ?></p></div>
+    <div class="card tip"><p class="eyebrow" style="margin:0 0 6px">Progress</p><p style="margin:0">Step <?= (int) $step ?> of 5. <span class="muted">Use "Save progress" any time and come back later.</span></p></div>
+    <div class="card tip"><p class="eyebrow" style="margin:0 0 6px">Need help?</p><p style="margin:0"><a href="/assistant">Ask DDLX</a> or <a href="/messages?new=1">write to the team</a>.</p></div></aside>
+  </div>
 <?php endif; ?>

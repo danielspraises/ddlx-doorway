@@ -25,6 +25,17 @@ $img = function (string $path, string $remove) use ($id, $editable): string {
 <?php if ($locked): ?><div class="notice"><h3>In review</h3><p>You can't edit this product while it is being reviewed. Withdraw it from review to make changes.</p></div><?php endif; ?>
 <?php if ($saved && $saved['live'] && $status !== 'approved'): ?><div class="notice"><h3>Customers still see the last approved version</h3><p>Your new changes go live only after the review team approves them. Stock changes apply at once.</p></div><?php endif; ?>
 
+<?php
+$checks = [
+    ['Name and category', trim($v('name')) !== '' && !empty($form['category_id'])],
+    ['Description', trim($v('description')) !== '' || trim($v('short_description')) !== ''],
+    ['Price', ($form['product_type'] ?? 'simple') === 'variable' || (float) ($form['regular_price'] ?? 0) > 0],
+    ['Weight and size', (float) ($form['weight_kg'] ?? 0) > 0 && (float) ($form['length_cm'] ?? 0) > 0 && (float) ($form['width_cm'] ?? 0) > 0 && (float) ($form['height_cm'] ?? 0) > 0],
+    ['Featured photo', !empty($saved['featured_image'])],
+];
+$doneN = count(array_filter($checks, fn ($c) => $c[1]));
+?>
+<div class="split"><div class="split-main">
 <form method="post" action="/products/save" data-keep class="editor"><?= csrf_field() ?>
   <input type="hidden" name="id" value="<?= e((string) $id) ?>"><input type="hidden" name="expected" value="<?= e($v('expected')) ?>">
   <fieldset<?= $dis ?> style="border:0;padding:0;margin:0">
@@ -156,3 +167,15 @@ $img = function (string $path, string $remove) use ($id, $editable): string {
 <?php else: ?>
   <p class="muted">Save the product first, then you can add photos.</p>
 <?php endif; ?>
+</div>
+<aside class="split-side">
+  <div class="card tip"><p class="eyebrow" style="margin:0 0 8px">Ready to submit <?= $doneN ?>/<?= count($checks) ?></p>
+    <div class="meter" aria-hidden="true"><i style="width:<?= (int) round($doneN / count($checks) * 100) ?>%"></i></div>
+    <ul class="checks"><?php foreach ($checks as [$label, $okc]): ?><li class="<?= $okc ? 'ok' : '' ?>"><?= icon($okc ? 'check' : 'arrow-right') ?><?= e($label) ?></li><?php endforeach; ?></ul>
+    <p class="muted small" style="margin:10px 0 0">Saved changes update this list.</p></div>
+  <?php if ($saved && $saved['featured_image']): ?><div class="card tip"><p class="eyebrow" style="margin:0 0 8px">Preview</p>
+    <img src="<?= e(product_image_url($saved['featured_image'])) ?>" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px;border:1px solid var(--line)">
+    <p style="margin:10px 0 0"><strong><?= e($saved['name']) ?></strong><br><span class="muted"><?= $saved['regular_price'] ? e($saved['currency'] . ' ' . number_format((float) $saved['regular_price'])) : '' ?></span></p></div><?php endif; ?>
+  <div class="card tip"><p class="eyebrow" style="margin:0 0 6px">Tips</p><ul class="muted small" style="margin:0;padding-left:18px"><li>Use bright, square photos on a plain background.</li><li>Put size, material and care in the description.</li><li>Accurate weight and size keep delivery costs right.</li></ul></div>
+</aside></div>
+

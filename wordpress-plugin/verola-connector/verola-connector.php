@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -24,6 +24,7 @@ final class Verola_Connector {
 	const STATE = 'verola_state';
 	const CRON = 'verola_sync_event';
 	const SEND = 'verola_send_order';
+	const RATING = 'verola_send_rating';
 
 	public static function init() {
 		add_action('before_woocommerce_init', function () {
@@ -63,6 +64,20 @@ final class Verola_Connector {
 		add_action('woocommerce_order_status_cancelled', [__CLASS__, 'order_cancelled']);
 		// Delivery statuses are run by the marketplace; Vendor Hub is told about each change.
 		add_action('woocommerce_order_status_changed', [__CLASS__, 'order_status_changed'], 10, 3);
+		// Customer reviews stay on the marketplace; Vendor Hub is told each product's average so sellers and levels can use it.
+		foreach (['comment_post', 'edit_comment', 'deleted_comment', 'trashed_comment', 'untrashed_comment', 'spammed_comment'] as $hook) {
+			add_action($hook, [__CLASS__, 'review_changed']);
+		}
+		add_action('wp_set_comment_status', [__CLASS__, 'review_changed']);
+		add_action(self::RATING, [__CLASS__, 'send_rating']);
+		// Show the seller level badge on product pages and in product grids.
+		add_action('woocommerce_single_product_summary', [__CLASS__, 'show_badge'], 6);
+		add_action('woocommerce_after_shop_loop_item_title', [__CLASS__, 'show_badge'], 4);
+		add_shortcode('vendor_hub_badge', function () {
+			ob_start();
+			self::show_badge();
+			return ob_get_clean();
+		});
 		add_action('woocommerce_admin_order_data_after_shipping_address', [__CLASS__, 'handoff_fields']);
 		add_action('woocommerce_process_shop_order_meta', [__CLASS__, 'save_handoff_fields']);
 		if (!wp_next_scheduled(self::CRON)) {
@@ -463,11 +478,118 @@ final class Verola_Connector {
 					break;
 				}
 			}
+			self::sync_coupons();
 			self::set_state(['last_sync' => time(), 'last_count' => $count]);
 		} catch (Throwable $e) {
 			self::set_state(['last_sync' => time(), 'last_count' => $count, 'last_error' => $e->getMessage()]);
 		}
 		delete_transient('verola_sync_lock');
+	}
+
+
+	// ------------------------------------------------------------------ seller discount codes (Vendor Hub -> store)
+
+	// Each code is funded by one seller and works only on that seller's products. The discount comes off the
+	// sale price, so the seller's earnings are worked out on what the customer actually paid.
+	private static function sync_coupons() {
+		if (!class_exists('WC_Coupon')) {
+			return;
+		}
+		$s = self::settings();
+		$res = wp_remote_get($s['url'] . '/api/marketplace/coupons', ['timeout' => 30, 'headers' => ['Authorization' => 'Bearer ' . $s['api_key']]]);
+		if (is_wp_error($res) || (int) wp_remote_retrieve_response_code($res) !== 200) {
+			return; // an older Vendor Hub without codes, or a hiccup: products still synced
+		}
+		$data = json_decode(wp_remote_retrieve_body($res), true);
+		if (!is_array($data) || !isset($data['coupons'])) {
+			return;
+		}
+		foreach ($data['coupons'] as $c) {
+			try {
+				self::upsert_coupon($c);
+			} catch (Throwable $e) {
+				self::set_state(['last_error' => 'Code ' . ($c['code'] ?? '?') . ': ' . $e->getMessage()]);
+			}
+		}
+	}
+
+	private static function upsert_coupon($c) {
+		$code = wc_format_coupon_code($c['code']);
+		$id = wc_get_coupon_id_by_code($code);
+		$coupon = new WC_Coupon($id ?: 0);
+		if ($id && $coupon->get_meta('_verola_coupon_id') !== $c['id']) {
+			throw new Exception('a different coupon already uses this code in WooCommerce');
+		}
+		$ids = [];
+		foreach ((array) $c['product_ids'] as $vid) {
+			$post = self::post_id_by_meta('_verola_product_id', $vid);
+			if ($post) {
+				$ids[] = (int) $post;
+			}
+		}
+		if ($c['scope'] === 'all') {
+			global $wpdb;
+			$ids = array_map('intval', $wpdb->get_col($wpdb->prepare("SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_verola_seller_id' AND meta_value = %s", $c['seller_id'])));
+		}
+		$enabled = !empty($c['enabled']) && $ids;
+		$coupon->set_code($code);
+		$coupon->set_discount_type($c['kind'] === 'percent' ? 'percent' : 'fixed_product');
+		$coupon->set_amount($c['amount']);
+		$coupon->set_product_ids($ids);
+		$coupon->set_individual_use(true);
+		$coupon->set_exclude_sale_items(false);
+		$coupon->set_minimum_amount($c['min_spend'] !== null ? $c['min_spend'] : '');
+		$coupon->set_usage_limit($c['usage_limit'] !== null ? (int) $c['usage_limit'] : 0);
+		$coupon->set_usage_limit_per_user(!empty($c['one_per_customer']) ? 1 : 0);
+		$coupon->set_date_expires($c['ends_at'] ? strtotime($c['ends_at']) : null);
+		$coupon->set_description('Funded by seller ' . $c['store_name'] . ' (Vendor Hub)');
+		$coupon->set_status($enabled ? 'publish' : 'draft');
+		$coupon->update_meta_data('_verola_coupon_id', $c['id']);
+		$coupon->save();
+	}
+
+	// ------------------------------------------------------------------ ratings (store -> Vendor Hub)
+
+	public static function show_badge() {
+		global $product;
+		if (!$product) {
+			return;
+		}
+		$level = get_post_meta($product->get_id(), '_verola_seller_level', true);
+		if (!$level || $level === 'starter') {
+			return;
+		}
+		$colors = ['bronze' => ['#f7e8dc', '#8a4b1c'], 'silver' => ['#eceef2', '#4a5160'], 'gold' => ['#fdf1c9', '#7a5a00'], 'blue' => ['#e4edff', '#1f4fd6']];
+		$c = $colors[$level] ?? ['#eee', '#333'];
+		printf('<span class="vh-badge vh-badge-%1$s" style="display:inline-block;margin:4px 0;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;background:%2$s;color:%3$s">%4$s seller</span>', esc_attr($level), esc_attr($c[0]), esc_attr($c[1]), esc_html(get_post_meta($product->get_id(), '_verola_seller_level_label', true)));
+	}
+
+	public static function review_changed($comment_id) {
+		$comment = get_comment($comment_id);
+		if (!$comment || get_post_type($comment->comment_post_ID) !== 'product') {
+			return;
+		}
+		if (!get_post_meta($comment->comment_post_ID, '_verola_product_id', true)) {
+			return;
+		}
+		// Wait a little so WooCommerce has recalculated the average first.
+		wp_schedule_single_event(time() + 45, self::RATING, [(int) $comment->comment_post_ID]);
+	}
+
+	public static function send_rating($post_id) {
+		$vid = get_post_meta($post_id, '_verola_product_id', true);
+		$product = wc_get_product($post_id);
+		if (!$vid || !$product || !self::configured()) {
+			return;
+		}
+		$s = self::settings();
+		$body = wp_json_encode(['event' => 'rating.updated', 'product' => ['product_id' => $vid, 'average' => round((float) $product->get_average_rating(), 2), 'count' => (int) $product->get_rating_count()]]);
+		$ts = time();
+		wp_remote_post($s['url'] . '/api/marketplace/ratings', [
+			'timeout' => 20,
+			'headers' => ['Content-Type' => 'application/json', 'X-Verola-Timestamp' => (string) $ts, 'X-Verola-Signature' => 'sha256=' . hash_hmac('sha256', $ts . '.' . $body, $s['secret'])],
+			'body' => $body,
+		]);
 	}
 
 	private static function post_id_by_meta($key, $value) {
@@ -702,6 +824,15 @@ final class Verola_Connector {
 		$id = $product->save();
 		update_post_meta($id, '_verola_product_id', $item['id']);
 		update_post_meta($id, '_verola_seller_id', $seller['id']);
+		// Seller level: stored on the product so grids can sort and filter by it. Higher levels get a lower menu order,
+		// so "Default sorting" shows Blue sellers first, then Gold, Silver, Bronze and Starter.
+		$badge = $seller['badge'] ?? null;
+		if ($badge) {
+			update_post_meta($id, '_verola_seller_level', $badge['level']);
+			update_post_meta($id, '_verola_seller_level_label', $badge['label']);
+			update_post_meta($id, '_verola_seller_rank', (int) $badge['rank']);
+			wp_update_post(['ID' => $id, 'menu_order' => (4 - (int) $badge['rank']) * 10]);
+		}
 		update_post_meta($id, '_verola_updated_at', $item['updated_at']);
 		wp_update_post(['ID' => $id, 'post_author' => self::vendor_user($seller)]);
 		if (taxonomy_exists('product_brand') && !empty($item['brand'])) {
@@ -818,7 +949,7 @@ final class Verola_Connector {
 			if (!$verola_id) {
 				continue;
 			}
-			$row = ['product_id' => $verola_id, 'quantity' => $qty, 'unit_price' => round(((float) $line->get_total()) / $qty, 2)];
+			$row = ['product_id' => $verola_id, 'quantity' => $qty, 'unit_price' => round(((float) $line->get_total()) / $qty, 2), 'discount' => round(max(0, (float) $line->get_subtotal() - (float) $line->get_total()), 2)];
 			if ($variation_id) {
 				$row['variation_id'] = $variation_id;
 			}
@@ -845,6 +976,7 @@ final class Verola_Connector {
 				'ship_city' => (string) ($order->get_shipping_city() ?: $order->get_billing_city()),
 				'ship_state' => (string) (($states[$state] ?? $state) ?: ''),
 				'restock' => true,
+				'coupons' => array_values(array_map('strval', $order->get_coupon_codes())),
 				'items' => $items,
 			],
 		];

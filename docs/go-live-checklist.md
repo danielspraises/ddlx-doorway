@@ -35,3 +35,9 @@ If a step fails, note the exact message and Admin → System check output; the l
 - Change the admin password, keep a second admin or staff account.
 - Delete the test seller and test orders (or leave them if the marketplace needs them for reconciliation).
 - Confirm email delivery: send a password reset to yourself. If it lands in spam, add SPF/DKIM for ddlx.shop in cPanel → Email Deliverability.
+
+## 5. New in this release: check these too
+- **Plugin 1.2.0** (upload and activate again): after the first sync, open a product on ddlx.shop and look for the level badge, and check WooCommerce → Marketing → Coupons for seller codes.
+- Create a code in a test seller's Promotions tab, wait a minute, use it at checkout, and confirm the order shows in Vendor Hub with "Used 1".
+- Leave a review on a test product and confirm the seller overview shows the rating within a couple of minutes.
+- Admin → Settings: add the Anthropic key if you want the AI assistant; set the Seller levels table (perks start at 0).

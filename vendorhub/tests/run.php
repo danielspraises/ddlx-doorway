@@ -417,6 +417,71 @@ ok(!import_stock($other, "sku,stock\n$skuA,5\n")['ok'], 'cannot update another s
 $cur = array_values(array_filter(seller_products($sid), fn ($p) => $p['sku'] === $skuA))[0]['stock'];
 eq($cur, 42, 'bad file changed nothing');
 
+// ---- ratings and seller levels
+$pid2 = $pid;
+$rt = parse_rating_event(['event' => 'rating.updated', 'product' => ['product_id' => $pid2, 'average' => 4.6, 'count' => 25]]);
+ok(is_array($rt), 'rating event parses');
+ok(is_string(parse_rating_event(['event' => 'rating.updated', 'product' => ['product_id' => $pid2, 'average' => 7, 'count' => 1]])), 'rating out of range refused');
+ok(record_rating($rt), 'rating recorded');
+eq(seller_rating_summary($sid), ['count' => 25, 'average' => 4.6], 'seller rating summary');
+ok(!record_rating(['product_id' => uuid(), 'average' => 4.0, 'count' => 1]), 'rating for unknown product');
+$m = level_metrics($sid);
+ok($m['delivered'] >= 0 && $m['rating'] === 4.6, 'metrics include rating');
+$fake = ['delivered' => 200, 'items' => 300, 'returns' => 3, 'return_pct' => 1.0, 'packed' => 100, 'dispatch_pct' => 97.0, 'ratings' => 30, 'rating' => 4.8];
+eq(level_earned($fake), 'blue', 'strong seller earns Blue');
+eq(level_earned(['delivered' => 60, 'return_pct' => 6.0, 'dispatch_pct' => 90.0, 'ratings' => 10, 'rating' => 4.2] + $fake), 'gold', 'gold needs 50 orders and 4.0 rating');
+eq(level_earned(['ratings' => 2, 'rating' => 5.0, 'delivered' => 60] + $fake), 'silver', 'gold needs enough ratings');
+eq(level_earned(['delivered' => 1] + $fake), 'starter', 'too few orders stays Starter');
+eq(level_earned(['delivered' => 20, 'return_pct' => 20.0] + $fake), 'starter', 'high returns blocks every level');
+eq(level_earned(['delivered' => 20, 'dispatch_pct' => null] + $fake), 'bronze', 'no packing data stops at Bronze');
+$row = level_refresh($sid, true);
+ok(in_array($row['auto_level'], LEVELS, true), 'level stored');
+eq(level_set_override($admin, $sid, 'gold', 'invited'), null, 'admin pins a level');
+eq(seller_level($sid), 'gold', 'pinned level wins');
+ok(count(db()->all("SELECT 1 FROM notifications WHERE user_id = ? AND type = 'level'", [$sid])) >= 1, 'seller told about the new level');
+ok(level_set_override($admin, $sid, 'platinum', '') !== null, 'unknown level refused');
+eq(save_level_rules(['gold' => ['commission_off' => '2', 'hold_off' => '3']]), null, 'rules saved');
+eq(level_perks('gold'), ['commission_off' => 2.0, 'hold_off' => 3], 'perks read back');
+eq(commission_rate_for(null, $sid), commission_percent() - 2.0, 'commission perk applied');
+ok(save_level_rules(['silver' => ['orders' => '500']]) !== null, 'levels must rise in order');
+eq(level_set_override($admin, $sid, '', ''), null, 'pin removed');
+db()->exec('DELETE FROM settings WHERE k = ?', ['level_rules']); unset($GLOBALS['vh_settings']);
+ok(level_badge('blue') !== '' && str_contains(level_badge('blue'), 'Blue'), 'badge renders');
+
+// ---- discount codes
+$cin = ['code' => 'welcome10', 'kind' => 'percent', 'amount' => '10', 'currency' => 'NGN', 'scope' => 'all', 'one_per_customer' => '1'];
+$cr = coupon_save($sid, $cin);
+ok($cr['ok'], 'coupon created');
+eq(coupons_for_seller($sid)[0]['code'], 'WELCOME10', 'code uppercased');
+ok(!coupon_save($other, $cin)['ok'], 'code is unique across sellers');
+ok(!coupon_save($sid, ['code' => 'ab'] + $cin)['ok'], 'short code refused');
+ok(!coupon_save($sid, ['code' => 'BIGONE', 'amount' => '90'] + $cin)['ok'], 'percent above 70 refused');
+ok(!coupon_save($sid, ['code' => 'BADDATE', 'starts_at' => '2030-02-01T10:00', 'ends_at' => '2030-01-01T10:00'] + $cin)['ok'], 'end before start refused');
+ok(!coupon_save($sid, ['code' => 'NOPROD', 'scope' => 'products', 'product_ids' => [uuid()]] + $cin)['ok'], 'products must be the seller\'s own');
+$cp = coupon_save($sid, ['code' => 'PICKED', 'scope' => 'products', 'product_ids' => [$pid], 'kind' => 'fixed', 'amount' => '500', 'usage_limit' => '2'] + $cin);
+ok($cp['ok'], 'product-scoped fixed code');
+db()->exec('UPDATE store_profiles SET vacation = 0 WHERE seller_id = ?', [$sid]);
+$feed = coupons_feed();
+$fw = array_values(array_filter($feed, fn ($c) => $c['code'] === 'WELCOME10'))[0];
+ok($fw['enabled'] && $fw['seller_id'] === $sid && $fw['kind'] === 'percent', 'feed lists the code as enabled');
+eq(array_values(array_filter($feed, fn ($c) => $c['code'] === 'PICKED'))[0]['product_ids'], [$pid], 'feed carries product ids');
+eq(coupon_toggle($sid, $cr['id'], false), null, 'pause');
+ok(!array_values(array_filter(coupons_feed(), fn ($c) => $c['code'] === 'WELCOME10'))[0]['enabled'], 'paused code disabled in feed');
+coupon_toggle($sid, $cr['id'], true);
+eq(coupon_admin_set($admin, $cr['id'], true), null, 'admin switches off');
+eq(coupons_for_seller($sid)[count(coupons_for_seller($sid)) - 1]['state'] ?? '', 'blocked', 'blocked state');
+coupon_admin_set($admin, $cr['id'], false);
+$ev = parse_order_event(['event' => 'order.paid', 'order' => ['id' => 'WC-C1', 'number' => 'C1', 'currency' => 'NGN', 'placed_at' => gmdate('c'), 'coupons' => ['welcome10'], 'items' => [['product_id' => $pid, 'quantity' => 1, 'unit_price' => 9000, 'discount' => 1000]]]]);
+ok(is_array($ev) && $ev['order']['coupons'] === ['WELCOME10'] && $ev['order']['items'][0]['discount'] === 1000.0, 'order carries coupon and discount');
+record_paid_order($ev);
+$cw = array_values(array_filter(coupons_for_seller($sid), fn ($c) => $c['code'] === 'WELCOME10'))[0];
+eq([$cw['used_count'], $cw['discount_total']], [1, 1000.0], 'redemption counted');
+record_paid_order($ev);
+eq(array_values(array_filter(coupons_for_seller($sid), fn ($c) => $c['code'] === 'WELCOME10'))[0]['used_count'], 1, 'repeat order does not count twice');
+eq(coupon_delete($sid, $cp['id']), null, 'unused code deleted');
+ok(!in_array('PICKED', array_column(coupons_for_seller($sid), 'code'), true), 'deleted code gone');
+ok(coupon_save($other, ['code' => 'PICKED'] + $cin)['ok'], 'deleted code can be reused');
+
 // ---- assistant
 $u = ['id' => $sid, 'email' => 's@x.test', 'stage' => 'verified', 'isAdmin' => false, 'canReview' => false, 'canOrders' => false, 'canMessages' => false];
 ok(str_contains(assistant_fallback('how do I withdraw money'), 'withdrawal'), 'fallback finds payouts');

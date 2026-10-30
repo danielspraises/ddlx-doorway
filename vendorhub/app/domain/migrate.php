@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -62,6 +62,18 @@ function migration_steps(): array
             if (!table_exists($db, 'assistant_messages')) {
                 $db->exec('CREATE TABLE assistant_messages (id CHAR(36) NOT NULL PRIMARY KEY, user_id CHAR(36) NOT NULL, role VARCHAR(10) NOT NULL, body TEXT NOT NULL, created_at DATETIME(3) NOT NULL)' . $engine($db));
                 $db->exec('CREATE INDEX assistant_user_idx ON assistant_messages (user_id, created_at)');
+            }
+        },
+        5 => function (Db $db) use ($engine) {
+            if (!column_exists($db, 'products', 'rating_avg')) $db->exec('ALTER TABLE products ADD COLUMN rating_avg DECIMAL(3,2) NULL');
+            if (!column_exists($db, 'products', 'rating_count')) $db->exec('ALTER TABLE products ADD COLUMN rating_count INT NOT NULL DEFAULT 0');
+            if (!table_exists($db, 'seller_levels')) {
+                $db->exec('CREATE TABLE seller_levels (seller_id CHAR(36) NOT NULL PRIMARY KEY, auto_level VARCHAR(12) NOT NULL DEFAULT \'starter\', override_level VARCHAR(12) NULL, override_note VARCHAR(250) NOT NULL DEFAULT \'\', metrics TEXT NULL, computed_at DATETIME(3) NOT NULL, changed_at DATETIME(3) NOT NULL)' . $engine($db));
+            }
+            if (!table_exists($db, 'coupons')) {
+                $db->exec('CREATE TABLE coupons (id CHAR(36) NOT NULL PRIMARY KEY, seller_id CHAR(36) NOT NULL, code VARCHAR(30) NOT NULL, kind VARCHAR(10) NOT NULL, amount DECIMAL(12,2) NOT NULL, currency VARCHAR(3) NOT NULL DEFAULT \'NGN\', scope VARCHAR(10) NOT NULL DEFAULT \'all\', product_ids TEXT NULL, min_spend DECIMAL(12,2) NULL, usage_limit INT NULL, one_per_customer TINYINT NOT NULL DEFAULT 1, starts_at DATETIME(3) NULL, ends_at DATETIME(3) NULL, active TINYINT NOT NULL DEFAULT 1, admin_disabled TINYINT NOT NULL DEFAULT 0, used_count INT NOT NULL DEFAULT 0, discount_total DECIMAL(14,2) NOT NULL DEFAULT 0, sync_status VARCHAR(10) NOT NULL DEFAULT \'pending\', sync_note VARCHAR(250) NOT NULL DEFAULT \'\', created_at DATETIME(3) NOT NULL, updated_at DATETIME(3) NOT NULL)' . $engine($db));
+                $db->exec('CREATE UNIQUE INDEX coupons_code_unique ON coupons (code)');
+                $db->exec('CREATE INDEX coupons_seller_idx ON coupons (seller_id, created_at)');
             }
         },
     ];

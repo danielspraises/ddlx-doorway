@@ -27,6 +27,23 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
     $low = array_filter($products, fn ($p) => in_array(stock_state($p), ['low', 'out'], true));
     $changes = array_filter($products, fn ($p) => in_array($p['status'], ['changes_requested', 'rejected'], true));
     $attention = array_slice(array_unique(array_merge(array_values($changes), array_values($low)), SORT_REGULAR), 0, 6); ?>
+<?php
+    $curLv = $level['override_level'] ?: $level['auto_level'];
+    $nextLv = LEVELS[level_rank($curLv) + 1] ?? null;
+    $nextChecks = $nextLv ? level_checks($nextLv, $lm) : [];
+?>
+  <div class="card level-card" style="margin-top:24px">
+    <div class="level-big lvl-<?= e($curLv) ?>"><?= icon('shield') ?></div>
+    <div>
+      <p class="muted small" style="margin:0">Your seller level</p>
+      <p style="margin:2px 0 4px"><?= level_badge($curLv) ?> <?php if ($level['override_level']): ?><span class="muted small">set by the DDLX team</span><?php endif; ?></p>
+      <p class="muted" style="margin:0"><?= e(LEVEL_NOTE[$curLv]) ?><?= $rating['count'] ? ' Rating ' . number_format((float) $rating['average'], 1) . ' from ' . (int) $rating['count'] . ' customer ratings.' : '' ?></p>
+      <?php if ($nextLv): ?><p style="margin:12px 0 0"><strong>To reach <?= e(LEVEL_LABEL[$nextLv]) ?>:</strong></p>
+      <ul class="need"><?php foreach ($nextChecks as $c): ?><li class="<?= $c['ok'] ? 'ok' : '' ?>"><?= icon($c['ok'] ? 'check' : 'arrow-right') ?><span><?= e($c['label']) ?>: <strong><?= e($c['have']) ?></strong> <span class="muted">(<?= e($c['need']) ?>)</span></span></li><?php endforeach; ?></ul>
+      <?php else: ?><p style="margin:12px 0 0"><strong>You are at the top level.</strong> Keep returns low and orders moving to stay here.</p><?php endif; ?>
+      <p class="muted small" style="margin:10px 0 0">Based on the last <?= LEVEL_WINDOW_DAYS ?> days. Higher levels get a badge and better placement on the marketplace<?php $pk = level_perks($curLv); echo $pk['commission_off'] > 0 || $pk['hold_off'] > 0 ? ', plus ' . ($pk['commission_off'] > 0 ? $pk['commission_off'] . ' points off commission' : '') . ($pk['commission_off'] > 0 && $pk['hold_off'] > 0 ? ' and ' : '') . ($pk['hold_off'] > 0 ? 'payouts ' . $pk['hold_off'] . ' days sooner' : '') : ''; ?>.</p>
+    </div>
+  </div>
   <div class="grid g4" style="margin-top:24px">
     <div class="stat"><p class="muted small">Products</p><p class="n"><?= count($products) ?></p></div>
     <div class="stat"><p class="muted small">Live on marketplace</p><p class="n"><?= $live ?></p></div>
@@ -78,6 +95,52 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
         <button class="btn btn-outline btn-sm" name="op" value="remove" type="submit">Remove</button>
         <button class="btn btn-sm" name="op" value="set" type="submit">Set to</button></form></td></tr>
   <?php endforeach; endforeach; ?></tbody></table></div>
+<?php endif; ?>
+
+<?php if ($tab === 'promotions'):
+    $e = $edit ?? null; $isEdit = $e && empty($e['form_only']) || ($e && !empty($e['id']));
+    $ev = fn (string $k, $d = '') => $e[$k] ?? $d; ?>
+  <p class="muted" style="max-width:680px">Create discount codes for your own products. <strong>You fund the discount</strong>: customers pay less and your earnings are worked out on the lower price. Codes appear on the DDLX marketplace within a minute or two.</p>
+  <?php if (!empty($err)): ?><p class="flash flash-error" role="alert"><?= e($err) ?></p><?php endif; ?>
+  <div class="split"><div class="split-main">
+  <h2 style="margin-top:0"><?= $isEdit ? 'Edit ' . e((string) $ev('code')) : 'New discount code' ?></h2>
+  <form method="post" action="/promotions/save" data-keep class="card"><?= csrf_field() ?>
+    <input type="hidden" name="id" value="<?= e((string) $ev('id')) ?>">
+    <div class="grid g2">
+      <?php if ($isEdit): ?><div class="field"><label>Code</label><input value="<?= e((string) $ev('code')) ?>" disabled></div><?php else: ?><?= f_text('code', 'Code', (string) $ev('code'), null, ['maxlength' => 20, 'required' => 1, 'placeholder' => 'WELCOME10', 'hint' => 'Letters and numbers. Customers type this at checkout.']) ?><?php endif; ?>
+      <div class="field"><label for="kind">Type</label><select id="kind" name="kind"><?php foreach (COUPON_KINDS as $k => $l): ?><option value="<?= e($k) ?>"<?= $ev('kind', 'percent') === $k ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+    </div>
+    <div class="grid g3">
+      <?= f_text('amount', 'Amount (percent 1-70, or money off each item)', (string) $ev('amount'), null, ['inputmode' => 'decimal', 'required' => 1]) ?>
+      <div class="field"><label for="currency">Currency (for money off)</label><select id="currency" name="currency"><?php foreach (CURRENCIES as $c): ?><option<?= $ev('currency', 'NGN') === $c ? ' selected' : '' ?>><?= e($c) ?></option><?php endforeach; ?></select></div>
+      <?= f_text('min_spend', 'Minimum spend (optional)', (string) $ev('min_spend'), null, ['inputmode' => 'decimal']) ?>
+    </div>
+    <div class="grid g3">
+      <?= f_text('usage_limit', 'Total uses allowed (optional)', (string) $ev('usage_limit'), null, ['inputmode' => 'numeric']) ?>
+      <div class="field"><label for="starts_at">Starts (Lagos time, optional)</label><input id="starts_at" type="datetime-local" name="starts_at" value="<?= e(iso_to_local(iso($ev('starts_at') ?: null))) ?>"></div>
+      <div class="field"><label for="ends_at">Ends (optional)</label><input id="ends_at" type="datetime-local" name="ends_at" value="<?= e(iso_to_local(iso($ev('ends_at') ?: null))) ?>"></div>
+    </div>
+    <label class="check"><input type="checkbox" name="one_per_customer" value="1" <?= $ev('one_per_customer', 1) ? 'checked' : '' ?>><span>One use per customer</span></label>
+    <div class="field" style="margin-top:12px"><label for="scope">Works on</label><select id="scope" name="scope"><option value="all"<?= $ev('scope', 'all') === 'all' ? ' selected' : '' ?>>All my products</option><option value="products"<?= $ev('scope', 'all') === 'products' ? ' selected' : '' ?>>Only the products I choose</option></select></div>
+    <details<?= $ev('scope', 'all') === 'products' ? ' open' : '' ?>><summary>Choose products</summary>
+      <div style="max-height:220px;overflow:auto;margin-top:8px"><?php $sel = (array) $ev('product_list', []); foreach ($all_products as $p): ?><label class="check"><input type="checkbox" name="product_ids[]" value="<?= e($p['id']) ?>" <?= in_array($p['id'], $sel, true) ? 'checked' : '' ?>><span><?= e($p['name']) ?></span></label><?php endforeach; if (!$all_products) echo '<p class="muted">Products appear here once submitted.</p>'; ?></div></details>
+    <p class="row" style="margin-top:16px"><button class="btn" type="submit"><?= $isEdit ? 'Save changes' : 'Create code' ?></button><?php if ($isEdit): ?><a class="btn btn-ghost" href="/seller?tab=promotions">Cancel</a><?php endif; ?></p>
+  </form>
+  </div>
+  <aside class="split-side"><div class="card tip"><p class="eyebrow" style="margin:0 0 6px">Tips</p><ul class="muted small" style="margin:0;padding-left:18px"><li>Money off applies to each item, so two items get it twice.</li><li>Set an end date and a use limit so a code cannot run forever.</li><li>Codes only work on your products, never on other sellers'.</li></ul></div></aside>
+  </div>
+  <h2>Your codes</h2>
+  <?php if (!$coupons): ?><p class="notice">No codes yet.</p><?php else: ?>
+  <div class="table-wrap"><table><thead><tr><th>Code</th><th>Discount</th><th>Status</th><th class="t-right">Used</th><th class="t-right">You gave away</th><th></th></tr></thead><tbody>
+  <?php foreach ($coupons as $c): if (str_starts_with($c['code'], 'DEL-')) continue; ?>
+    <tr><td><strong><?= e($c['code']) ?></strong><br><span class="muted small"><?= $c['scope'] === 'all' ? 'All products' : count($c['product_list']) . ' product' . (count($c['product_list']) === 1 ? '' : 's') ?><?= $c['ends_at'] ? ' · ends ' . e(human_date($c['ends_at'], true)) : '' ?></span></td>
+      <td><?= $c['kind'] === 'percent' ? e((string) $c['amount']) . '%' : e($c['currency'] . ' ' . number_format($c['amount'], 2)) . ' each' ?></td>
+      <td><?= e(COUPON_STATE_LABEL[$c['state']] ?? $c['state']) ?></td><td class="t-right"><?= (int) $c['used_count'] ?><?= $c['usage_limit'] !== null ? ' / ' . (int) $c['usage_limit'] : '' ?></td><td class="t-right"><?= e(number_format($c['discount_total'], 2)) ?></td>
+      <td><form method="post" action="/promotions/action" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>">
+        <a class="btn btn-sm btn-outline" href="/seller?tab=promotions&amp;edit=<?= e($c['id']) ?>">Edit</a>
+        <?php if (!$c['admin_disabled']): ?><button class="btn btn-sm btn-outline" name="action" value="<?= $c['active'] ? 'pause' : 'resume' ?>"><?= $c['active'] ? 'Pause' : 'Resume' ?></button><?php endif; ?>
+        <button class="btn btn-sm btn-ghost" name="action" value="delete" data-confirm="Delete this code?">Delete</button></form></td></tr>
+  <?php endforeach; ?></tbody></table></div><?php endif; ?>
 <?php endif; ?>
 
 <?php if ($tab === 'sales'): ?>

@@ -156,6 +156,8 @@ CREATE TABLE products (
   reviewed_by CHAR(36) NULL,
   reviewed_at DATETIME(3) NULL,
   published_at DATETIME(3) NULL,
+  rating_avg DECIMAL(3,2) NULL,
+  rating_count INT NOT NULL DEFAULT 0,
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   CONSTRAINT prod_seller_fk FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -406,3 +408,41 @@ CREATE TABLE assistant_messages (
   CONSTRAINT assistant_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX assistant_user_idx ON assistant_messages (user_id, created_at);
+
+CREATE TABLE seller_levels (
+  seller_id CHAR(36) NOT NULL PRIMARY KEY,
+  auto_level VARCHAR(12) NOT NULL DEFAULT 'starter',
+  override_level VARCHAR(12) NULL,
+  override_note VARCHAR(250) NOT NULL DEFAULT '',
+  metrics TEXT NULL,
+  computed_at DATETIME(3) NOT NULL,
+  changed_at DATETIME(3) NOT NULL,
+  CONSTRAINT level_seller_fk FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE coupons (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  seller_id CHAR(36) NOT NULL,
+  code VARCHAR(30) NOT NULL,
+  kind VARCHAR(10) NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  currency VARCHAR(3) NOT NULL DEFAULT 'NGN',
+  scope VARCHAR(10) NOT NULL DEFAULT 'all',
+  product_ids TEXT NULL,
+  min_spend DECIMAL(12,2) NULL,
+  usage_limit INT NULL,
+  one_per_customer TINYINT NOT NULL DEFAULT 1,
+  starts_at DATETIME(3) NULL,
+  ends_at DATETIME(3) NULL,
+  active TINYINT NOT NULL DEFAULT 1,
+  admin_disabled TINYINT NOT NULL DEFAULT 0,
+  used_count INT NOT NULL DEFAULT 0,
+  discount_total DECIMAL(14,2) NOT NULL DEFAULT 0,
+  sync_status VARCHAR(10) NOT NULL DEFAULT 'pending',
+  sync_note VARCHAR(250) NOT NULL DEFAULT '',
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL,
+  CONSTRAINT coupon_seller_fk FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE UNIQUE INDEX coupons_code_unique ON coupons (code);
+CREATE INDEX coupons_seller_idx ON coupons (seller_id, created_at);

@@ -125,10 +125,14 @@ function apply_marketplace_status(array $o, string $source = 'marketplace'): boo
         }
         // Delivered: start the hold clock on the sellers' money. (Completed also releases it, in case Delivered was skipped.)
         if (FULFILMENT_RANK[$o['status']] >= FULFILMENT_RANK['delivered']) {
-            $db->exec("UPDATE wallet_entries SET available_at = ? WHERE available_at = ? AND order_item_id IN (SELECT id FROM order_items WHERE order_id = ?)", [$release, NOT_DELIVERED_YET, $order['id']]);
+            foreach (array_unique(array_column($db->all('SELECT seller_id FROM order_items WHERE order_id = ?', [$order['id']]), 'seller_id')) as $sellerOfLine) {
+                $rel = db_plus('+' . max(0, hold_days() - level_perks(seller_level($sellerOfLine))['hold_off']) . ' days');
+                $db->exec("UPDATE wallet_entries SET available_at = ? WHERE available_at = ? AND order_item_id IN (SELECT id FROM order_items WHERE order_id = ? AND seller_id = ?)", [$rel, NOT_DELIVERED_YET, $order['id'], $sellerOfLine]);
+            }
         }
         return true;
     });
+    if ($found && FULFILMENT_RANK[$o['status']] >= FULFILMENT_RANK['delivered']) foreach (array_keys($sellers) as $sid) { try { level_refresh($sid, true); } catch (Throwable $e) { log_error('level refresh: ' . $e->getMessage()); } }
     foreach ($sellers as $sid => $num) {
         announce('seller', 'order', 'Order ' . $num . ' is now ' . strtolower(FULFILMENT_LABEL[$o['status']]), $sid);
         notify($sid, 'order', 'Order ' . $num . ' is now ' . strtolower(FULFILMENT_LABEL[$o['status']]), $o['tracking'] !== '' ? trim($o['carrier'] . ' ' . $o['tracking']) : '', '/seller?tab=sales', in_array($o['status'], ['shipped', 'delivered'], true));
@@ -175,13 +179,15 @@ function parse_order_event(mixed $d): array|string
         if (!is_numeric($p) || $p < 0 || $p > 1000000000) return 'Invalid item unit_price.';
         $vid = $it['variation_id'] ?? null;
         if ($vid !== null && !is_uuid($vid)) return 'Invalid variation_id.';
-        $items[] = ['product_id' => $it['product_id'], 'variation_id' => $vid, 'quantity' => $q, 'unit_price' => (float) $p];
+        $disc = $it['discount'] ?? 0;
+        $items[] = ['product_id' => $it['product_id'], 'variation_id' => $vid, 'quantity' => $q, 'unit_price' => (float) $p, 'discount' => is_numeric($disc) && $disc >= 0 && $disc <= 1000000000 ? (float) $disc : 0.0];
     }
     if (count($items) > 200) return 'Too many items.';
     return ['event' => $d['event'], 'order' => [
         'id' => $id, 'number' => str_limit((string) ($o['number'] ?? ''), 100), 'currency' => $o['currency'], 'placed_at' => $placed,
         'customer_name' => str_limit((string) ($o['customer_name'] ?? ''), 200), 'ship_city' => str_limit((string) ($o['ship_city'] ?? ''), 100),
         'ship_state' => str_limit((string) ($o['ship_state'] ?? ''), 100), 'restock' => !empty($o['restock']), 'items' => $items,
+        'coupons' => array_slice(array_values(array_filter(array_map(fn ($c) => is_string($c) ? coupon_clean_code($c) : '', (array) ($o['coupons'] ?? [])))), 0, 10),
     ]];
 }
 
@@ -195,7 +201,8 @@ function record_paid_order(array $event): array
     $sellers = [];
     $names = [];
     $touched = [];
-    $result = $db->tx(function () use ($db, $o, &$sellers, &$names, &$touched) {
+    $discBy = [];
+    $result = $db->tx(function () use ($db, $o, &$sellers, &$names, &$touched, &$discBy) {
         if ($db->val('SELECT id FROM orders WHERE marketplace_order_id = ?', [$o['id']])) return ['duplicate' => true];
         $orderId = uuid();
         try {
@@ -218,7 +225,7 @@ function record_paid_order(array $event): array
             } elseif ($p['product_type'] === 'variable') {
                 throw new OrderRejected('Product ' . $it['product_id'] . ' needs a variation_id.');
             }
-            $rate = commission_rate_for($p['category_id']);
+            $rate = commission_rate_for($p['category_id'], $p['seller_id']);
             $line = round2($it['unit_price'] * $it['quantity']);
             $commission = round2($line * $rate / 100);
             $net = round2($line - $commission);
@@ -238,10 +245,12 @@ function record_paid_order(array $event): array
             $sellers[$p['seller_id']] = round2(($sellers[$p['seller_id']] ?? 0) + $net);
             $names[$p['seller_id']][] = $it['quantity'] . ' × ' . $p['name'] . ($options ? ' (' . implode(' / ', $options) . ')' : '');
             $touched[$it['product_id']] = $p['seller_id'];
+            $discBy[$p['seller_id']] = ($discBy[$p['seller_id']] ?? 0) + (float) ($it['discount'] ?? 0);
         }
         return ['duplicate' => false];
     });
     if (!$result['duplicate']) {
+        if (!empty($o['coupons'])) { try { coupons_record_use($o['coupons'], $discBy); } catch (Throwable $e) { log_error('coupon use: ' . $e->getMessage()); } }
         announce('orders', 'order', 'New order ' . ($o['number'] ?: $o['id']));
         foreach ($sellers as $sid => $net) {
             announce('seller', 'sale', 'New sale: ' . $o['currency'] . ' ' . number_format($net, 2) . ' earned', $sid);

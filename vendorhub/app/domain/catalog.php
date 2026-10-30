@@ -323,6 +323,7 @@ function hydrate_product(array $r): array
         'submitted_at' => iso($r['submitted_at']), 'reviewed_at' => iso($r['reviewed_at']), 'published_at' => iso($r['published_at']),
         'created_at' => iso($r['created_at']), 'updated_at' => iso($r['updated_at']), 'updated_raw' => $r['updated_at'],
         'has_snapshot' => !empty($r['published_snapshot']),
+        'rating_avg' => isset($r['rating_avg']) ? (float) $r['rating_avg'] : null, 'rating_count' => (int) ($r['rating_count'] ?? 0),
         'variations' => [],
     ];
     foreach (array_merge(['store_name', 'seller_email'], []) as $k) if (array_key_exists($k, $r)) $out[$k] = $r[$k];
@@ -724,12 +725,15 @@ function category_label(array $p): string
 }
 
 // The rate for a category: its own override, else the nearest parent's, else the marketplace-wide rate.
-function commission_rate_for(?string $categoryId): float
+function commission_rate_for(?string $categoryId, ?string $sellerId = null): float
 {
+    $rate = commission_percent();
     foreach (array_reverse(category_chain($categoryId)) as $c) {
-        if ($c['commission_percent'] !== null) return (float) $c['commission_percent'];
+        if ($c['commission_percent'] !== null) { $rate = (float) $c['commission_percent']; break; }
     }
-    return commission_percent();
+    // A seller level can earn a few points off the commission (set by the admin; zero by default).
+    if ($sellerId !== null) $rate = max(0.0, $rate - level_perks(seller_level($sellerId))['commission_off']);
+    return round($rate, 2);
 }
 
 // Blank clears the override so the category inherits again.

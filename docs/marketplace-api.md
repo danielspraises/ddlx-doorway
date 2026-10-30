@@ -195,3 +195,25 @@ Each product's `seller` object now carries `profile`: `tagline`, `description`, 
 `return_policy`, `shipping_policy`, `logo`, `banner` (public image URLs), `vacation`, `vacation_message`.
 While a seller is on vacation their products come back with `live: false`, so the marketplace hides them
 and shows them again when vacation ends. The connector maps the profile onto the Dokan store page.
+
+## Seller levels (badges and grid order)
+
+Each product's `seller` object carries `badge`: `{"level":"gold","label":"Gold","rank":3}` (levels: starter 0, bronze 1, silver 2, gold 3, blue 4).
+The connector stores it on the product (`_verola_seller_level`, `_verola_seller_level_label`, `_verola_seller_rank`), sets the product
+menu order so default sorting shows higher levels first, and prints a badge on product pages and grids (also the `[vendor_hub_badge]` shortcode).
+A level change touches the seller's products, so the next sync picks it up.
+
+## Seller discount codes
+
+`GET /api/marketplace/coupons` (Bearer key) returns `{"coupons":[{id, seller_id, store_name, code, kind: "percent"|"fixed", amount, currency,
+scope: "all"|"products", product_ids, min_spend, usage_limit, one_per_customer, starts_at, ends_at, enabled}]}`. The connector creates or
+updates a WooCommerce coupon per code on every sync, limited to that seller's products (`fixed` is money off each item). A code with
+`enabled: false` is unpublished. The discount lowers the sale price, so the seller funds it: order lines are reported at the price paid.
+`order.paid` now also carries `order.coupons` (codes used) and per item `discount` (money taken off that line), so Vendor Hub can show
+each seller how often a code was used and how much they gave away.
+
+## Product ratings
+
+Customer reviews stay in WooCommerce. When a review is added, edited, approved, trashed or deleted, the connector sends (signed like orders)
+`POST /api/marketplace/ratings` with `{"event":"rating.updated","product":{"product_id":"<uuid>","average":4.6,"count":25}}`.
+Vendor Hub shows sellers their rating and uses it for the Gold and Blue levels.

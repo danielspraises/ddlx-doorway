@@ -208,6 +208,32 @@ $docLinks = function (array $docs): string {
       </div></details></li><?php endforeach; ?></ul>
 <?php endif; ?>
 
+<?php if ($tab === 'codes'): ?>
+  <p class="muted">Codes created by sellers. The seller funds each discount. Switch a code off if it is being misused.</p>
+  <div class="table-wrap"><table><thead><tr><th>Code</th><th>Seller</th><th>Discount</th><th>Status</th><th class="t-right">Used</th><th class="t-right">Given away</th><th></th></tr></thead><tbody>
+  <?php foreach ($items as $c): ?><tr><td><strong><?= e($c['code']) ?></strong></td><td><?= e($c['store']) ?></td>
+    <td><?= $c['kind'] === 'percent' ? e((string) $c['amount']) . '%' : e($c['currency'] . ' ' . number_format($c['amount'], 2)) . ' each' ?></td>
+    <td><?= e(COUPON_STATE_LABEL[$c['state']] ?? $c['state']) ?></td><td class="t-right"><?= (int) $c['used_count'] ?></td><td class="t-right"><?= e(number_format($c['discount_total'], 2)) ?></td>
+    <td><form method="post" action="/admin/code" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>"><button class="btn btn-sm btn-outline" name="action" value="<?= $c['admin_disabled'] ? 'allow' : 'block' ?>"><?= $c['admin_disabled'] ? 'Switch on' : 'Switch off' ?></button></form></td></tr>
+  <?php endforeach; if (!$items): ?><tr><td colspan="7" class="muted">No codes yet.</td></tr><?php endif; ?></tbody></table></div>
+<?php endif; ?>
+
+<?php if ($tab === 'sellers'): ?>
+  <form method="get" action="/admin" class="row" style="margin:12px 0" data-keep><input type="hidden" name="tab" value="sellers"><input type="search" name="q" value="<?= e($q) ?>" placeholder="Search sellers" style="max-width:260px"><button class="btn btn-sm btn-outline">Search</button>
+    </form>
+  <form method="post" action="/admin/level" data-keep style="margin-bottom:12px"><?= csrf_field() ?><input type="hidden" name="action" value="recalculate"><button class="btn btn-sm btn-outline" type="submit">Recalculate all levels</button> <span class="muted small">Levels also update when orders are delivered and ratings change.</span></form>
+  <div class="table-wrap"><table><thead><tr><th>Seller</th><th>Level</th><th class="t-right">Delivered (90d)</th><th class="t-right">Returns</th><th class="t-right">Packed in 48h</th><th class="t-right">Rating</th><th>Pin a level</th></tr></thead><tbody>
+  <?php foreach ($items as $s): $m = $s['m']; ?>
+    <tr><td><strong><?= e($s['store']) ?></strong><br><span class="muted small"><?= e($s['email']) ?></span></td>
+      <td><?= level_badge($s['level']) ?><?= $s['override_level'] ? '<br><span class="muted small">pinned' . ($s['override_note'] ? ': ' . e($s['override_note']) : '') . '</span>' : '' ?></td>
+      <td class="t-right"><?= (int) ($m['delivered'] ?? 0) ?></td><td class="t-right"><?= isset($m['return_pct']) ? e((string) $m['return_pct']) . '%' : '–' ?></td>
+      <td class="t-right"><?= isset($m['dispatch_pct']) && $m['dispatch_pct'] !== null ? e((string) $m['dispatch_pct']) . '%' : '–' ?></td><td class="t-right"><?= !empty($m['rating']) ? e((string) $m['rating']) . ' (' . (int) $m['ratings'] . ')' : '–' ?></td>
+      <td><form method="post" action="/admin/level" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="seller" value="<?= e($s['id']) ?>">
+        <select name="level" aria-label="Level"><option value="">Automatic</option><?php foreach (LEVEL_LABEL as $k => $l): ?><option value="<?= e($k) ?>"<?= $s['override_level'] === $k ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select>
+        <input name="note" placeholder="Reason (optional)" value="<?= e($s['override_note']) ?>" maxlength="250" style="max-width:170px"><button class="btn btn-sm" type="submit">Save</button></form></td></tr>
+  <?php endforeach; if (!$items): ?><tr><td colspan="7" class="muted">No verified sellers yet.</td></tr><?php endif; ?></tbody></table></div>
+<?php endif; ?>
+
 <?php if ($tab === 'staff'): ?>
   <p class="muted">Staff are created by you. They can sign in to review and publish seller products, nothing else.</p>
   <form method="post" action="/admin/staff" class="card" style="max-width:520px" data-keep><?= csrf_field() ?><input type="hidden" name="action" value="create"><h3 style="margin-top:0">Add a staff account</h3>
@@ -249,6 +275,15 @@ $docLinks = function (array $docs): string {
     <button class="btn">Save settings</button>
   </form>
   <p style="max-width:640px"><a class="btn btn-outline" href="/admin/health">Run system check</a> <span class="muted small">Checks PHP, the database, folders, HTTPS, email and the marketplace connection.</span></p>
+  <h2>Seller levels</h2>
+  <p class="muted" style="max-width:700px">Sellers earn Bronze, Silver, Gold and Blue from the last 90 days. The badge and marketplace placement always apply. Perks are optional: leave them at 0 to start, and raise them later as a reward.</p>
+  <?php $rules = level_rules(); ?>
+  <form method="post" action="/admin/level-rules" data-keep class="card" style="max-width:900px"><?= csrf_field() ?>
+    <div class="table-wrap"><table><thead><tr><th>Level</th><th>Delivered orders</th><th>Max returns %</th><th>Packed in 48h %</th><th>Min rating</th><th>Ratings needed</th><th>Commission points off</th><th>Payout days sooner</th></tr></thead><tbody>
+    <?php foreach ($rules as $lv => $r): ?><tr><td><?= level_badge($lv) ?></td>
+      <?php foreach (['orders', 'returns', 'dispatch', 'rating', 'min_ratings', 'commission_off', 'hold_off'] as $k): ?><td><input name="lv[<?= e($lv) ?>][<?= e($k) ?>]" value="<?= e((string) $r[$k]) ?>" inputmode="decimal" style="width:84px" aria-label="<?= e(LEVEL_LABEL[$lv] . ' ' . $k) ?>"></td><?php endforeach; ?></tr><?php endforeach; ?>
+    </tbody></table></div>
+    <button class="btn" type="submit">Save level rules</button></form>
   <h2>Backup</h2>
   <p class="muted" style="max-width:640px">Download a copy of all sellers, products, orders and balances. Do this weekly and before any update. Uploaded photos and documents are in the <code>storage</code> folder; download that from cPanel File Manager too. Keep backups private: they contain personal data.</p>
   <form method="post" action="/admin/backup" class="row" data-keep><?= csrf_field() ?><input type="password" name="password" placeholder="Your password" autocomplete="current-password" required style="max-width:240px"><button class="btn btn-outline" type="submit">Download database backup</button></form>

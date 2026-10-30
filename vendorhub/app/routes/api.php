@@ -68,6 +68,7 @@ function marketplace_catalogue(?string $sinceDb, int $limit): array
     $rows = $db->all($sql . ' ORDER BY p.updated_at, p.id LIMIT ' . (int) $limit, $args);
     $apps = [];
     $profiles = [];
+    $levels = [];
     $products = [];
     foreach ($rows as $r) {
         $s = jdec($r['published_snapshot'], []);
@@ -77,6 +78,7 @@ function marketplace_catalogue(?string $sinceDb, int $limit): array
             $a = $db->one('SELECT applicant_email, brand, business FROM seller_applications WHERE user_id = ?', [$sid]) ?: [];
             $apps[$sid] = ['brand' => jdec($a['brand'] ?? '', []), 'business' => jdec($a['business'] ?? '', []), 'email' => $a['applicant_email'] ?? null];
             $profiles[$sid] = store_profile($sid);
+            $levels[$sid] = ['level' => seller_level($sid)];
         }
         $brand = $apps[$sid]['brand'];
         $profile = $profiles[$sid];
@@ -87,6 +89,7 @@ function marketplace_catalogue(?string $sinceDb, int $limit): array
         $products[] = [
             'id' => $r['id'], 'live' => (int) $r['live'] === 1 && !$profile['vacation'], 'updated_at' => iso($r['updated_at']), 'published_at' => iso($r['published_at']),
             'seller' => [
+                'badge' => ['level' => $levels[$sid]['level'], 'label' => LEVEL_LABEL[$levels[$sid]['level']], 'rank' => level_rank($levels[$sid]['level'])],
                 'id' => $sid, 'store_name' => $storeName, 'store_slug' => slugify($storeName) . '-' . substr($sid, 0, 6), 'email' => $apps[$sid]['email'],
                 'city' => $apps[$sid]['business']['city'] ?? null, 'state' => $apps[$sid]['business']['state'] ?? null,
                 'profile' => ['tagline' => $pf('tagline'), 'description' => $pf('description'), 'phone' => $pf('phone'), 'support_email' => $pf('support_email'), 'return_policy' => $pf('return_policy'),
@@ -143,6 +146,25 @@ route('POST', '/api/marketplace/orders', function () {
     } catch (OrderRejected $e) {
         market_json(['error' => $e->getMessage()], 422);
     }
+}, ['api' => true]);
+
+// Seller discount codes the marketplace should offer.
+route('GET', '/api/marketplace/coupons', function () {
+    market_check_key();
+    market_json(['coupons' => coupons_feed()]);
+}, ['api' => true]);
+
+// A product's average rating and number of ratings, as the marketplace shows them. Signed like orders.
+route('POST', '/api/marketplace/ratings', function () {
+    $raw = (string) file_get_contents('php://input');
+    if (strlen($raw) > 100000) market_json(['error' => 'Payload too large.'], 413);
+    market_check_signature($raw);
+    $e = parse_rating_event(json_decode($raw, true));
+    if (is_string($e)) market_json(['error' => 'Invalid rating payload.', 'issues' => [$e]], 400);
+    if (!record_rating($e)) market_json(['error' => 'Unknown product.'], 404);
+    $sid = (string) db()->val('SELECT seller_id FROM products WHERE id = ?', [$e['product_id']]);
+    try { level_refresh($sid, true); } catch (Throwable $ex) { log_error('level refresh: ' . $ex->getMessage()); }
+    market_json(['ok' => true]);
 }, ['api' => true]);
 
 // ---------------------------------------------------------------- public photos for the marketplace

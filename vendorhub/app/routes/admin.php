@@ -9,7 +9,7 @@ function admin_tabs(array $u): array
     if ($u['canReview']) $tabs['products'] = 'Products';
     if ($u['canMessages']) $tabs['messages'] = 'Messages';
     if ($u['canOrders']) { $tabs['orders'] = 'Orders'; $tabs['returns'] = 'Returns'; }
-    if ($u['isAdmin']) $tabs += ['payouts' => 'Payouts', 'categories' => 'Categories', 'staff' => 'Staff', 'activity' => 'Activity', 'settings' => 'Settings'];
+    if ($u['isAdmin']) $tabs += ['sellers' => 'Sellers', 'codes' => 'Discount codes', 'payouts' => 'Payouts', 'categories' => 'Categories', 'staff' => 'Staff', 'activity' => 'Activity', 'settings' => 'Settings'];
     return $tabs;
 }
 
@@ -30,6 +30,8 @@ route('GET', '/admin', function () {
         case 'payouts': $vars['items'] = withdrawal_review_list(); break;
         case 'categories': $vars['all'] = categories_all(true); break;
         case 'staff': $vars['items'] = staff_list(); break;
+        case 'codes': $vars['items'] = coupons_admin_list(); break;
+        case 'sellers': $vars['items'] = levels_admin_list(input('q')); $vars['q'] = input('q'); break;
         case 'activity': $f = array_key_exists(input('filter'), AUDIT_LABEL) ? input('filter') : ''; $vars['items'] = audit_list(200, $f); $vars['filter'] = $f; break;
         case 'settings': break;
     }
@@ -164,4 +166,26 @@ route('POST', '/admin/backup', function () use ($adminBack) {
     header('Cache-Control: no-store');
     backup_stream(function (string $chunk) { echo $chunk; flush(); });
     exit;
+});
+
+route('POST', '/admin/level', function () use ($adminBack) {
+    $u = require_admin();
+    if (input('action') === 'recalculate') {
+        $n = 0;
+        foreach (levels_admin_list() as $s) { level_refresh($s['id'], true); $n++; }
+        $adminBack('sellers', null, 'Levels recalculated for ' . $n . ' seller' . ($n === 1 ? '' : 's') . '.');
+    }
+    $err = is_uuid(input('seller')) ? level_set_override($u, input('seller'), input('level'), input_raw('note')) : 'Seller not found.';
+    $adminBack('sellers', $err, input('level') === '' ? 'Level is automatic again.' : 'Level pinned.');
+});
+
+route('POST', '/admin/level-rules', function () use ($adminBack) {
+    require_admin();
+    $adminBack('settings', save_level_rules((array) ($_POST['lv'] ?? [])), 'Seller level rules saved.');
+});
+
+route('POST', '/admin/code', function () use ($adminBack) {
+    $u = require_admin();
+    $err = coupon_admin_set($u, input('id'), input('action') === 'block');
+    $adminBack('codes', $err, input('action') === 'block' ? 'Code switched off.' : 'Code switched on.');
 });

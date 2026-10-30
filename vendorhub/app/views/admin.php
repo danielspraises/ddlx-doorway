@@ -225,7 +225,7 @@ $docLinks = function (array $docs): string {
   <div class="table-wrap"><table><thead><tr><th>Seller</th><th>Level</th><th class="t-right">Delivered (90d)</th><th class="t-right">Returns</th><th class="t-right">Packed in 48h</th><th class="t-right">Rating</th><th>Pin a level</th></tr></thead><tbody>
   <?php foreach ($items as $s): $m = $s['m']; ?>
     <tr><td><strong><?= e($s['store']) ?></strong><br><span class="muted small"><?= e($s['email']) ?></span></td>
-      <td><?= level_badge($s['level']) ?><?= $s['override_level'] ? '<br><span class="muted small">pinned' . ($s['override_note'] ? ': ' . e($s['override_note']) : '') . '</span>' : '' ?></td>
+      <td><?= level_badge($s['level']) ?><?= $s['override_level'] ? '<br><span class="muted small">pinned' . ($s['override_note'] ? ': ' . e($s['override_note']) : '') . '</span>' : '' ?><?= !empty($s['below_since']) && !$s['override_level'] ? '<br><span class="muted small" style="color:#b45309">at risk since ' . e(human_date($s['below_since'], false)) . '</span>' : '' ?></td>
       <td class="t-right"><?= (int) ($m['delivered'] ?? 0) ?></td><td class="t-right"><?= isset($m['return_pct']) ? e((string) $m['return_pct']) . '%' : '–' ?></td>
       <td class="t-right"><?= isset($m['dispatch_pct']) && $m['dispatch_pct'] !== null ? e((string) $m['dispatch_pct']) . '%' : '–' ?></td><td class="t-right"><?= !empty($m['rating']) ? e((string) $m['rating']) . ' (' . (int) $m['ratings'] . ')' : '–' ?></td>
       <td><form method="post" action="/admin/level" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="seller" value="<?= e($s['id']) ?>">
@@ -283,6 +283,15 @@ $docLinks = function (array $docs): string {
     <?php foreach ($rules as $lv => $r): ?><tr><td><?= level_badge($lv) ?></td>
       <?php foreach (['orders', 'returns', 'dispatch', 'rating', 'min_ratings', 'commission_off', 'hold_off'] as $k): ?><td><input name="lv[<?= e($lv) ?>][<?= e($k) ?>]" value="<?= e((string) $r[$k]) ?>" inputmode="decimal" style="width:84px" aria-label="<?= e(LEVEL_LABEL[$lv] . ' ' . $k) ?>"></td><?php endforeach; ?></tr><?php endforeach; ?>
     </tbody></table></div>
+    <?php $pol = level_policy(); ?>
+    <h3>When a seller stops meeting a level</h3>
+    <div class="field"><label for="ld">Downgrading</label><select id="ld" name="level_downgrade">
+      <option value="auto"<?= $pol['mode'] === 'auto' ? ' selected' : '' ?>>Automatic: the level drops at the next daily check</option>
+      <option value="grace"<?= $pol['mode'] === 'grace' ? ' selected' : '' ?>>Grace period: warn the seller, drop after the days below</option>
+      <option value="never"<?= $pol['mode'] === 'never' ? ' selected' : '' ?>>Never automatic: levels only go up, I lower them by hand</option></select></div>
+    <div class="grid g2"><?= f_text('level_grace_days', 'Grace period (days)', (string) $pol['grace_days'], null, ['inputmode' => 'numeric']) ?>
+      <div class="field"><label>&nbsp;</label><label class="check"><input type="checkbox" name="level_one_step" value="yes" <?= $pol['one_step'] ? 'checked' : '' ?>><span>Drop one level at a time</span></label></div></div>
+    <p class="muted small">Levels are checked every day, and whenever an order is delivered or a rating changes. A level you pinned on the Sellers tab never changes automatically.</p>
     <button class="btn" type="submit">Save level rules</button></form>
   <h2>Backup</h2>
   <p class="muted" style="max-width:640px">Download a copy of all sellers, products, orders and balances. Do this weekly and before any update. Uploaded photos and documents are in the <code>storage</code> folder; download that from cPanel File Manager too. Keep backups private: they contain personal data.</p>

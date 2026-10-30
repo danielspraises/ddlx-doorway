@@ -93,6 +93,7 @@ function vh_run(): void
 
     if ($installed) {
         migrate_if_needed();
+        if (!defined('VH_TESTING')) register_shutdown_function(function () { if (function_exists('fastcgi_finish_request')) @fastcgi_finish_request(); level_sweep_if_due(); });
         $isApi = !empty($opts['api']);
         csrf_boot();
         if ($method === 'POST' && !$isApi) {

@@ -482,6 +482,32 @@ eq(coupon_delete($sid, $cp['id']), null, 'unused code deleted');
 ok(!in_array('PICKED', array_column(coupons_for_seller($sid), 'code'), true), 'deleted code gone');
 ok(coupon_save($other, ['code' => 'PICKED'] + $cin)['ok'], 'deleted code can be reused');
 
+// ---- level downgrading
+$T0 = '2026-01-01 00:00:00.000';
+$auto = ['mode' => 'auto', 'grace_days' => 14, 'one_step' => false];
+$grace = ['mode' => 'grace', 'grace_days' => 14, 'one_step' => false];
+$never = ['mode' => 'never', 'grace_days' => 14, 'one_step' => false];
+eq(level_decide('gold', 'blue', null, $auto, $T0), ['blue', null, false], 'earning more upgrades at once');
+eq(level_decide('gold', 'silver', null, $auto, $T0), ['silver', null, false], 'auto: drops straight away');
+eq(level_decide('gold', 'bronze', null, ['one_step' => true] + $auto, $T0), ['silver', $T0, false], 'auto one step: drops one and keeps the clock');
+eq(level_decide('gold', 'silver', null, $never, $T0), ['gold', null, false], 'never: keeps the level');
+eq(level_decide('gold', 'silver', null, $grace, $T0), ['gold', $T0, true], 'grace: first miss starts the clock and warns');
+eq(level_decide('gold', 'silver', $T0, $grace, '2026-01-10 00:00:00.000'), ['gold', $T0, false], 'grace: inside the window keeps the level');
+eq(level_decide('gold', 'silver', $T0, $grace, '2026-01-16 00:00:00.000'), ['silver', null, false], 'grace: after the window it drops');
+eq(level_decide('gold', 'gold', $T0, $grace, '2026-01-05 00:00:00.000'), ['gold', null, false], 'meeting the bar again clears the risk');
+eq(save_level_policy(['level_downgrade' => 'grace', 'level_grace_days' => '30', 'level_one_step' => 'yes']), null, 'policy saved');
+eq(level_policy(), ['mode' => 'grace', 'grace_days' => 30, 'one_step' => true], 'policy read back');
+ok(save_level_policy(['level_downgrade' => 'sometimes']) !== null, 'bad mode refused');
+ok(save_level_policy(['level_downgrade' => 'auto', 'level_grace_days' => '0']) !== null, 'bad grace refused');
+db()->exec("DELETE FROM settings WHERE k IN ('level_downgrade','level_grace_days','level_one_step')"); unset($GLOBALS['vh_settings']);
+// end to end: a seller who held Gold but now only earns Starter falls straight down under "auto"
+db()->exec('UPDATE seller_levels SET auto_level = ?, override_level = NULL, below_since = NULL WHERE seller_id = ?', ['gold', $sid]);
+$r = level_refresh($sid, true);
+ok(LEVELS[level_rank($r['auto_level'])] !== 'gold', 'a seller who no longer qualifies loses the badge automatically');
+ok((int) db()->val("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND title LIKE 'Your seller level is now%'", [$sid]) >= 1, 'seller told about the downgrade');
+level_sweep_if_due();
+ok(setting('level_last_sweep', '') !== '', 'daily sweep ran');
+
 // ---- assistant
 $u = ['id' => $sid, 'email' => 's@x.test', 'stage' => 'verified', 'isAdmin' => false, 'canReview' => false, 'canOrders' => false, 'canMessages' => false];
 ok(str_contains(assistant_fallback('how do I withdraw money'), 'withdrawal'), 'fallback finds payouts');

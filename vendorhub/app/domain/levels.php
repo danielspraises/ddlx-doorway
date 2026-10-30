@@ -130,21 +130,81 @@ function level_perks(string $level): array
     return ['commission_off' => (float) ($r['commission_off'] ?? 0), 'hold_off' => (int) ($r['hold_off'] ?? 0)];
 }
 
+// What happens when a seller no longer meets the requirements of the level they hold:
+//   auto  - the level drops at the next check
+//   grace - they keep it for a number of days (and are warned), then it drops
+//   never - levels only go up; the team lowers them by hand
+function level_policy(): array
+{
+    $mode = (string) setting('level_downgrade', 'auto');
+    return ['mode' => in_array($mode, ['auto', 'grace', 'never'], true) ? $mode : 'auto', 'grace_days' => max(1, min(180, (int) setting('level_grace_days', '14'))), 'one_step' => setting('level_one_step', '0') === '1'];
+}
+
+function save_level_policy(array $in): ?string
+{
+    $mode = (string) ($in['level_downgrade'] ?? 'auto');
+    if (!in_array($mode, ['auto', 'grace', 'never'], true)) return 'Choose how downgrades work.';
+    $days = $in['level_grace_days'] ?? '14';
+    if (!is_numeric($days) || (int) $days < 1 || (int) $days > 180) return 'Grace period must be 1 to 180 days.';
+    set_setting('level_downgrade', $mode);
+    set_setting('level_grace_days', (string) (int) $days);
+    set_setting('level_one_step', ($in['level_one_step'] ?? '') === 'yes' ? '1' : '0');
+    return null;
+}
+
+// The level to hold now, given what is earned, what is held, and when they first fell short.
+// Returns [level, below_since or null, warn (bool: newly at risk)].
+function level_decide(string $held, string $earned, ?string $belowSince, array $policy, ?string $now = null): array
+{
+    $now ??= now_db();
+    if (level_rank($earned) >= level_rank($held)) return [$earned, null, false];
+    if ($policy['mode'] === 'never') return [$held, null, false];
+    $drop = fn () => $policy['one_step'] ? LEVELS[level_rank($held) - 1] : $earned;
+    if ($policy['mode'] === 'auto') {
+        $to = $drop();
+        return [$to, level_rank($to) > level_rank($earned) ? $now : null, false];
+    }
+    if ($belowSince === null) return [$held, $now, true];
+    if (strtotime($now . ' UTC') >= strtotime(db_plus('+' . $policy['grace_days'] . ' days', $belowSince) . ' UTC')) {
+        $to = $drop();
+        return [$to, level_rank($to) > level_rank($earned) ? $now : null, false];
+    }
+    return [$held, $belowSince, false];
+}
+
 // Works out the level and saves it. Tells the seller and the marketplace when it changes.
 function level_refresh(string $sellerId, bool $force = false): array
 {
     $row = level_row($sellerId);
     if (!$force && $row && strtotime($row['computed_at'] . ' UTC') > time() - 6 * 3600) return $row;
     $m = level_metrics($sellerId);
-    $auto = level_earned($m);
+    $earned = level_earned($m);
     $now = now_db();
     $before = $row ? ($row['override_level'] ?: $row['auto_level']) : 'starter';
-    if ($row) db()->exec('UPDATE seller_levels SET auto_level = ?, metrics = ?, computed_at = ? WHERE seller_id = ?', [$auto, jenc($m), $now, $sellerId]);
-    else db()->insert('seller_levels', ['seller_id' => $sellerId, 'auto_level' => $auto, 'override_level' => null, 'override_note' => '', 'metrics' => jenc($m), 'computed_at' => $now, 'changed_at' => $now]);
+    [$auto, $below, $warn] = level_decide($row ? $row['auto_level'] : 'starter', $earned, $row['below_since'] ?? null, level_policy(), $now);
+    if ($row) db()->exec('UPDATE seller_levels SET auto_level = ?, below_since = ?, metrics = ?, computed_at = ? WHERE seller_id = ?', [$auto, $below, jenc($m), $now, $sellerId]);
+    else db()->insert('seller_levels', ['seller_id' => $sellerId, 'auto_level' => $auto, 'override_level' => null, 'override_note' => '', 'below_since' => $below, 'metrics' => jenc($m), 'computed_at' => $now, 'changed_at' => $now]);
     $row = level_row($sellerId);
     $after = $row['override_level'] ?: $row['auto_level'];
     if ($after !== $before) level_changed($sellerId, $before, $after);
+    elseif ($warn && !$row['override_level']) {
+        $until = human_date(db_plus('+' . level_policy()['grace_days'] . ' days', $now), false);
+        notify($sellerId, 'level', 'Your ' . LEVEL_LABEL[$after] . ' level is at risk', 'You no longer meet the ' . LEVEL_LABEL[$after] . ' requirements. Meet them again by ' . $until . ' to keep your badge. See your overview for what is needed.', '/seller?tab=overview');
+    }
     return $row;
+}
+
+// Once a day, on whatever request comes first, every verified seller is checked so levels fall (or rise) even if nobody opens the page.
+function level_sweep_if_due(): void
+{
+    try {
+        $last = (string) setting('level_last_sweep', '');
+        if ($last !== '' && strtotime($last . ' UTC') > time() - 86400) return;
+        set_setting('level_last_sweep', now_db());
+        foreach (db()->all("SELECT user_id FROM seller_verifications WHERE status = 'approved'") as $r) level_refresh($r['user_id'], true);
+    } catch (Throwable $e) {
+        log_error('level sweep: ' . $e->getMessage());
+    }
 }
 
 function level_changed(string $sellerId, string $from, string $to): void
@@ -179,7 +239,7 @@ function levels_admin_list(string $q = ''): array
     $args = [];
     $where = "v.status = 'approved'";
     if ($q !== '') { $like = '%' . str_replace(['%', '_'], ['\%', '\_'], $q) . '%'; $where .= ' AND (u.email LIKE ? OR a.brand LIKE ?)'; $args = [$like, $like]; }
-    $rows = db()->all("SELECT u.id, u.email, a.brand AS brand_json, l.auto_level, l.override_level, l.override_note, l.metrics, l.computed_at FROM seller_verifications v JOIN users u ON u.id = v.user_id LEFT JOIN seller_applications a ON a.user_id = u.id LEFT JOIN seller_levels l ON l.seller_id = u.id WHERE $where ORDER BY u.email LIMIT 300", $args);
+    $rows = db()->all("SELECT u.id, u.email, a.brand AS brand_json, l.auto_level, l.override_level, l.override_note, l.below_since, l.metrics, l.computed_at FROM seller_verifications v JOIN users u ON u.id = v.user_id LEFT JOIN seller_applications a ON a.user_id = u.id LEFT JOIN seller_levels l ON l.seller_id = u.id WHERE $where ORDER BY u.email LIMIT 300", $args);
     foreach ($rows as &$r) {
         $r['store'] = trim((string) (jdec((string) $r['brand_json'], [])['store_name'] ?? '')) ?: $r['email'];
         $r['level'] = ($r['override_level'] ?: $r['auto_level']) ?: 'starter';

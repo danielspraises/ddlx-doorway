@@ -181,7 +181,7 @@ route('POST', '/admin/level', function () use ($adminBack) {
 
 route('POST', '/admin/level-rules', function () use ($adminBack) {
     require_admin();
-    $adminBack('settings', save_level_rules((array) ($_POST['lv'] ?? [])), 'Seller level rules saved.');
+    $adminBack('settings', save_level_rules((array) ($_POST['lv'] ?? [])) ?? save_level_policy($_POST), 'Seller level rules saved. They apply at the next check, or press Recalculate on the Sellers tab.');
 });
 
 route('POST', '/admin/code', function () use ($adminBack) {

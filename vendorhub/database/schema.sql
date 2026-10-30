@@ -414,6 +414,7 @@ CREATE TABLE seller_levels (
   auto_level VARCHAR(12) NOT NULL DEFAULT 'starter',
   override_level VARCHAR(12) NULL,
   override_note VARCHAR(250) NOT NULL DEFAULT '',
+  below_since DATETIME(3) NULL,
   metrics TEXT NULL,
   computed_at DATETIME(3) NOT NULL,
   changed_at DATETIME(3) NOT NULL,

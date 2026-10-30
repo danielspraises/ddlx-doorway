@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -75,6 +75,9 @@ function migration_steps(): array
                 $db->exec('CREATE UNIQUE INDEX coupons_code_unique ON coupons (code)');
                 $db->exec('CREATE INDEX coupons_seller_idx ON coupons (seller_id, created_at)');
             }
+        },
+        6 => function (Db $db) {
+            if (!column_exists($db, 'seller_levels', 'below_since')) $db->exec('ALTER TABLE seller_levels ADD COLUMN below_since DATETIME(3) NULL');
         },
     ];
 }

@@ -8,7 +8,7 @@ function f_text(string $name, string $label, string $value = '', ?string $error 
     $id = 'f-' . $name;
     $type = $o['type'] ?? 'text';
     $attrs = '';
-    foreach (['maxlength', 'placeholder', 'inputmode', 'min', 'max', 'step', 'autocomplete'] as $k) {
+    foreach (['maxlength', 'placeholder', 'inputmode', 'min', 'max', 'step', 'autocomplete', 'list'] as $k) {
         if (isset($o[$k])) $attrs .= ' ' . $k . '="' . e($o[$k]) . '"';
     }
     if (!empty($o['required'])) $attrs .= ' required';

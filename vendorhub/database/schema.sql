@@ -196,6 +196,8 @@ CREATE TABLE orders (
   customer_name VARCHAR(200) NOT NULL DEFAULT '',
   ship_city VARCHAR(100) NOT NULL DEFAULT '',
   ship_state VARCHAR(100) NOT NULL DEFAULT '',
+  payment_ref VARCHAR(100) NOT NULL DEFAULT '',
+  payment_method VARCHAR(40) NOT NULL DEFAULT '',
   placed_at DATETIME(3) NOT NULL,
   created_at DATETIME(3) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -244,6 +246,8 @@ CREATE TABLE bank_accounts (
   bank_name VARCHAR(100) NOT NULL,
   account_number CHAR(10) NOT NULL,
   account_name VARCHAR(120) NOT NULL,
+  bank_code VARCHAR(20) NULL,
+  recipient_code VARCHAR(60) NULL,
   created_at DATETIME(3) NOT NULL,
   CONSTRAINT bank_seller_fk FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -261,6 +265,9 @@ CREATE TABLE withdrawals (
   status VARCHAR(12) NOT NULL DEFAULT 'requested',
   admin_note VARCHAR(500) NULL,
   reference VARCHAR(120) NULL,
+  transfer_ref VARCHAR(80) NULL,
+  transfer_code VARCHAR(60) NULL,
+  transfer_attempts INT NOT NULL DEFAULT 0,
   requested_at DATETIME(3) NOT NULL,
   decided_by CHAR(36) NULL,
   decided_at DATETIME(3) NULL,
@@ -447,3 +454,22 @@ CREATE TABLE coupons (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE UNIQUE INDEX coupons_code_unique ON coupons (code);
 CREATE INDEX coupons_seller_idx ON coupons (seller_id, created_at);
+
+CREATE INDEX withdrawals_transfer_idx ON withdrawals (transfer_ref);
+
+CREATE TABLE customer_refunds (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  order_id CHAR(36) NOT NULL,
+  currency CHAR(3) NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  status VARCHAR(10) NOT NULL DEFAULT 'to_pay',
+  paystack_refund_id VARCHAR(60) NULL,
+  note VARCHAR(500) NOT NULL DEFAULT '',
+  decided_by CHAR(36) NULL,
+  decided_at DATETIME(3) NULL,
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL,
+  CONSTRAINT cr_order_fk FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX customer_refunds_status_idx ON customer_refunds (status, created_at);
+CREATE INDEX customer_refunds_order_idx ON customer_refunds (order_id);

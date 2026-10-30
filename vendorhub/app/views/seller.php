@@ -202,7 +202,8 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
     <?php if (!$accounts): ?><li class="muted">No bank accounts yet.</li><?php endif; ?></ul>
   <?php if (count($accounts) < MAX_BANK_ACCOUNTS): ?>
   <form method="post" action="/payouts/bank" class="card" style="max-width:520px;margin-top:16px" data-keep><?= csrf_field() ?><h3 style="margin-top:0">Add a bank account</h3>
-    <?= f_text('bank_name', 'Bank', '', null, ['required' => 1, 'placeholder' => 'e.g. GTBank']) ?>
+    <?= f_text('bank_name', 'Bank', '', null, ['required' => 1, 'placeholder' => 'e.g. GTBank', 'list' => 'banklist', 'autocomplete' => 'off']) ?>
+    <?php $bl = paystack_on() ? paystack_banks() : []; if ($bl): ?><datalist id="banklist"><?php foreach ($bl as $bn): ?><option value="<?= e($bn) ?>"></option><?php endforeach; ?></datalist><p class="muted small" style="margin-top:-8px">Pick your bank from the list. We check the account number with the bank and use the name it gives.</p><?php endif; ?>
     <?= f_text('account_number', 'Account number', '', null, ['required' => 1, 'inputmode' => 'numeric', 'maxlength' => 10]) ?>
     <?= f_text('account_name', 'Account name', '', null, ['required' => 1]) ?>
     <button class="btn" type="submit">Save account</button></form><?php endif; ?>

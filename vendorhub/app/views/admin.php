@@ -179,17 +179,37 @@ $docLinks = function (array $docs): string {
 <?php endif; ?>
 
 <?php if ($tab === 'payouts'): ?>
-  <p class="muted">Pay the seller from your bank or Paystack dashboard, then enter the transfer reference here. <a href="/admin/export?kind=payouts">Download all withdrawals (CSV)</a></p>
+  <p class="muted"><?= $ps ? 'Press <strong>Send with Paystack</strong> to pay a seller\'s bank account automatically. The request shows as sending until the bank confirms.' : 'Pay the seller from your bank or Paystack dashboard, then enter the transfer reference here. Add your Paystack key in Settings to pay with one click.' ?> <a href="/admin/export?kind=payouts">Download all withdrawals (CSV)</a></p>
   <ul class="list"><?php foreach ($items as $w): ?><li>
     <div class="row between"><div><strong><?= e($w['store_name']) ?></strong> <span class="muted">· <?= e($w['seller_email']) ?></span>
       <div>Pay <strong><?= e($m((float) $w['amount'] - (float) $w['fee'], $w['currency'])) ?></strong><?= (float) $w['fee'] > 0 ? ' <span class="muted small">(' . e($m($w['amount'], $w['currency'])) . ' less ' . e($m($w['fee'], $w['currency'])) . ' fee)</span>' : '' ?></div>
       <div class="muted small"><?= e($w['bank_name']) ?> · <?= e($w['account_number']) ?> · <?= e($w['account_name']) ?></div>
       <div class="muted small">Requested <?= e(human_date($w['requested_at'], true)) ?><?= $w['reference'] ? ' · Ref ' . e($w['reference']) : '' ?><?= $w['admin_note'] ? ' · ' . e($w['admin_note']) : '' ?></div></div>
       <?php if ($w['status'] === 'requested'): ?>
-      <form method="post" action="/admin/payout" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($w['id']) ?>"><input name="text" placeholder="Transfer reference or reason" maxlength="500" style="width:230px" aria-label="Transfer reference or reason" required>
-        <button class="btn btn-sm" name="decision" value="paid" data-confirm="Mark as paid?">Mark paid</button><button class="btn btn-sm btn-danger" name="decision" value="rejected" data-confirm="Reject and return the money to the seller's wallet?">Reject</button></form>
-      <?php else: echo pill($w['status'], WITHDRAWAL_LABEL); endif; ?></div></li><?php endforeach; ?>
+      <div>
+      <?php if ($ps && $w['currency'] === 'NGN'): ?><form method="post" action="/admin/payout/paystack" data-keep style="margin-bottom:8px"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($w['id']) ?>"><button class="btn btn-sm btn-accent" name="action" value="send" data-confirm="Send <?= e($m((float) $w['amount'] - (float) $w['fee'], $w['currency'])) ?> to <?= e($w['account_name']) ?> with Paystack? This moves real money from your Paystack balance.">Send with Paystack</button></form><?php endif; ?>
+      <form method="post" action="/admin/payout" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($w['id']) ?>"><input name="text" placeholder="Transfer reference or reason" maxlength="500" style="width:230px" aria-label="Transfer reference or reason">
+        <button class="btn btn-sm btn-outline" name="decision" value="paid" data-confirm="Mark as paid?">Mark paid</button><button class="btn btn-sm btn-danger" name="decision" value="rejected" data-confirm="Reject and return the money to the seller's wallet?">Reject</button></form></div>
+      <?php elseif ($w['status'] === 'processing'): ?>
+      <form method="post" action="/admin/payout/paystack" data-keep class="row"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($w['id']) ?>"><?= pill('processing', WITHDRAWAL_LABEL, ['processing' => 'warn']) ?><button class="btn btn-sm btn-outline" name="action" value="check">Check status</button></form>
+      <?php else: echo pill($w['status'], WITHDRAWAL_LABEL, ['failed' => 'bad']); endif; ?></div></li><?php endforeach; ?>
     <?php if (!$items): ?><li class="muted">No withdrawal requests yet.</li><?php endif; ?></ul>
+<?php endif; ?>
+
+<?php if ($tab === 'refunds'): ?>
+  <p class="muted" style="max-width:720px">When an order is refunded or cancelled, the seller's earnings are taken back automatically. The <strong>customer's money</strong> is returned here. Press <strong>Refund with Paystack</strong> to send it back to the customer's card or bank, or mark it done if you refunded it somewhere else. Do not refund the same order twice.</p>
+  <div class="row" style="margin:12px 0"><?php foreach (['open' => 'To do', 'done' => 'Done', 'all' => 'All'] as $k => $l): ?><a class="chip" style="<?= $filter === $k ? 'border-color:var(--ink);font-weight:700' : '' ?>" href="/admin?tab=refunds&amp;filter=<?= e($k) ?>"><?= e($l) ?></a><?php endforeach; ?></div>
+  <ul class="list"><?php foreach ($items as $r): ?><li>
+    <div class="row between"><div><strong>Order <?= e($r['number'] ?: $r['marketplace_order_id']) ?></strong> <span class="muted">· <?= e($r['customer_name']) ?> · <?= e(human_date($r['created_at'], true)) ?></span>
+      <div>Refund <strong><?= e($m((float) $r['amount'], $r['currency'])) ?></strong> <?= pill($r['status'], CR_LABEL, ['to_pay' => 'warn', 'sending' => 'warn', 'failed' => 'bad', 'refunded' => 'ok', 'manual' => 'ok']) ?></div>
+      <div class="muted small"><?= $r['payment_ref'] !== '' ? 'Paystack payment ' . e($r['payment_ref']) : 'No Paystack payment reference on this order' ?><?= $r['payment_method'] !== '' ? ' · ' . e($r['payment_method']) : '' ?><?= $r['note'] ? ' · ' . e($r['note']) : '' ?></div></div>
+      <?php if (in_array($r['status'], ['to_pay', 'failed', 'sending'], true)): ?>
+      <form method="post" action="/admin/refund" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($r['id']) ?>">
+        <input name="amount" value="<?= e(number_format((float) $r['amount'], 2, '.', '')) ?>" inputmode="decimal" style="width:110px" aria-label="Amount to refund">
+        <?php if ($ps && $r['currency'] === 'NGN' && $r['payment_ref'] !== '' && $r['status'] !== 'sending'): ?><button class="btn btn-sm btn-accent" name="action" value="paystack" data-confirm="Refund this amount to the customer through Paystack? This cannot be undone.">Refund with Paystack</button><?php endif; ?>
+        <input name="note" placeholder="Note (optional)" maxlength="300" style="width:170px" aria-label="Note"><button class="btn btn-sm btn-outline" name="action" value="manual" data-confirm="Mark as refunded? Only do this if the customer already got the money back.">Mark done</button></form>
+      <?php endif; ?></div></li><?php endforeach; ?>
+  <?php if (!$items): ?><li class="muted">Nothing to refund.</li><?php endif; ?></ul>
 <?php endif; ?>
 
 <?php if ($tab === 'categories'): $flat = category_flat($all); ?>
@@ -293,6 +313,14 @@ $docLinks = function (array $docs): string {
       <div class="field"><label>&nbsp;</label><label class="check"><input type="checkbox" name="level_one_step" value="yes" <?= $pol['one_step'] ? 'checked' : '' ?>><span>Drop one level at a time</span></label></div></div>
     <p class="muted small">Levels are checked every day, and whenever an order is delivered or a rating changes. A level you pinned on the Sellers tab never changes automatically.</p>
     <button class="btn" type="submit">Save level rules</button></form>
+  <h2>Paystack</h2>
+  <p class="muted" style="max-width:700px">Lets you pay sellers and refund customers with one click. In Paystack, open Settings → API Keys &amp; Webhooks, copy your <strong>secret key</strong>, and set the webhook address to <code><?= e(base_url()) ?>/api/paystack/webhook</code>. In Settings → Preferences turn off "Confirm transfers before sending", or transfers will wait for an OTP. Start with a <code>sk_test_</code> key and test before using <code>sk_live_</code>.</p>
+  <form method="post" action="/admin/paystack" data-keep class="card" style="max-width:640px"><?= csrf_field() ?>
+    <label class="check"><input type="checkbox" name="paystack_enabled" value="yes" <?= setting('paystack_enabled', '1') === '1' ? 'checked' : '' ?>><span>Use Paystack for payouts and refunds</span></label>
+    <?= f_text('paystack_secret_key', 'Secret key', '', null, ['type' => 'password', 'autocomplete' => 'off', 'placeholder' => paystack_key() !== '' ? 'Saved (' . (paystack_test_mode() ? 'test key' : 'live key') . ', ends ' . substr(paystack_key(), -4) . '). Paste a new key to replace it.' : 'sk_test_...']) ?>
+    <?php if (paystack_key() !== ''): ?><label class="check"><input type="checkbox" name="paystack_clear_key" value="yes"><span>Remove the saved key</span></label><?php endif; ?>
+    <p class="row"><button class="btn" type="submit">Save Paystack</button><button class="btn btn-outline" type="submit" name="action" value="test">Test connection</button></p>
+  </form>
   <h2>Backup</h2>
   <p class="muted" style="max-width:640px">Download a copy of all sellers, products, orders and balances. Do this weekly and before any update. Uploaded photos and documents are in the <code>storage</code> folder; download that from cPanel File Manager too. Keep backups private: they contain personal data.</p>
   <form method="post" action="/admin/backup" class="row" data-keep><?= csrf_field() ?><input type="password" name="password" placeholder="Your password" autocomplete="current-password" required style="max-width:240px"><button class="btn btn-outline" type="submit">Download database backup</button></form>

@@ -9,7 +9,7 @@ function admin_tabs(array $u): array
     if ($u['canReview']) $tabs['products'] = 'Products';
     if ($u['canMessages']) $tabs['messages'] = 'Messages';
     if ($u['canOrders']) { $tabs['orders'] = 'Orders'; $tabs['returns'] = 'Returns'; }
-    if ($u['isAdmin']) $tabs += ['sellers' => 'Sellers', 'codes' => 'Discount codes', 'payouts' => 'Payouts', 'categories' => 'Categories', 'staff' => 'Staff', 'activity' => 'Activity', 'settings' => 'Settings'];
+    if ($u['isAdmin']) $tabs += ['sellers' => 'Sellers', 'codes' => 'Discount codes', 'payouts' => 'Payouts', 'refunds' => 'Customer refunds', 'categories' => 'Categories', 'staff' => 'Staff', 'activity' => 'Activity', 'settings' => 'Settings'];
     return $tabs;
 }
 
@@ -30,6 +30,8 @@ route('GET', '/admin', function () {
         case 'payouts': $vars['items'] = withdrawal_review_list(); break;
         case 'categories': $vars['all'] = categories_all(true); break;
         case 'staff': $vars['items'] = staff_list(); break;
+        case 'refunds': $f = in_array(input('filter'), ['open', 'done', 'all'], true) ? input('filter') : 'open'; $vars['items'] = customer_refunds_list($f); $vars['filter'] = $f; break;
+        case 'payouts': $vars['items'] = withdrawal_review_list(); $vars['ps'] = paystack_on(); break;
         case 'codes': $vars['items'] = coupons_admin_list(); break;
         case 'sellers': $vars['items'] = levels_admin_list(input('q')); $vars['q'] = input('q'); break;
         case 'activity': $f = array_key_exists(input('filter'), AUDIT_LABEL) ? input('filter') : ''; $vars['items'] = audit_list(200, $f); $vars['filter'] = $f; break;
@@ -188,4 +190,32 @@ route('POST', '/admin/code', function () use ($adminBack) {
     $u = require_admin();
     $err = coupon_admin_set($u, input('id'), input('action') === 'block');
     $adminBack('codes', $err, input('action') === 'block' ? 'Code switched off.' : 'Code switched on.');
+});
+
+route('POST', '/admin/payout/paystack', function () use ($adminBack) {
+    $u = require_admin();
+    $a = input('action');
+    $err = $a === 'check' ? paystack_check_withdrawal(input('id')) : paystack_send_withdrawal($u, input('id'));
+    $adminBack('payouts', $err, $a === 'check' ? 'Checked with Paystack.' : 'Sent to Paystack. The seller is told when the bank confirms it.');
+});
+
+route('POST', '/admin/refund', function () use ($adminBack) {
+    $u = require_admin();
+    $amount = str_replace(',', '', input('amount'));
+    $err = match (input('action')) {
+        'paystack' => is_numeric($amount) ? paystack_send_refund($u, input('id'), (float) $amount) : 'Enter the amount to refund.',
+        'manual' => customer_refund_mark($u, input('id'), input_raw('note')),
+        default => 'Unknown action.',
+    };
+    $adminBack('refunds', $err, input('action') === 'paystack' ? 'Refund sent to Paystack. It shows as refunded when Paystack confirms.' : 'Marked as refunded.');
+});
+
+route('POST', '/admin/paystack', function () use ($adminBack) {
+    require_admin();
+    if (input('action') === 'test') {
+        if (!paystack_on()) $adminBack('settings', 'Add your Paystack key and switch it on first.', '');
+        $b = paystack_balance();
+        $adminBack('settings', $b['ok'] ? null : 'Paystack said: ' . $b['error'], 'Connected to Paystack (' . (paystack_test_mode() ? 'test mode' : 'live mode') . '). Available balance: NGN ' . number_format($b['ok'] ? $b['ngn'] : 0, 2) . '.');
+    }
+    $adminBack('settings', save_paystack_settings($_POST), 'Paystack settings saved.');
 });

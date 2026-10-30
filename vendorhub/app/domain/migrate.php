@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -74,6 +74,17 @@ function migration_steps(): array
                 $db->exec('CREATE TABLE coupons (id CHAR(36) NOT NULL PRIMARY KEY, seller_id CHAR(36) NOT NULL, code VARCHAR(30) NOT NULL, kind VARCHAR(10) NOT NULL, amount DECIMAL(12,2) NOT NULL, currency VARCHAR(3) NOT NULL DEFAULT \'NGN\', scope VARCHAR(10) NOT NULL DEFAULT \'all\', product_ids TEXT NULL, min_spend DECIMAL(12,2) NULL, usage_limit INT NULL, one_per_customer TINYINT NOT NULL DEFAULT 1, starts_at DATETIME(3) NULL, ends_at DATETIME(3) NULL, active TINYINT NOT NULL DEFAULT 1, admin_disabled TINYINT NOT NULL DEFAULT 0, used_count INT NOT NULL DEFAULT 0, discount_total DECIMAL(14,2) NOT NULL DEFAULT 0, sync_status VARCHAR(10) NOT NULL DEFAULT \'pending\', sync_note VARCHAR(250) NOT NULL DEFAULT \'\', created_at DATETIME(3) NOT NULL, updated_at DATETIME(3) NOT NULL)' . $engine($db));
                 $db->exec('CREATE UNIQUE INDEX coupons_code_unique ON coupons (code)');
                 $db->exec('CREATE INDEX coupons_seller_idx ON coupons (seller_id, created_at)');
+            }
+        },
+        7 => function (Db $db) use ($engine) {
+            $cols = [['orders', 'payment_ref', "VARCHAR(100) NOT NULL DEFAULT ''"], ['orders', 'payment_method', "VARCHAR(40) NOT NULL DEFAULT ''"], ['bank_accounts', 'bank_code', 'VARCHAR(20) NULL'], ['bank_accounts', 'recipient_code', 'VARCHAR(60) NULL'],
+                ['withdrawals', 'transfer_ref', 'VARCHAR(80) NULL'], ['withdrawals', 'transfer_code', 'VARCHAR(60) NULL'], ['withdrawals', 'transfer_attempts', 'INT NOT NULL DEFAULT 0']];
+            foreach ($cols as [$t, $c, $def]) if (!column_exists($db, $t, $c)) $db->exec("ALTER TABLE $t ADD COLUMN $c $def");
+            try { $db->exec('CREATE INDEX withdrawals_transfer_idx ON withdrawals (transfer_ref)'); } catch (Throwable) {}
+            if (!table_exists($db, 'customer_refunds')) {
+                $db->exec("CREATE TABLE customer_refunds (id CHAR(36) NOT NULL PRIMARY KEY, order_id CHAR(36) NOT NULL, currency CHAR(3) NOT NULL, amount DECIMAL(12,2) NOT NULL, status VARCHAR(10) NOT NULL DEFAULT 'to_pay', paystack_refund_id VARCHAR(60) NULL, note VARCHAR(500) NOT NULL DEFAULT '', decided_by CHAR(36) NULL, decided_at DATETIME(3) NULL, created_at DATETIME(3) NOT NULL, updated_at DATETIME(3) NOT NULL)" . $engine($db));
+                $db->exec('CREATE INDEX customer_refunds_status_idx ON customer_refunds (status, created_at)');
+                $db->exec('CREATE INDEX customer_refunds_order_idx ON customer_refunds (order_id)');
             }
         },
         6 => function (Db $db) {

@@ -167,6 +167,16 @@ route('POST', '/api/marketplace/ratings', function () {
     market_json(['ok' => true]);
 }, ['api' => true]);
 
+// Paystack tells us when a transfer or refund finishes. Add https://<this app>/api/paystack/webhook in Paystack → Settings → API Keys & Webhooks.
+route('POST', '/api/paystack/webhook', function () {
+    $raw = (string) file_get_contents('php://input');
+    if (strlen($raw) > 200000) market_json(['error' => 'Payload too large.'], 413);
+    if (!paystack_signature_ok($raw, (string) ($_SERVER['HTTP_X_PAYSTACK_SIGNATURE'] ?? ''))) market_json(['error' => 'Invalid signature.'], 401);
+    $e = json_decode($raw, true);
+    if (is_array($e)) { try { paystack_handle_event($e); } catch (Throwable $ex) { log_error('paystack webhook: ' . $ex->getMessage()); market_json(['error' => 'Could not process.'], 500); } }
+    market_json(['ok' => true]);
+}, ['api' => true]);
+
 // ---------------------------------------------------------------- public photos for the marketplace
 
 route('GET', '/media', function () {

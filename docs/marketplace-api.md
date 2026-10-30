@@ -217,3 +217,14 @@ each seller how often a code was used and how much they gave away.
 Customer reviews stay in WooCommerce. When a review is added, edited, approved, trashed or deleted, the connector sends (signed like orders)
 `POST /api/marketplace/ratings` with `{"event":"rating.updated","product":{"product_id":"<uuid>","average":4.6,"count":25}}`.
 Vendor Hub shows sellers their rating and uses it for the Gold and Blue levels.
+
+## Paystack (payouts and customer refunds)
+
+`order.paid` also carries `order.payment_ref` (the order's transaction id, which the Paystack WooCommerce plugin sets to the Paystack reference)
+and `order.payment_method`. Vendor Hub uses the reference to refund the customer.
+
+Vendor Hub talks to Paystack directly (set the secret key in Admin → Settings → Paystack):
+- Withdrawals: recipient is created from the seller's bank account (bank code from `/bank`), then `POST /transfer` with reference `vh-<withdrawal id>-<attempt>`.
+- Customer refunds: `POST /refund` with the order's payment reference and the amount in kobo.
+- Webhook: `POST /api/paystack/webhook` (signed with HMAC-SHA512 of the body using the secret key, header `x-paystack-signature`). Handles
+  `transfer.success`, `transfer.failed`, `transfer.reversed`, `refund.processed`, `refund.failed`. A failed or reversed transfer returns the money to the seller's wallet once.

@@ -4,7 +4,7 @@ declare(strict_types=1);
 // Sales from the marketplace, the seller wallet, bank accounts, withdrawals and the store profile.
 
 const MAX_BANK_ACCOUNTS = 3;
-const WITHDRAWAL_LABEL = ['requested' => 'Waiting to be paid', 'paid' => 'Paid', 'rejected' => 'Rejected', 'cancelled' => 'Cancelled'];
+const WITHDRAWAL_LABEL = ['requested' => 'Waiting to be paid', 'processing' => 'Sending to your bank', 'paid' => 'Paid', 'rejected' => 'Rejected', 'cancelled' => 'Cancelled', 'failed' => 'Failed, money returned'];
 
 function round2(float $v): float
 {
@@ -186,7 +186,7 @@ function parse_order_event(mixed $d): array|string
     return ['event' => $d['event'], 'order' => [
         'id' => $id, 'number' => str_limit((string) ($o['number'] ?? ''), 100), 'currency' => $o['currency'], 'placed_at' => $placed,
         'customer_name' => str_limit((string) ($o['customer_name'] ?? ''), 200), 'ship_city' => str_limit((string) ($o['ship_city'] ?? ''), 100),
-        'ship_state' => str_limit((string) ($o['ship_state'] ?? ''), 100), 'restock' => !empty($o['restock']), 'items' => $items,
+        'ship_state' => str_limit((string) ($o['ship_state'] ?? ''), 100), 'restock' => !empty($o['restock']), 'payment_ref' => str_limit(trim((string) ($o['payment_ref'] ?? '')), 100), 'payment_method' => str_limit(trim((string) ($o['payment_method'] ?? '')), 40), 'items' => $items,
         'coupons' => array_slice(array_values(array_filter(array_map(fn ($c) => is_string($c) ? coupon_clean_code($c) : '', (array) ($o['coupons'] ?? [])))), 0, 10),
     ]];
 }
@@ -207,7 +207,7 @@ function record_paid_order(array $event): array
         $orderId = uuid();
         try {
             $db->insert('orders', ['id' => $orderId, 'marketplace_order_id' => $o['id'], 'number' => $o['number'], 'currency' => $o['currency'], 'customer_name' => $o['customer_name'],
-                'ship_city' => $o['ship_city'], 'ship_state' => $o['ship_state'], 'placed_at' => $o['placed_at'], 'created_at' => now_db()]);
+                'ship_city' => $o['ship_city'], 'ship_state' => $o['ship_state'], 'payment_ref' => $o['payment_ref'] ?? '', 'payment_method' => $o['payment_method'] ?? '', 'placed_at' => $o['placed_at'], 'created_at' => now_db()]);
         } catch (Throwable $e) {
             if (Db::isDuplicate($e)) return ['duplicate' => true];
             throw $e;
@@ -269,8 +269,11 @@ function record_paid_order(array $event): array
 // Takes the listed paid lines back: earnings reversed (on the same availability date) and, if asked, stock returned.
 function refund_lines(Db $db, string $currency, array $lines, string $label, bool $restock, array &$sellers): void
 {
+    $owed = [];
     foreach ($lines as $l) {
         $db->exec("UPDATE order_items SET status = 'refunded' WHERE id = ?", [$l['id']]);
+        $money = $db->one('SELECT order_id, line_total FROM order_items WHERE id = ?', [$l['id']]);
+        if ($money) $owed[$money['order_id']] = ($owed[$money['order_id']] ?? 0) + (float) $money['line_total'];
         $sale = $db->one("SELECT available_at FROM wallet_entries WHERE order_item_id = ? AND kind = 'sale'", [$l['id']]);
         if ($sale && !$db->val("SELECT 1 FROM wallet_entries WHERE order_item_id = ? AND kind = 'refund'", [$l['id']])) {
             $db->insert('wallet_entries', ['id' => uuid(), 'seller_id' => $l['seller_id'], 'kind' => 'refund', 'amount' => -((float) $l['net']), 'currency' => $currency,
@@ -283,6 +286,7 @@ function refund_lines(Db $db, string $currency, array $lines, string $label, boo
         }
         $sellers[$l['seller_id']] = true;
     }
+    foreach ($owed as $oid => $amt) customer_refund_add($db, $oid, $currency, round2($amt));
 }
 
 // Reverses every line of an order: the credit is taken back (on the same availability date) and, if asked, the stock returns.
@@ -309,7 +313,7 @@ function record_refund(array $event): array
 
 function bank_accounts(string $sellerId): array
 {
-    return db()->all('SELECT id, bank_name, account_number, account_name FROM bank_accounts WHERE seller_id = ? ORDER BY created_at', [$sellerId]);
+    return db()->all('SELECT id, bank_name, account_number, account_name, bank_code FROM bank_accounts WHERE seller_id = ? ORDER BY created_at', [$sellerId]);
 }
 
 function add_bank_account(string $sellerId, string $bank, string $number, string $name): ?string
@@ -320,12 +324,21 @@ function add_bank_account(string $sellerId, string $bank, string $number, string
     if (mb_strlen($bank) < 2 || mb_strlen($bank) > 100) return 'Enter the bank name.';
     if (!preg_match('/^[0-9]{10}$/', $number)) return 'The account number must be 10 digits.';
     if (mb_strlen($name) < 2 || mb_strlen($name) > 120) return 'Enter the account name.';
+    // With Paystack on, the bank must be one it knows, and the bank tells us the real account name.
+    $code = null;
+    if (paystack_on() && paystack_banks()) {
+        $code = bank_code_for($bank);
+        if (!$code) return 'Choose your bank from the list.';
+        $bank = paystack_banks()[$code];
+        $real = paystack_resolve_account($number, $code);
+        if ($real !== null) $name = $real;
+    }
     $db = db();
-    return $db->tx(function () use ($db, $sellerId, $bank, $number, $name) {
+    return $db->tx(function () use ($db, $sellerId, $bank, $number, $name, $code) {
         $db->val('SELECT id FROM users WHERE id = ?' . $db->lock(), [$sellerId]);
         if ((int) $db->val('SELECT COUNT(*) FROM bank_accounts WHERE seller_id = ?', [$sellerId]) >= MAX_BANK_ACCOUNTS) return 'You can save up to ' . MAX_BANK_ACCOUNTS . ' bank accounts. Remove one first.';
         try {
-            $db->insert('bank_accounts', ['id' => uuid(), 'seller_id' => $sellerId, 'bank_name' => $bank, 'account_number' => $number, 'account_name' => $name, 'created_at' => now_db()]);
+            $db->insert('bank_accounts', ['id' => uuid(), 'seller_id' => $sellerId, 'bank_name' => $bank, 'account_number' => $number, 'account_name' => $name, 'bank_code' => $code, 'created_at' => now_db()]);
         } catch (Throwable $e) {
             if (Db::isDuplicate($e)) return 'This account is already saved.';
             throw $e;

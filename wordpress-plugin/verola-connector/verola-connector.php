@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.2.0
+ * Version: 1.3.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -977,6 +977,9 @@ final class Verola_Connector {
 				'ship_state' => (string) (($states[$state] ?? $state) ?: ''),
 				'restock' => true,
 				'coupons' => array_values(array_map('strval', $order->get_coupon_codes())),
+				// Lets Vendor Hub refund the customer through Paystack. The Paystack plugin stores its transaction reference as the order's transaction id.
+				'payment_ref' => (string) $order->get_transaction_id(),
+				'payment_method' => (string) $order->get_payment_method(),
 				'items' => $items,
 			],
 		];

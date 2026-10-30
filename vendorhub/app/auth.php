@@ -129,7 +129,7 @@ function user_from_token(string $token): ?array
     if ($isAdmin) {
         $pending['applications'] = (int) $db->val("SELECT COUNT(*) FROM seller_applications WHERE status = 'submitted'");
         $pending['verifications'] = (int) $db->val("SELECT COUNT(*) FROM seller_verifications WHERE status = 'submitted'");
-        $pending['payouts'] = (int) $db->val("SELECT COUNT(*) FROM withdrawals WHERE status = 'requested'");
+        $pending['payouts'] = (int) $db->val("SELECT COUNT(*) FROM withdrawals WHERE status IN ('requested', 'processing')") + customer_refund_open_count();
     }
     if (!$isAdmin && !$canOrders) {
         $pending['returns'] = (int) $db->val("SELECT COUNT(*) FROM return_cases WHERE seller_id = ? AND status = 'open'", [$row['id']]);

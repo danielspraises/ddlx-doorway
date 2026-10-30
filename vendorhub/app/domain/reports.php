@@ -63,7 +63,7 @@ function admin_overview(): array
     $owed = [];
     foreach ($db->all('SELECT currency, SUM(amount) AS total FROM wallet_entries GROUP BY currency') as $r) $owed[$r['currency']] = round2((float) $r['total']);
     $waiting = [];
-    foreach ($db->all("SELECT currency, SUM(amount) AS total FROM withdrawals WHERE status = 'requested' GROUP BY currency") as $r) $waiting[$r['currency']] = round2((float) $r['total']);
+    foreach ($db->all("SELECT currency, SUM(amount) AS total FROM withdrawals WHERE status IN ('requested', 'processing') GROUP BY currency") as $r) $waiting[$r['currency']] = round2((float) $r['total']);
     return [
         'by_category' => commission_by_category($since),
         'sales' => array_values($per),

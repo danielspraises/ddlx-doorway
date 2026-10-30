@@ -41,3 +41,14 @@ If a step fails, note the exact message and Admin → System check output; the l
 - Create a code in a test seller's Promotions tab, wait a minute, use it at checkout, and confirm the order shows in Vendor Hub with "Used 1".
 - Leave a review on a test product and confirm the seller overview shows the rating within a couple of minutes.
 - Admin → Settings: add the Anthropic key if you want the AI assistant; set the Seller levels table (perks start at 0).
+
+## 6. Paystack (do in test mode first)
+1. Paystack dashboard → Settings → API Keys & Webhooks: copy the **test secret key**. Set the **test webhook URL** to `https://vendor.ddlx.shop/api/paystack/webhook`.
+2. Settings → Preferences: turn **off** "Confirm transfers before sending" (otherwise every transfer waits for an OTP).
+3. Vendor Hub → Admin → Settings → Paystack: paste the key, press **Test connection**. It should show your test balance.
+4. Upload plugin **1.3.0**. Place a test order paid through Paystack; the order in Vendor Hub should show a Paystack payment reference under Admin → Refunds once refunded.
+5. Payout test: a seller requests a withdrawal (add the bank account choosing the bank from the list), admin presses **Send with Paystack**. Status goes Sending → Paid when Paystack confirms. Test a failure by using Paystack's test failure account numbers: the money must return to the seller's wallet.
+6. Refund test: refund a test order in Vendor Hub or WooCommerce, open Admin → Refunds, press **Refund with Paystack**. It should show Sending, then Refunded.
+7. When all pass: replace the test key and webhook URL with the **live** ones, fund your Paystack balance, and repeat one small real withdrawal.
+
+Rules the app enforces: transfers and refunds only start from an admin click, a second click cannot send twice, Paystack is used only for NGN, and a manual "Mark paid / Mark done" is still available if you prefer your bank.

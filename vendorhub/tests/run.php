@@ -548,5 +548,103 @@ ok(count($chk) > 10, 'system check returns rows');
 eq(count(array_filter($chk, fn ($r) => $r[0] === 'Tables' && $r[1] === 'ok')), 1, 'system check sees all tables');
 eq(ini_bytes('8M'), 8388608, 'ini_bytes');
 
+// ---- Paystack
+$calls = [];
+$mode = ['transfer' => 'success', 'refund' => 'pending'];
+$GLOBALS['vh_paystack_stub'] = function ($method, $path, $body) use (&$calls, &$mode) {
+    $calls[] = [$method, $path, $body];
+    if ($path === '/balance') return ['code' => 200, 'data' => [['currency' => 'NGN', 'balance' => 12345600]]];
+    if (str_starts_with($path, '/bank?')) return ['code' => 200, 'data' => [['code' => '058', 'name' => 'Guaranty Trust Bank'], ['code' => '044', 'name' => 'Access Bank']]];
+    if (str_starts_with($path, '/bank/resolve')) return ['code' => 200, 'data' => ['account_name' => 'ADA OBI']];
+    if ($path === '/transferrecipient') return ['code' => 200, 'data' => ['recipient_code' => 'RCP_test']];
+    if ($path === '/transfer') return $mode['transfer'] === 'refuse' ? ['code' => 400, 'data' => [], 'message' => 'Insufficient balance'] : ['code' => 200, 'data' => ['status' => $mode['transfer'], 'transfer_code' => 'TRF_abc']];
+    if (str_starts_with($path, '/transfer/verify/')) return $mode['transfer'] === 'missing' ? ['code' => 404, 'data' => [], 'message' => 'not found'] : ['code' => 200, 'data' => ['status' => 'success', 'transfer_code' => 'TRF_abc']];
+    if ($path === '/refund') return $mode['refund'] === 'refuse' ? ['code' => 400, 'data' => [], 'message' => 'Transaction not found'] : ['code' => 200, 'data' => ['status' => $mode['refund'], 'id' => 777]];
+    return ['code' => 404, 'data' => []];
+};
+eq(save_paystack_settings(['paystack_secret_key' => 'nonsense']), 'That does not look like a Paystack secret key. It starts with sk_test_ or sk_live_.', 'bad Paystack key refused');
+eq(save_paystack_settings(['paystack_secret_key' => 'sk_' . 'test_' . 'abcdefghijklmnopqrstuvwx', 'paystack_enabled' => 'yes']), null, 'key saved');
+ok(paystack_on() && paystack_test_mode(), 'Paystack on in test mode');
+eq(paystack_balance(), ['ok' => true, 'ngn' => 123456.0], 'balance read in naira');
+eq(kobo(1234.565), 123457, 'kobo rounding');
+eq(bank_code_for('guaranty trust bank'), '058', 'bank found by name');
+eq(bank_code_for('GTBank'), null, 'unknown bank name not guessed');
+// bank accounts: the bank must be known and the name comes from the bank
+ok(add_bank_account($other, 'Nowhere Bank', '0123456789', 'Someone') === 'Choose your bank from the list.', 'unknown bank refused');
+eq(add_bank_account($other, 'Guaranty Trust Bank', '0123456789', 'typed name'), null, 'known bank accepted');
+$acct = db()->one('SELECT * FROM bank_accounts WHERE seller_id = ?', [$other]);
+eq([$acct['bank_code'], $acct['account_name']], ['058', 'ADA OBI'], 'bank code stored and name taken from the bank');
+// withdrawals
+db()->exec("DELETE FROM withdrawals WHERE seller_id = ?", [$other]);
+db()->insert('wallet_entries', ['id' => uuid(), 'seller_id' => $other, 'kind' => 'adjustment', 'amount' => 50000, 'currency' => 'NGN', 'note' => 'test', 'available_at' => '2000-01-01 00:00:00.000', 'created_at' => now_db()]);
+eq(request_withdrawal($other, $acct['id'], 'NGN', 10000), null, 'withdrawal requested');
+$w = seller_withdrawals($other)[0];
+$before = wallet_balances($other)[0]['available'];
+$calls = [];
+$mode['transfer'] = 'refuse';
+ok(str_contains((string) paystack_send_withdrawal($admin, $w['id']), 'Insufficient balance'), 'refused transfer reports why');
+eq(db()->val('SELECT status FROM withdrawals WHERE id = ?', [$w['id']]), 'requested', 'refused transfer leaves it requested');
+$mode['transfer'] = 'pending';
+eq(paystack_send_withdrawal($admin, $w['id']), null, 'transfer started');
+$wd = db()->one('SELECT * FROM withdrawals WHERE id = ?', [$w['id']]);
+eq([$wd['status'], $wd['transfer_ref'], $wd['transfer_code']], ['processing', 'vh-' . $w['id'] . '-2', 'TRF_abc'], 'processing with a fresh reference per attempt');
+$tr = array_values(array_filter($calls, fn ($c) => $c[1] === '/transfer'));
+eq(end($tr)[2]['amount'], 1000000, 'transfer amount in kobo');
+ok(paystack_send_withdrawal($admin, $w['id']) !== null, 'cannot send twice (double click)');
+eq(count(array_filter($calls, fn ($c) => $c[1] === '/transfer')), 2, 'only the refused and the real transfer were sent');
+eq(count(array_filter($calls, fn ($c) => $c[1] === '/transferrecipient')), 1, 'recipient created once and reused');
+ok(decide_withdrawal($admin, $w['id'], 'paid', 'x') !== null, 'manual decision blocked while sending');
+eq(wallet_balances($other)[0]['available'], $before, 'money stays held while sending');
+// webhook
+ok(!paystack_signature_ok('{}', 'wrong'), 'bad signature refused');
+$raw = '{"event":"transfer.success","data":{"reference":"' . $wd['transfer_ref'] . '"}}';
+ok(paystack_signature_ok($raw, hash_hmac('sha512', $raw, paystack_key())), 'good signature accepted');
+paystack_handle_event(json_decode($raw, true));
+eq(db()->val('SELECT status FROM withdrawals WHERE id = ?', [$w['id']]), 'paid', 'webhook marks paid');
+eq(db()->val('SELECT reference FROM withdrawals WHERE id = ?', [$w['id']]), 'TRF_abc', 'transfer code kept as the reference');
+paystack_handle_event(json_decode($raw, true));
+eq(wallet_balances($other)[0]['available'], $before, 'repeat webhook changes nothing');
+// failure returns the money
+eq(request_withdrawal($other, $acct['id'], 'NGN', 5000), null, 'second withdrawal');
+$w2 = seller_withdrawals($other)[0];
+$mid = wallet_balances($other)[0]['available'];
+$mode['transfer'] = 'pending';
+paystack_send_withdrawal($admin, $w2['id']);
+$ref2 = db()->val('SELECT transfer_ref FROM withdrawals WHERE id = ?', [$w2['id']]);
+paystack_handle_event(['event' => 'transfer.failed', 'data' => ['reference' => $ref2, 'reason' => 'Account closed']]);
+eq(db()->val('SELECT status FROM withdrawals WHERE id = ?', [$w2['id']]), 'failed', 'failed transfer marked failed');
+eq(wallet_balances($other)[0]['available'], $mid + 5000.0, 'failed transfer returns the money');
+paystack_handle_event(['event' => 'transfer.failed', 'data' => ['reference' => $ref2]]);
+eq(wallet_balances($other)[0]['available'], $mid + 5000.0, 'money returned only once');
+// lost answer, then check
+eq(request_withdrawal($other, $acct['id'], 'NGN', 2000), null, 'third withdrawal');
+$w3 = seller_withdrawals($other)[0];
+$mode['transfer'] = 'missing';
+db()->exec("UPDATE withdrawals SET status = 'processing', transfer_ref = 'vh-lost', transfer_attempts = 1 WHERE id = ?", [$w3['id']]);
+eq(paystack_check_withdrawal($w3['id']), null, 'check runs');
+eq(db()->val('SELECT status FROM withdrawals WHERE id = ?', [$w3['id']]), 'requested', 'no record at Paystack: can send again');
+// refunds: customer money queue
+$cr = db()->one("SELECT * FROM customer_refunds ORDER BY created_at LIMIT 1");
+ok($cr !== null && $cr['status'] === 'to_pay', 'refunding an order queued the customer refund');
+$ord = db()->one('SELECT * FROM orders WHERE id = ?', [$cr['order_id']]);
+ok(str_contains((string) paystack_send_refund($admin, $cr['id'], 100), 'no Paystack payment reference'), 'no payment reference: cannot refund through Paystack');
+db()->exec("UPDATE orders SET payment_ref = 'PSK_123' WHERE id = ?", [$cr['order_id']]);
+$mode['refund'] = 'refuse';
+ok(str_contains((string) paystack_send_refund($admin, $cr['id'], 100), 'Transaction not found'), 'refused refund reports why');
+eq(db()->val('SELECT status FROM customer_refunds WHERE id = ?', [$cr['id']]), 'failed', 'refused refund marked failed, can retry');
+$mode['refund'] = 'pending';
+$calls = [];
+eq(paystack_send_refund($admin, $cr['id'], 150.5), null, 'refund started');
+eq(db()->val('SELECT status FROM customer_refunds WHERE id = ?', [$cr['id']]), 'sending', 'refund sending');
+eq($calls[0][2]['amount'], 15050, 'refund amount in kobo');
+eq($calls[0][2]['transaction'], 'PSK_123', 'refund uses the payment reference');
+ok(paystack_send_refund($admin, $cr['id'], 150.5) !== null && count($calls) === 1, 'double click does not refund twice');
+paystack_handle_event(['event' => 'refund.processed', 'data' => ['id' => 777, 'transaction_reference' => 'PSK_123']]);
+eq(db()->val('SELECT status FROM customer_refunds WHERE id = ?', [$cr['id']]), 'refunded', 'webhook marks refunded');
+ok(customer_refund_mark($admin, $cr['id'], '') !== null, 'finished refund cannot be marked again');
+ok(customer_refund_open_count() >= 0, 'open refund count works');
+$GLOBALS['vh_paystack_stub'] = null; unset($GLOBALS['vh_paystack_stub']);
+ok(!paystack_call('GET', '/balance')['ok'], 'no real Paystack calls while testing');
+
 echo "$pass passed, $fail failed\n";
 exit($fail ? 1 : 0);

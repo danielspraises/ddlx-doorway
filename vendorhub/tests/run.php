@@ -646,6 +646,89 @@ ok(customer_refund_open_count() >= 0, 'open refund count works');
 $GLOBALS['vh_paystack_stub'] = null; unset($GLOBALS['vh_paystack_stub']);
 ok(!paystack_call('GET', '/balance')['ok'], 'no real Paystack calls while testing');
 
+// ---- linking to the existing marketplace seller, product and order import ----
+$lk = uuid();
+db()->insert('users', ['id' => $lk, 'email' => 'old@shop.test', 'password_hash' => 'x', 'created_at' => now_db()]);
+$appId = uuid();
+db()->insert('seller_applications', ['id' => $appId, 'user_id' => $lk, 'status' => 'approved', 'current_step' => 5, 'personal' => '{}', 'business' => '{}', 'brand' => jenc(['store_name' => 'Old Shop']), 'registration' => '{}', 'declaration' => '{}', 'submitted_at' => now_db(), 'created_at' => now_db(), 'updated_at' => now_db()]);
+ok(!is_verified_seller($lk), 'not verified yet');
+ok(link_seller(['id' => $lk, 'email' => 'a'], $lk, 7, 'Old Shop') !== null, 'unverified seller cannot be linked');
+db()->insert('seller_verifications', ['id' => uuid(), 'application_id' => $appId, 'user_id' => $lk, 'status' => 'approved', 'current_step' => 5, 'details' => '{}', 'documents' => '{}', 'created_at' => now_db(), 'updated_at' => now_db()]);
+ok(is_verified_seller($lk), 'verified now');
+$admin = ['id' => $lk, 'email' => 'admin@x.test'];
+set_setting('marketplace_url', 'https://shop.test'); set_setting('marketplace_api_key', 'k');
+$calls = [];
+$wcProducts = [
+  ['id' => 501, 'type' => 'simple', 'name' => 'Linen Shirt', 'status' => 'publish', 'sku' => 'OLD-1', 'description' => '<p>Nice</p>', 'short_description' => 'Nice', 'currency' => 'NGN', 'manage_stock' => true, 'stock' => 12, 'backorders' => false, 'low_stock' => 3,
+   'weight' => '0.4', 'length' => '30', 'width' => '20', 'height' => '5', 'category_path' => ['Fashion', 'Men'], 'tags' => ['linen'], 'images' => ['https://shop.test/a.jpg', 'https://shop.test/b.jpg'], 'regular_price' => '8000', 'sale_price' => '7000', 'attributes' => []],
+  ['id' => 502, 'type' => 'variable', 'name' => 'Ankara Dress', 'status' => 'publish', 'sku' => 'OLD-2', 'description' => '', 'short_description' => '', 'currency' => 'NGN', 'manage_stock' => false, 'stock' => 0, 'backorders' => false, 'low_stock' => 0, 'category_path' => ['Nowhere'], 'tags' => [], 'images' => [],
+   'regular_price' => '', 'sale_price' => '', 'attributes' => [['name' => 'Size', 'values' => ['S', 'M'], 'variation' => true]],
+   'variations' => [['id' => 601, 'sku' => 'OLD-2-S', 'options' => ['Size' => 'S'], 'regular_price' => '12000', 'sale_price' => '', 'stock' => 4, 'enabled' => true], ['id' => 602, 'sku' => '', 'options' => ['Size' => 'M'], 'regular_price' => '12000', 'sale_price' => '', 'stock' => 6, 'enabled' => true]]],
+  ['id' => 503, 'type' => 'grouped', 'name' => 'Bundle', 'status' => 'publish', 'sku' => 'OLD-3'],
+  ['id' => 504, 'type' => 'simple', 'name' => 'Clash', 'status' => 'publish', 'sku' => 'OLD-1', 'regular_price' => '100', 'attributes' => []],
+];
+$wcOrders = [
+  ['id' => '9001', 'number' => '9001', 'status' => 'completed', 'currency' => 'NGN', 'placed_at' => gmdate('c', time() - 86400 * 10), 'customer_name' => 'Ada O.', 'ship_city' => 'Lagos', 'ship_state' => 'Lagos', 'payment_ref' => 'ref1', 'payment_method' => 'paystack', 'items' => [['wc_product_id' => 501, 'wc_variation_id' => null, 'quantity' => 2, 'unit_price' => 7000]]],
+  ['id' => '9002', 'number' => '9002', 'status' => 'shipped', 'currency' => 'NGN', 'placed_at' => gmdate('c', time() - 86400 * 2), 'customer_name' => 'Bo K.', 'ship_city' => 'Abuja', 'ship_state' => 'FCT', 'carrier' => 'DHL', 'tracking_number' => 'T1', 'items' => [['wc_product_id' => 502, 'wc_variation_id' => 602, 'quantity' => 1, 'unit_price' => 12000], ['wc_product_id' => 999, 'quantity' => 1, 'unit_price' => 5]]],
+  ['id' => '9003', 'number' => '9003', 'status' => 'processing', 'currency' => 'NGN', 'placed_at' => gmdate('c', time() - 3600), 'items' => [['wc_product_id' => 999, 'quantity' => 1, 'unit_price' => 5]]],
+];
+$GLOBALS['vh_fetch_stub'] = fn ($u) => base64_decode('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==');
+$GLOBALS['vh_market_stub'] = function ($path, $method, $body) use (&$calls, $wcProducts, $wcOrders) {
+    $calls[] = [$path, $method, $body];
+    if (str_starts_with($path, '/vendors')) return ['vendors' => [['id' => 7, 'email' => 'old@shop.test', 'name' => 'Old Shop', 'product_count' => 3], ['id' => 8, 'email' => 'other@shop.test', 'name' => 'Other', 'product_count' => 1]]];
+    if ($path === '/link') return ['ok' => true];
+    if ($path === '/unlink') return ['ok' => true];
+    if (str_starts_with($path, '/vendor/products')) { parse_str((string) parse_url($path, PHP_URL_QUERY), $q); return ['products' => (int) $q['after'] === 0 ? $wcProducts : [], 'next' => null, 'remaining' => 0]; }
+    if ($path === '/adopt') return ['ok' => true, 'adopted' => count($body['items'])];
+    if (str_starts_with($path, '/vendor/orders')) { parse_str((string) parse_url($path, PHP_URL_QUERY), $q); return ['orders' => (int) $q['after'] === 0 ? $wcOrders : [], 'next' => null, 'remaining' => 0]; }
+    return null;
+};
+$vend = marketplace_vendors('');
+eq(count($vend), 2, 'marketplace sellers listed');
+$sug = suggest_matches($vend, 'old@shop.test', 'Old Shop');
+eq($sug[0]['id'], 7, 'same email suggested first'); eq($sug[0]['why'], 'Same email', 'reason shown');
+eq(suggest_matches($vend, 'zzz@x.test', 'other')[0]['id'], 8, 'store name match suggested');
+ok(import_products_batch($admin, $lk, 0)['error'] === 'Link the seller first.', 'import needs a link');
+eq(link_seller($admin, $lk, 7, 'Old Shop'), null, 'linked');
+ok(link_seller($admin, $lk, 7, 'Old Shop') !== null, 'cannot link twice');
+$lk2 = uuid(); db()->insert('users', ['id' => $lk2, 'email' => 'second@shop.test', 'password_hash' => 'x', 'created_at' => now_db()]);
+eq(seller_link($lk)['uid'], 7, 'link stored');
+$r = import_products_batch($admin, $lk, 0);
+eq($r['created'], 2, 'two products imported');
+ok(count($r['notes']) === 2, 'grouped and SKU clash reported: ' . implode(' | ', $r['notes']));
+$shirt = db()->one('SELECT * FROM products WHERE marketplace_product_id = 501');
+eq($shirt['status'], 'approved', 'published product is live'); eq((int) $shirt['live'], 1, 'live flag'); eq((int) $shirt['stock'], 12, 'stock copied');
+eq((float) $shirt['sale_price'], 7000.0, 'sale price copied'); ok(!empty($shirt['published_snapshot']), 'snapshot written so the feed has it');
+ok($shirt['category_id'] !== null, 'category matched by name path'); ok(!empty($shirt['featured_image']) && count(jdec($shirt['gallery'], [])) === 1, 'images downloaded');
+$dress = db()->one('SELECT * FROM products WHERE marketplace_product_id = 502');
+eq($dress['product_type'], 'variable', 'variable imported'); eq($dress['category_id'], null, 'unknown category left empty');
+eq((int) db()->val('SELECT COUNT(*) FROM product_variations WHERE product_id = ?', [$dress['id']]), 2, 'variations imported');
+ok((bool) db()->val("SELECT 1 FROM product_variations WHERE sku = 'OLD-2-2'"), 'blank variation SKU generated');
+$adopt = array_values(array_filter($calls, fn ($c) => $c[0] === '/adopt'))[0][2];
+eq(count($adopt['items']), 2, 'marketplace told about both products'); eq(count($adopt['items'][1]['variations']), 2, 'variation ids sent');
+$again = import_products_batch($admin, $lk, 0);
+eq((int) db()->val('SELECT COUNT(*) FROM products WHERE seller_id = ?', [$lk]), 2, 'importing again creates no duplicates');
+eq(import_orders_batch($admin, $lk, 0)['imported'], 2, 'two orders imported (third has no matching products)');
+$hist = db()->one("SELECT * FROM orders WHERE marketplace_order_id = '9001'"); eq((int) $hist['history'], 1, 'finished order is history');
+eq((float) db()->val("SELECT COALESCE(SUM(amount),0) FROM wallet_entries WHERE seller_id = ?", [$lk]), 10800.0, 'only the open order pays the wallet (12000 less 10%)');
+eq((int) db()->val("SELECT COUNT(*) FROM wallet_entries WHERE order_item_id IN (SELECT id FROM order_items WHERE order_id = ?)", [$hist['id']]), 0, 'history order adds no wallet entry');
+$open = db()->one("SELECT i.* FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.marketplace_order_id = '9002'");
+eq($open['fulfilment'], 'shipped', 'open order keeps its stage'); eq($open['carrier'], 'DHL', 'carrier kept');
+eq(import_orders_batch($admin, $lk, 0)['imported'], 0, 'orders import is repeatable');
+eq((int) db()->val('SELECT COUNT(*) FROM orders'), 2 + (int) db()->val("SELECT COUNT(*) FROM orders WHERE marketplace_order_id NOT IN ('9001','9002')"), 'no duplicate orders');
+// the store later reports the same open order: nothing doubles
+$dup = record_paid_order(['event' => 'order.paid', 'order' => ['id' => '9002', 'number' => '9002', 'currency' => 'NGN', 'placed_at' => now_db(), 'customer_name' => '', 'ship_city' => '', 'ship_state' => '', 'restock' => false, 'items' => [['product_id' => $dress['id'], 'variation_id' => db()->val("SELECT id FROM product_variations WHERE marketplace_variation_id = 602"), 'quantity' => 1, 'unit_price' => 12000.0, 'discount' => 0.0]]]]);
+ok($dup['duplicate'], 'live reports of an imported order are ignored');
+// delivering the open order starts the normal payout hold
+apply_marketplace_status(['id' => '9002', 'status' => 'delivered', 'carrier' => '', 'tracking' => '', 'note' => ''], 'marketplace');
+ok((string) db()->val("SELECT available_at FROM wallet_entries WHERE seller_id = ?", [$lk]) !== NOT_DELIVERED_YET, 'delivery releases the imported open order after the hold');
+// a refund of a history order reverses nothing in the wallet
+$before = (float) db()->val("SELECT COALESCE(SUM(amount),0) FROM wallet_entries WHERE seller_id = ?", [$lk]);
+record_refund(['event' => 'order.refunded', 'order' => ['id' => '9001', 'number' => '9001', 'restock' => false]]);
+eq((float) db()->val("SELECT COALESCE(SUM(amount),0) FROM wallet_entries WHERE seller_id = ?", [$lk]), $before, 'refunding a history order leaves the wallet alone');
+ok(unlink_seller($admin, $lk) !== null, 'cannot unlink after importing');
+unset($GLOBALS['vh_market_stub'], $GLOBALS['vh_fetch_stub']); set_setting('marketplace_url', ''); set_setting('marketplace_api_key', '');
+
 // ---- SMTP settings ----
 ok(save_smtp_settings(['smtp_host' => 'bad host!', 'smtp_port' => '587', 'smtp_secure' => 'tls']) !== null, 'smtp: bad host refused');
 ok(save_smtp_settings(['smtp_host' => 'smtp.example.com', 'smtp_port' => '99999', 'smtp_secure' => 'tls']) !== null, 'smtp: bad port refused');

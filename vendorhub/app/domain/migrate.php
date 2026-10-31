@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -75,6 +75,13 @@ function migration_steps(): array
                 $db->exec('CREATE UNIQUE INDEX coupons_code_unique ON coupons (code)');
                 $db->exec('CREATE INDEX coupons_seller_idx ON coupons (seller_id, created_at)');
             }
+        },
+        8 => function (Db $db) {
+            $cols = [['users', 'marketplace_user_id', 'INT NULL'], ['users', 'marketplace_name', 'VARCHAR(200) NULL'], ['users', 'marketplace_linked_at', 'DATETIME(3) NULL'],
+                ['products', 'marketplace_product_id', 'INT NULL'], ['product_variations', 'marketplace_variation_id', 'INT NULL'], ['orders', 'history', 'TINYINT(1) NOT NULL DEFAULT 0']];
+            foreach ($cols as [$t, $c, $def]) if (!column_exists($db, $t, $c)) $db->exec("ALTER TABLE $t ADD COLUMN $c $def");
+            try { $db->exec('CREATE INDEX products_market_idx ON products (marketplace_product_id)'); } catch (Throwable) {}
+            try { $db->exec('CREATE INDEX users_market_idx ON users (marketplace_user_id)'); } catch (Throwable) {}
         },
         7 => function (Db $db) use ($engine) {
             $cols = [['orders', 'payment_ref', "VARCHAR(100) NOT NULL DEFAULT ''"], ['orders', 'payment_method', "VARCHAR(40) NOT NULL DEFAULT ''"], ['bank_accounts', 'bank_code', 'VARCHAR(20) NULL'], ['bank_accounts', 'recipient_code', 'VARCHAR(60) NULL'],

@@ -33,7 +33,7 @@ route('GET', '/admin', function () {
         case 'refunds': $f = in_array(input('filter'), ['open', 'done', 'all'], true) ? input('filter') : 'open'; $vars['items'] = customer_refunds_list($f); $vars['filter'] = $f; break;
         case 'payouts': $vars['items'] = withdrawal_review_list(); $vars['ps'] = paystack_on(); break;
         case 'codes': $vars['items'] = coupons_admin_list(); break;
-        case 'sellers': $vars['items'] = levels_admin_list(input('q')); $vars['q'] = input('q'); break;
+        case 'sellers': $vars['items'] = levels_admin_list(input('q')); $vars['q'] = input('q'); $vars['links'] = seller_links_map(); break;
         case 'activity': $f = array_key_exists(input('filter'), AUDIT_LABEL) ? input('filter') : ''; $vars['items'] = audit_list(200, $f); $vars['filter'] = $f; break;
         case 'settings': break;
     }
@@ -151,6 +151,41 @@ route('POST', '/admin/settings', function () use ($adminBack) {
     $err = save_settings($_POST);
     if (!$err) audit($actor, 'settings', 'Saved settings (commission ' . setting('commission_percent', '') . '%, hold ' . setting('payout_hold_days', '') . ' days)');
     $adminBack('settings', $err, 'Settings saved.');
+});
+
+route('GET', '/admin/link', function () {
+    require_admin();
+    $id = input('seller');
+    if (!is_uuid($id) || !is_verified_seller($id)) abort(404);
+    $row = db()->one('SELECT email FROM users WHERE id = ?', [$id]);
+    $app = load_application($id);
+    $store = trim((string) ($app['brand']['store_name'] ?? '')) ?: $row['email'];
+    $link = seller_link($id);
+    $vendors = null; $q = input('q', '');
+    if (!$link && marketplace_connected()) {
+        $vendors = marketplace_vendors($q);
+        if ($vendors !== null) $vendors = suggest_matches($vendors, $q === '' ? $row['email'] : '', $q === '' ? $store : '');
+    }
+    render('link', ['title' => 'Link to marketplace', 'user' => current_user(), 'scripts' => ['link.js'], 'sid' => $id, 'email' => $row['email'], 'store' => $store, 'link' => $link,
+        'vendors' => $vendors, 'q' => $q, 'connected' => marketplace_connected(), 'counts' => link_counts($id)]);
+});
+
+route('POST', '/admin/link', function () {
+    $u = require_admin();
+    $id = input('seller');
+    if (!is_uuid($id)) abort(404);
+    $err = input('action') === 'unlink' ? unlink_seller($u, $id) : link_seller($u, $id, (int) input('uid'), input_raw('name'));
+    redirect('/admin/link?seller=' . $id, $err ?? (input('action') === 'unlink' ? 'Link removed.' : 'Linked. Now import their products, then their past orders.'), $err ? 'error' : 'ok');
+});
+
+route('POST', '/admin/link/run', function () {
+    $u = require_admin();
+    $id = input('seller');
+    if (!is_uuid($id) || !is_verified_seller($id)) json_out(['error' => 'Seller not found.'], 404);
+    $after = max(0, (int) input('after'));
+    @set_time_limit(120);
+    $res = input('kind') === 'orders' ? import_orders_batch($u, $id, $after) : import_products_batch($u, $id, $after);
+    json_out($res + ['counts' => link_counts($id)]);
 });
 
 route('GET', '/admin/health', function () {

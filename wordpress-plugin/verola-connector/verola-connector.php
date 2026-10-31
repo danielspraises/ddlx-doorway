@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.3.0
+ * Version: 1.4.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -342,6 +342,13 @@ final class Verola_Connector {
 		register_rest_route('vendor-hub/v1', '/order-status', ['methods' => 'POST', 'callback' => [__CLASS__, 'rest_order_status'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
 		register_rest_route('vendor-hub/v1', '/sku/next', ['methods' => 'GET', 'callback' => [__CLASS__, 'rest_sku_next'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
 		register_rest_route('vendor-hub/v1', '/sku/check', ['methods' => 'POST', 'callback' => [__CLASS__, 'rest_sku_check'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
+		// Matching Vendor Hub sellers to sellers that already exist in this store
+		register_rest_route('vendor-hub/v1', '/vendors', ['methods' => 'GET', 'callback' => [__CLASS__, 'rest_vendors'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
+		register_rest_route('vendor-hub/v1', '/link', ['methods' => 'POST', 'callback' => [__CLASS__, 'rest_link'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
+		register_rest_route('vendor-hub/v1', '/unlink', ['methods' => 'POST', 'callback' => [__CLASS__, 'rest_unlink'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
+		register_rest_route('vendor-hub/v1', '/vendor/products', ['methods' => 'GET', 'callback' => [__CLASS__, 'rest_vendor_products'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
+		register_rest_route('vendor-hub/v1', '/adopt', ['methods' => 'POST', 'callback' => [__CLASS__, 'rest_adopt'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
+		register_rest_route('vendor-hub/v1', '/vendor/orders', ['methods' => 'GET', 'callback' => [__CLASS__, 'rest_vendor_orders'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
 	}
 
 	// Vendor Hub proves who it is with the same API key used everywhere else.
@@ -390,6 +397,293 @@ final class Verola_Connector {
 			}
 		}
 		return ['conflicts' => array_values(array_unique($conflicts))];
+	}
+
+
+	// ------------------------------------------------------------------ matching existing sellers
+
+	private static function is_vendor_user($user) {
+		if (!$user) {
+			return false;
+		}
+		$role = self::settings()['role'];
+		return in_array($role, (array) $user->roles, true) || in_array('seller', (array) $user->roles, true);
+	}
+
+	// Sellers already in this store, with a count of their products and whether they are linked.
+	public static function rest_vendors($request) {
+		$search = trim((string) $request->get_param('search'));
+		$page = max(1, (int) $request->get_param('page'));
+		$roles = array_values(array_unique([self::settings()['role'], 'seller']));
+		$ids = [];
+		$base = ['role__in' => $roles, 'fields' => 'ID', 'number' => 20, 'paged' => $page, 'orderby' => 'display_name'];
+		if ($search !== '') {
+			$by_user = get_users($base + ['search' => '*' . $search . '*', 'search_columns' => ['user_login', 'user_email', 'display_name', 'user_nicename']]);
+			$by_store = get_users($base + ['meta_query' => [['key' => 'store_name', 'value' => $search, 'compare' => 'LIKE']]]);
+			$by_dokan = get_users($base + ['meta_query' => [['key' => 'dokan_profile_settings', 'value' => $search, 'compare' => 'LIKE']]]);
+			$ids = array_values(array_unique(array_merge($by_user, $by_store, $by_dokan)));
+		} else {
+			$ids = get_users($base);
+		}
+		$out = [];
+		foreach ($ids as $id) {
+			$u = get_userdata($id);
+			if (!$u) {
+				continue;
+			}
+			$profile = get_user_meta($id, 'dokan_profile_settings', true);
+			$name = is_array($profile) && !empty($profile['store_name']) ? $profile['store_name'] : ($u->display_name ?: $u->user_login);
+			$out[] = [
+				'id' => (int) $id,
+				'email' => $u->user_email,
+				'name' => $name,
+				'slug' => $u->user_nicename,
+				'product_count' => (int) count_user_posts($id, 'product', true),
+				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
+			];
+		}
+		return ['vendors' => $out];
+	}
+
+	public static function rest_link($request) {
+		$uid = (int) $request->get_param('user_id');
+		$seller = sanitize_text_field((string) $request->get_param('seller_id'));
+		$user = get_userdata($uid);
+		if (!self::is_vendor_user($user) || !preg_match('/^[0-9a-f-]{36}$/i', $seller)) {
+			return new WP_REST_Response(['ok' => false, 'message' => 'That seller was not found in the store.'], 404);
+		}
+		$have = (string) get_user_meta($uid, '_verola_seller_id', true);
+		if ($have !== '' && $have !== $seller) {
+			return new WP_REST_Response(['ok' => false, 'message' => 'That store seller is already linked to another Vendor Hub seller.'], 409);
+		}
+		update_user_meta($uid, '_verola_seller_id', $seller);
+		update_user_meta($uid, '_verola_linked_existing', 1); // keeps their store page, address and profile untouched
+		return ['ok' => true];
+	}
+
+	public static function rest_unlink($request) {
+		$uid = (int) $request->get_param('user_id');
+		if ($uid > 0 && get_user_meta($uid, '_verola_linked_existing', true)) {
+			delete_user_meta($uid, '_verola_seller_id');
+			delete_user_meta($uid, '_verola_linked_existing');
+		}
+		return ['ok' => true];
+	}
+
+	private static function vendor_product_ids($uid, $after, $limit) {
+		global $wpdb;
+		$ids = $wpdb->get_col($wpdb->prepare(
+			"SELECT p.ID FROM {$wpdb->posts} p
+			 LEFT JOIN {$wpdb->postmeta} m ON m.post_id = p.ID AND m.meta_key = '_verola_product_id'
+			 WHERE p.post_type = 'product' AND p.post_author = %d AND p.post_status IN ('publish','draft','pending','private') AND p.ID > %d AND m.meta_id IS NULL
+			 ORDER BY p.ID ASC LIMIT %d", $uid, $after, $limit
+		));
+		return array_map('intval', $ids);
+	}
+
+	private static function category_path_of($product) {
+		$ids = $product->get_category_ids();
+		if (!$ids) {
+			return [];
+		}
+		$best = [];
+		foreach ($ids as $cid) {
+			$chain = array_reverse(get_ancestors($cid, 'product_cat', 'taxonomy'));
+			$chain[] = $cid;
+			if (count($chain) > count($best)) {
+				$best = $chain;
+			}
+		}
+		$names = [];
+		foreach ($best as $cid) {
+			$t = get_term($cid, 'product_cat');
+			if ($t && !is_wp_error($t)) {
+				$names[] = html_entity_decode($t->name);
+			}
+		}
+		return $names;
+	}
+
+	private static function attachment_urls($product) {
+		$ids = array_merge([$product->get_image_id()], $product->get_gallery_image_ids());
+		$urls = [];
+		foreach ($ids as $aid) {
+			$u = $aid ? wp_get_attachment_url($aid) : '';
+			if ($u) {
+				$urls[] = $u;
+			}
+		}
+		return $urls;
+	}
+
+	private static function export_product($product) {
+		$type = $product->get_type();
+		$row = [
+			'id' => $product->get_id(), 'type' => $type, 'name' => $product->get_name(), 'status' => $product->get_status(), 'sku' => (string) $product->get_sku(),
+			'description' => $product->get_description(), 'short_description' => $product->get_short_description(), 'currency' => get_woocommerce_currency(),
+			'manage_stock' => (bool) $product->get_manage_stock(), 'stock' => (int) $product->get_stock_quantity(), 'backorders' => $product->get_backorders() !== 'no',
+			'low_stock' => (int) $product->get_low_stock_amount(), 'weight' => $product->get_weight(), 'length' => $product->get_length(), 'width' => $product->get_width(), 'height' => $product->get_height(),
+			'category_path' => self::category_path_of($product),
+			'tags' => wp_get_post_terms($product->get_id(), 'product_tag', ['fields' => 'names']),
+			'images' => self::attachment_urls($product),
+			'regular_price' => $product->get_regular_price(), 'sale_price' => $product->get_sale_price(),
+			'attributes' => [], 'variations' => [],
+		];
+		foreach ($product->get_attributes() as $attr) {
+			if (!is_a($attr, 'WC_Product_Attribute')) {
+				continue;
+			}
+			$values = $attr->is_taxonomy() ? wc_get_product_terms($product->get_id(), $attr->get_name(), ['fields' => 'names']) : $attr->get_options();
+			$row['attributes'][] = ['name' => wc_attribute_label($attr->get_name()), 'slug' => sanitize_title($attr->get_name()), 'values' => array_values(array_map('strval', $values)), 'variation' => (bool) $attr->get_variation()];
+		}
+		if ($type === 'variable') {
+			foreach ($product->get_children() as $vid) {
+				$v = wc_get_product($vid);
+				if (!$v) {
+					continue;
+				}
+				$opts = [];
+				foreach ($v->get_attributes() as $slug => $val) {
+					$label = wc_attribute_label($slug, $product);
+					if ($val === '') {
+						continue; // "any" option: cannot be expressed as one combination
+					}
+					if (taxonomy_exists($slug)) {
+						$term = get_term_by('slug', $val, $slug);
+						$val = $term ? $term->name : $val;
+					}
+					$opts[$label] = (string) $val;
+				}
+				$img = $v->get_image_id() ? wp_get_attachment_url($v->get_image_id()) : '';
+				$row['variations'][] = ['id' => (int) $vid, 'sku' => (string) $v->get_sku(), 'options' => $opts, 'regular_price' => $v->get_regular_price(), 'sale_price' => $v->get_sale_price(),
+					'stock' => (int) $v->get_stock_quantity(), 'image' => $img ?: null, 'enabled' => $v->get_status() === 'publish'];
+			}
+		}
+		$from = $product->get_date_on_sale_from();
+		$to = $product->get_date_on_sale_to();
+		$row['sale_starts_at'] = $from ? gmdate('c', $from->getTimestamp()) : null;
+		$row['sale_ends_at'] = $to ? gmdate('c', $to->getTimestamp()) : null;
+		return $row;
+	}
+
+	// The seller's products that Vendor Hub does not manage yet, a few at a time.
+	public static function rest_vendor_products($request) {
+		global $wpdb;
+		$uid = (int) $request->get_param('user_id');
+		if (!self::is_vendor_user(get_userdata($uid))) {
+			return new WP_REST_Response(['message' => 'Seller not found.'], 404);
+		}
+		$after = max(0, (int) $request->get_param('after'));
+		$limit = min(10, max(1, (int) $request->get_param('limit')));
+		$ids = self::vendor_product_ids($uid, $after, $limit);
+		$products = [];
+		foreach ($ids as $id) {
+			$p = wc_get_product($id);
+			if ($p) {
+				$products[] = self::export_product($p);
+			}
+		}
+		$last = $ids ? end($ids) : 0;
+		$more = $ids ? self::vendor_product_ids($uid, $last, 1) : [];
+		$remaining = (int) $wpdb->get_var($wpdb->prepare(
+			"SELECT COUNT(*) FROM {$wpdb->posts} p LEFT JOIN {$wpdb->postmeta} m ON m.post_id = p.ID AND m.meta_key = '_verola_product_id'
+			 WHERE p.post_type = 'product' AND p.post_author = %d AND p.post_status IN ('publish','draft','pending','private') AND p.ID > %d AND m.meta_id IS NULL", $uid, $last
+		));
+		return ['products' => $products, 'next' => $more ? $last : null, 'remaining' => $remaining];
+	}
+
+	// Ties existing store products to their new Vendor Hub ids, so the next sync updates them instead of creating copies.
+	public static function rest_adopt($request) {
+		$uid = (int) $request->get_param('user_id');
+		$items = (array) $request->get_param('items');
+		if (!self::is_vendor_user(get_userdata($uid))) {
+			return new WP_REST_Response(['ok' => false, 'message' => 'Seller not found.'], 404);
+		}
+		$n = 0;
+		foreach ($items as $it) {
+			$wc = (int) ($it['wc_id'] ?? 0);
+			$vh = sanitize_text_field((string) ($it['vh_id'] ?? ''));
+			if ($wc < 1 || !preg_match('/^[0-9a-f-]{36}$/i', $vh) || get_post_type($wc) !== 'product' || (int) get_post_field('post_author', $wc) !== $uid) {
+				continue;
+			}
+			update_post_meta($wc, '_verola_product_id', $vh);
+			foreach ((array) ($it['variations'] ?? []) as $v) {
+				$vwc = (int) ($v['wc_id'] ?? 0);
+				$vvh = sanitize_text_field((string) ($v['vh_id'] ?? ''));
+				if ($vwc > 0 && preg_match('/^[0-9a-f-]{36}$/i', $vvh) && (int) wp_get_post_parent_id($vwc) === $wc) {
+					update_post_meta($vwc, '_verola_variation_id', $vvh);
+				}
+			}
+			$n++;
+		}
+		return ['ok' => true, 'adopted' => $n];
+	}
+
+	// Past paid orders that contain this seller's products (their own lines only).
+	public static function rest_vendor_orders($request) {
+		global $wpdb;
+		$uid = (int) $request->get_param('user_id');
+		if (!self::is_vendor_user(get_userdata($uid))) {
+			return new WP_REST_Response(['message' => 'Seller not found.'], 404);
+		}
+		$after = max(0, (int) $request->get_param('after'));
+		$limit = min(30, max(1, (int) $request->get_param('limit')));
+		$sql = "SELECT DISTINCT oi.order_id FROM {$wpdb->prefix}woocommerce_order_items oi
+			JOIN {$wpdb->prefix}woocommerce_order_itemmeta pm ON pm.order_item_id = oi.order_item_id AND pm.meta_key = '_product_id'
+			JOIN {$wpdb->posts} p ON p.ID = pm.meta_value
+			WHERE oi.order_item_type = 'line_item' AND p.post_author = %d AND oi.order_id > %d ORDER BY oi.order_id ASC LIMIT %d";
+		$ids = array_map('intval', $wpdb->get_col($wpdb->prepare($sql, $uid, $after, $limit)));
+		$allowed = ['processing', 'completed', 'ready-shipping', 'shipped', 'delivered'];
+		$orders = [];
+		foreach ($ids as $oid) {
+			$order = wc_get_order($oid);
+			if (!$order || $order->get_parent_id() || !in_array($order->get_status(), $allowed, true)) {
+				continue;
+			}
+			$items = [];
+			foreach ($order->get_items() as $line) {
+				$product = $line->get_product();
+				if (!$product) {
+					continue;
+				}
+				$pid = $product->is_type('variation') ? $product->get_parent_id() : $product->get_id();
+				if ((int) get_post_field('post_author', $pid) !== $uid) {
+					continue;
+				}
+				$qty = max(1, (int) $line->get_quantity());
+				$items[] = [
+					'wc_product_id' => (int) $pid, 'wc_variation_id' => $product->is_type('variation') ? (int) $product->get_id() : null,
+					'name' => $line->get_name(), 'sku' => (string) $product->get_sku(), 'quantity' => $qty,
+					'unit_price' => round(((float) $line->get_total()) / $qty, 2),
+				];
+			}
+			if (!$items) {
+				continue;
+			}
+			$country = $order->get_shipping_country() ?: $order->get_billing_country();
+			$state = $order->get_shipping_state() ?: $order->get_billing_state();
+			$states = $country ? WC()->countries->get_states($country) : [];
+			$first = $order->get_shipping_first_name() ?: $order->get_billing_first_name();
+			$last = $order->get_shipping_last_name() ?: $order->get_billing_last_name();
+			$created = $order->get_date_created();
+			$orders[] = [
+				'id' => (string) $order->get_id(), 'number' => (string) $order->get_order_number(), 'status' => $order->get_status(), 'currency' => $order->get_currency(),
+				'placed_at' => gmdate('c', $created ? $created->getTimestamp() : time()),
+				'customer_name' => trim($first . ' ' . ($last !== '' ? mb_substr($last, 0, 1) . '.' : '')),
+				'ship_city' => (string) ($order->get_shipping_city() ?: $order->get_billing_city()), 'ship_state' => (string) (($states[$state] ?? $state) ?: ''),
+				'payment_ref' => (string) $order->get_transaction_id(), 'payment_method' => (string) $order->get_payment_method(),
+				'carrier' => (string) $order->get_meta('_vh_carrier'), 'tracking_number' => (string) $order->get_meta('_vh_tracking'),
+				'items' => $items,
+			];
+		}
+		$last = $ids ? end($ids) : 0;
+		$more = $ids ? $wpdb->get_var($wpdb->prepare($sql, $uid, $last, 1)) : null;
+		$remaining = (int) $wpdb->get_var($wpdb->prepare(
+			"SELECT COUNT(DISTINCT oi.order_id) FROM {$wpdb->prefix}woocommerce_order_items oi
+			 JOIN {$wpdb->prefix}woocommerce_order_itemmeta pm ON pm.order_item_id = oi.order_item_id AND pm.meta_key = '_product_id'
+			 JOIN {$wpdb->posts} p ON p.ID = pm.meta_value WHERE oi.order_item_type = 'line_item' AND p.post_author = %d AND oi.order_id > %d", $uid, $last
+		));
+		return ['orders' => $orders, 'next' => $more ? $last : null, 'remaining' => $remaining];
 	}
 
 	public static function test_connection() {
@@ -616,13 +910,18 @@ final class Verola_Connector {
 		$s = self::settings();
 		$existing = get_users(['meta_key' => '_verola_seller_id', 'meta_value' => $seller['id'], 'number' => 1, 'fields' => 'ID']);
 		$name = $seller['store_name'] ?? 'DDLX seller';
+		$linked = false;
 		if ($existing) {
 			$uid = (int) $existing[0];
-			$update = ['ID' => $uid, 'display_name' => $name];
-			if (!empty($seller['store_slug'])) {
-				$update['user_nicename'] = sanitize_title($seller['store_slug']);
+			// A seller who already had a store here keeps their name, store address and profile exactly as they are.
+			$linked = (bool) get_user_meta($uid, '_verola_linked_existing', true);
+			if (!$linked) {
+				$update = ['ID' => $uid, 'display_name' => $name];
+				if (!empty($seller['store_slug'])) {
+					$update['user_nicename'] = sanitize_title($seller['store_slug']);
+				}
+				wp_update_user($update);
 			}
-			wp_update_user($update);
 		} else {
 			$short = substr(str_replace('-', '', $seller['id']), 0, 8);
 			$login = 'verola_' . $short;
@@ -641,6 +940,9 @@ final class Verola_Connector {
 				throw new Exception('Could not create the seller account: ' . $uid->get_error_message());
 			}
 			update_user_meta($uid, '_verola_seller_id', $seller['id']);
+		}
+		if ($linked) {
+			return (int) $uid;
 		}
 		update_user_meta($uid, 'store_name', $name);
 		// Best-effort support for the common vendor plugins.

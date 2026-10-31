@@ -63,3 +63,13 @@ Vendor Hub installs like an app on phones and computers. It needs HTTPS (your li
 
 ## 8. Email (SMTP)
 Admin → Settings → Email sending. Easiest: a free Brevo account (SMTP & API → SMTP): server `smtp-relay.brevo.com`, port 587, TLS, your SMTP login and key. Set the sender address (same section above) to one Brevo has verified, press **Send me a test email**, and check your inbox and spam. If SMTP fails, Vendor Hub falls back to the host's built-in mail automatically.
+
+## 9. Link existing marketplace sellers (do this before opening to everyone)
+Upload plugin **1.4.0** first. For each seller who already sells on ddlx.shop:
+1. The seller registers on Vendor Hub, finishes the application and verification, and you approve both.
+2. Admin → Sellers → **Link to marketplace**. The list shows their store with a "Same email" or "Same store name" hint; press **Link** on the right one. (Wrong one? **Remove link** works until something has been imported.)
+3. **Import products**: their existing products (photos, price, stock, variations) are copied into Vendor Hub and tied to the same product on the store, so nothing duplicates. Products whose SKU already exists in Vendor Hub, or of unsupported types (grouped, external), are listed and left on the store.
+4. **Import past orders**: sales history appears in their reports and counts towards their level. Finished orders are history only and add nothing to the wallet. Orders still on their way are paid out normally after delivery. Money Dokan already owes them stays in Dokan; settle it there.
+5. From then on, edits, stock and prices are made in Vendor Hub and follow to the store within minutes; new orders arrive as usual. Their store page and address on ddlx.shop are not changed.
+
+Tip: link one seller first and check one product and one order on both sides before doing the rest. Do not edit that seller's products in Dokan afterwards; Vendor Hub will overwrite them.

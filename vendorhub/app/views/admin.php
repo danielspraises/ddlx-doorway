@@ -242,7 +242,7 @@ $docLinks = function (array $docs): string {
   <form method="get" action="/admin" class="row" style="margin:12px 0" data-keep><input type="hidden" name="tab" value="sellers"><input type="search" name="q" value="<?= e($q) ?>" placeholder="Search sellers" style="max-width:260px"><button class="btn btn-sm btn-outline">Search</button>
     </form>
   <form method="post" action="/admin/level" data-keep style="margin-bottom:12px"><?= csrf_field() ?><input type="hidden" name="action" value="recalculate"><button class="btn btn-sm btn-outline" type="submit">Recalculate all levels</button> <span class="muted small">Levels also update when orders are delivered and ratings change.</span></form>
-  <div class="table-wrap"><table><thead><tr><th>Seller</th><th>Level</th><th class="t-right">Delivered (90d)</th><th class="t-right">Returns</th><th class="t-right">Packed in 48h</th><th class="t-right">Rating</th><th>Pin a level</th></tr></thead><tbody>
+  <div class="table-wrap"><table><thead><tr><th>Seller</th><th>Level</th><th class="t-right">Delivered (90d)</th><th class="t-right">Returns</th><th class="t-right">Packed in 48h</th><th class="t-right">Rating</th><th>Pin a level</th><th>Marketplace</th></tr></thead><tbody>
   <?php foreach ($items as $s): $m = $s['m']; ?>
     <tr><td><strong><?= e($s['store']) ?></strong><br><span class="muted small"><?= e($s['email']) ?></span></td>
       <td><?= level_badge($s['level']) ?><?= $s['override_level'] ? '<br><span class="muted small">pinned' . ($s['override_note'] ? ': ' . e($s['override_note']) : '') . '</span>' : '' ?><?= !empty($s['below_since']) && !$s['override_level'] ? '<br><span class="muted small" style="color:#b45309">at risk since ' . e(human_date($s['below_since'], false)) . '</span>' : '' ?></td>
@@ -250,8 +250,9 @@ $docLinks = function (array $docs): string {
       <td class="t-right"><?= isset($m['dispatch_pct']) && $m['dispatch_pct'] !== null ? e((string) $m['dispatch_pct']) . '%' : '–' ?></td><td class="t-right"><?= !empty($m['rating']) ? e((string) $m['rating']) . ' (' . (int) $m['ratings'] . ')' : '–' ?></td>
       <td><form method="post" action="/admin/level" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="seller" value="<?= e($s['id']) ?>">
         <select name="level" aria-label="Level"><option value="">Automatic</option><?php foreach (LEVEL_LABEL as $k => $l): ?><option value="<?= e($k) ?>"<?= $s['override_level'] === $k ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select>
-        <input name="note" placeholder="Reason (optional)" value="<?= e($s['override_note']) ?>" maxlength="250" style="max-width:170px"><button class="btn btn-sm" type="submit">Save</button></form></td></tr>
-  <?php endforeach; if (!$items): ?><tr><td colspan="7" class="muted">No verified sellers yet.</td></tr><?php endif; ?></tbody></table></div>
+        <input name="note" placeholder="Reason (optional)" value="<?= e($s['override_note']) ?>" maxlength="250" style="max-width:170px"><button class="btn btn-sm" type="submit">Save</button></form></td>
+      <td><?php $lk = $links[$s['id']] ?? null; ?><?= $lk ? '<span class="pill pill-ok">Linked</span><br><span class="muted small">' . e($lk['name']) . ' #' . (int) $lk['uid'] . '</span><br>' : '' ?><a class="btn btn-sm btn-outline" href="/admin/link?seller=<?= e($s['id']) ?>"><?= $lk ? 'Manage' : 'Link to marketplace' ?></a></td></tr>
+  <?php endforeach; if (!$items): ?><tr><td colspan="8" class="muted">No verified sellers yet.</td></tr><?php endif; ?></tbody></table></div>
 <?php endif; ?>
 
 <?php if ($tab === 'staff'): ?>

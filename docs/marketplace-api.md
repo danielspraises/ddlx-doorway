@@ -228,3 +228,11 @@ Vendor Hub talks to Paystack directly (set the secret key in Admin → Settings 
 - Customer refunds: `POST /refund` with the order's payment reference and the amount in kobo.
 - Webhook: `POST /api/paystack/webhook` (signed with HMAC-SHA512 of the body using the secret key, header `x-paystack-signature`). Handles
   `transfer.success`, `transfer.failed`, `transfer.reversed`, `refund.processed`, `refund.failed`. A failed or reversed transfer returns the money to the seller's wallet once.
+
+## Linking existing sellers (plugin 1.4.0)
+Bearer-authenticated endpoints under `/wp-json/vendor-hub/v1` that Vendor Hub calls from Admin → Sellers → Link to marketplace:
+- `GET /vendors?search=&page=` lists store sellers (id, email, name, slug, product_count, linked).
+- `POST /link {user_id, seller_id}` / `POST /unlink {user_id}` ties a store user to a Vendor Hub seller (`_verola_seller_id`). Linked sellers keep their name, store address and profile.
+- `GET /vendor/products?user_id=&after=&limit=` exports products not yet managed by Vendor Hub, in batches.
+- `POST /adopt {user_id, items:[{wc_id, vh_id, variations:[{wc_id, vh_id}]}]}` stores the Vendor Hub ids on those products so later syncs update them in place.
+- `GET /vendor/orders?user_id=&after=&limit=` exports past paid orders (the seller's lines only), in batches.

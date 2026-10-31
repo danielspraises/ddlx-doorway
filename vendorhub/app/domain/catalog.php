@@ -423,7 +423,7 @@ function local_next_sku(string $prefix): string
 }
 
 // SKUs must be unique across the whole marketplace store; the connector plugin answers for it. Null = could not ask.
-function marketplace_call(string $path, string $method, ?array $body = null): ?array
+function marketplace_call(string $path, string $method, ?array $body = null, int $timeout = 8): ?array
 {
     $url = rtrim((string) setting('marketplace_url', cfg('marketplace_url', '')), '/');
     $key = (string) setting('marketplace_api_key', cfg('marketplace_api_key', ''));
@@ -431,7 +431,7 @@ function marketplace_call(string $path, string $method, ?array $body = null): ?a
     if (!empty($GLOBALS['vh_market_stub'])) return ($GLOBALS['vh_market_stub'])($path, $method, $body);
     if (!function_exists('curl_init')) return null;
     $ch = curl_init($url . '/wp-json/vendor-hub/v1' . $path);
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_CUSTOMREQUEST => $method,
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_CUSTOMREQUEST => $method,
         CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $key, 'Content-Type: application/json']]);
     if ($body !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
     $res = curl_exec($ch);

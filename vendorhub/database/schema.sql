@@ -7,6 +7,9 @@ CREATE TABLE users (
   totp_enabled TINYINT NOT NULL DEFAULT 0,
   totp_last_step BIGINT NOT NULL DEFAULT 0,
   totp_recovery TEXT NULL,
+  marketplace_user_id INT NULL,
+  marketplace_name VARCHAR(200) NULL,
+  marketplace_linked_at DATETIME(3) NULL,
   created_at DATETIME(3) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE UNIQUE INDEX users_email_unique ON users (email);
@@ -158,6 +161,7 @@ CREATE TABLE products (
   published_at DATETIME(3) NULL,
   rating_avg DECIMAL(3,2) NULL,
   rating_count INT NOT NULL DEFAULT 0,
+  marketplace_product_id INT NULL,
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   CONSTRAINT prod_seller_fk FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -183,6 +187,7 @@ CREATE TABLE product_variations (
   image VARCHAR(200) NULL,
   enabled TINYINT(1) NOT NULL DEFAULT 1,
   position INT NOT NULL DEFAULT 0,
+  marketplace_variation_id INT NULL,
   CONSTRAINT var_prod_fk FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE UNIQUE INDEX product_variations_sku_unique ON product_variations (sku);
@@ -198,6 +203,7 @@ CREATE TABLE orders (
   ship_state VARCHAR(100) NOT NULL DEFAULT '',
   payment_ref VARCHAR(100) NOT NULL DEFAULT '',
   payment_method VARCHAR(40) NOT NULL DEFAULT '',
+  history TINYINT(1) NOT NULL DEFAULT 0,
   placed_at DATETIME(3) NOT NULL,
   created_at DATETIME(3) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

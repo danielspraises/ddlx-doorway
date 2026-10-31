@@ -646,5 +646,17 @@ ok(customer_refund_open_count() >= 0, 'open refund count works');
 $GLOBALS['vh_paystack_stub'] = null; unset($GLOBALS['vh_paystack_stub']);
 ok(!paystack_call('GET', '/balance')['ok'], 'no real Paystack calls while testing');
 
+// ---- SMTP settings ----
+ok(save_smtp_settings(['smtp_host' => 'bad host!', 'smtp_port' => '587', 'smtp_secure' => 'tls']) !== null, 'smtp: bad host refused');
+ok(save_smtp_settings(['smtp_host' => 'smtp.example.com', 'smtp_port' => '99999', 'smtp_secure' => 'tls']) !== null, 'smtp: bad port refused');
+ok(save_smtp_settings(['smtp_host' => 'smtp.example.com', 'smtp_port' => '587', 'smtp_secure' => 'weird']) !== null, 'smtp: bad mode refused');
+eq(save_smtp_settings(['smtp_host' => 'smtp.example.com', 'smtp_port' => '465', 'smtp_secure' => 'ssl', 'smtp_user' => 'u', 'smtp_pass' => 'secret']), null, 'smtp saved');
+eq(setting('smtp_pass', ''), 'secret', 'smtp password stored');
+save_smtp_settings(['smtp_host' => 'smtp.example.com', 'smtp_port' => '465', 'smtp_secure' => 'ssl', 'smtp_user' => 'u', 'smtp_pass' => '']);
+eq(setting('smtp_pass', ''), 'secret', 'blank password keeps the saved one');
+save_smtp_settings(['smtp_host' => '', 'smtp_port' => '587', 'smtp_secure' => 'tls', 'smtp_clear' => 'yes']);
+eq(setting('smtp_pass', ''), '', 'password can be removed');
+ok(!smtp_on(), 'smtp never used while testing');
+
 echo "$pass passed, $fail failed\n";
 exit($fail ? 1 : 0);

@@ -60,3 +60,6 @@ Vendor Hub installs like an app on phones and computers. It needs HTTPS (your li
 - The app stores only its look (CSS, JS, icons) for speed, never pages or account data. Offline it shows a "You are offline" page.
 - After you change `sw.js`, bump `VERSION` inside it so phones pick up the new files.
 - For Play Store / App Store listings later, wrap this same site with PWABuilder or Capacitor.
+
+## 8. Email (SMTP)
+Admin → Settings → Email sending. Easiest: a free Brevo account (SMTP & API → SMTP): server `smtp-relay.brevo.com`, port 587, TLS, your SMTP login and key. Set the sender address (same section above) to one Brevo has verified, press **Send me a test email**, and check your inbox and spam. If SMTP fails, Vendor Hub falls back to the host's built-in mail automatically.

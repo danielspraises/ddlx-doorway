@@ -69,7 +69,7 @@ function system_checks(bool $probeMarketplace = true): array
 
     $up = min(ini_bytes((string) ini_get('upload_max_filesize')), ini_bytes((string) ini_get('post_max_size')));
     $add('Upload size limit', $up >= 8 * 1048576 ? 'ok' : 'warn', round($up / 1048576, 1) . ' MB per file. Product photos and verification documents can be several MB; 8 MB or more is comfortable.');
-    $add('Email', function_exists('mail') && (string) setting('mail_from', '') !== '' ? 'ok' : 'warn', (string) setting('mail_from', '') === '' ? 'No sender address set in Settings. Email alerts and password resets need one.' : 'Sender ' . setting('mail_from', ''));
+    $add('Email', (string) setting('smtp_host', '') !== '' ? ((string) setting('mail_from', '') !== '' ? 'ok' : 'warn') : (function_exists('mail') && (string) setting('mail_from', '') !== '' ? 'ok' : 'warn'), (string) setting('mail_from', '') === '' ? 'No sender address set in Settings. Email alerts and password resets need one.' : 'Sender ' . setting('mail_from', '') . ((string) setting('smtp_host', '') !== '' ? ' via ' . setting('smtp_host', '') : ' (host mail)'));
 
     $add('API key and webhook secret', (setting('marketplace_api_key', '') !== '' && setting('marketplace_webhook_secret', '') !== '') ? 'ok' : 'fail', (setting('marketplace_api_key', '') !== '' && setting('marketplace_webhook_secret', '') !== '') ? 'Both are set' : 'Missing. Create them in Settings.');
     $last = db()->val("SELECT MAX(created_at) FROM orders");

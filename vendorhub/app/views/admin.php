@@ -294,6 +294,16 @@ $docLinks = function (array $docs): string {
     <?= f_text('ai_model', 'Model', (string) setting('ai_model', 'claude-sonnet-5-5'), null, ['hint' => 'Leave as is unless told otherwise.']) ?>
     <button class="btn">Save settings</button>
   </form>
+  <h2>Email sending (SMTP)</h2>
+  <p class="muted" style="max-width:700px">Makes order, payout and password emails land in inboxes instead of spam. Use a service such as Brevo (free tier) or your own mail account. Leave the server blank to use your host's built-in mail.</p>
+  <form method="post" action="/admin/email" class="card" style="max-width:640px" data-keep><?= csrf_field() ?>
+    <div class="grid g2"><?= f_text('smtp_host', 'Mail server', (string) setting('smtp_host', ''), null, ['placeholder' => 'smtp-relay.brevo.com']) ?><?= f_text('smtp_port', 'Port', (string) setting('smtp_port', '587'), null, ['inputmode' => 'numeric', 'hint' => '587 for TLS, 465 for SSL.']) ?>
+      <?= f_text('smtp_user', 'Username', (string) setting('smtp_user', ''), null, ['autocomplete' => 'off']) ?><?= f_text('smtp_pass', 'Password', '', null, ['type' => 'password', 'autocomplete' => 'new-password', 'placeholder' => setting('smtp_pass', '') !== '' ? 'Saved. Type a new one to replace.' : '']) ?></div>
+    <div class="field"><label for="smtp_secure">Connection</label><select id="smtp_secure" name="smtp_secure"><?php foreach (['tls' => 'TLS (port 587)', 'ssl' => 'SSL (port 465)', 'none' => 'None (not recommended)'] as $k => $l): ?><option value="<?= $k ?>" <?= setting('smtp_secure', 'tls') === $k ? 'selected' : '' ?>><?= $l ?></option><?php endforeach; ?></select></div>
+    <?php if (setting('smtp_pass', '') !== ''): ?><label class="check"><input type="checkbox" name="smtp_clear" value="yes"><span>Remove the saved password</span></label><?php endif; ?>
+    <div class="row"><button class="btn" name="action" value="save">Save email settings</button><button class="btn btn-outline" name="action" value="test" formnovalidate>Send me a test email</button></div>
+    <p class="hint" style="margin:8px 0 0">The sender address above must be allowed by your mail service.</p>
+  </form>
   <p style="max-width:640px"><a class="btn btn-outline" href="/admin/health">Run system check</a> <span class="muted small">Checks PHP, the database, folders, HTTPS, email and the marketplace connection.</span></p>
   <h2>Seller levels</h2>
   <p class="muted" style="max-width:700px">Sellers earn Bronze, Silver, Gold and Blue from the last 90 days. The badge and marketplace placement always apply. Perks are optional: leave them at 0 to start, and raise them later as a reward.</p>

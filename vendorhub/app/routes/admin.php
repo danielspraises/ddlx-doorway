@@ -210,6 +210,17 @@ route('POST', '/admin/refund', function () use ($adminBack) {
     $adminBack('refunds', $err, input('action') === 'paystack' ? 'Refund sent to Paystack. It shows as refunded when Paystack confirms.' : 'Marked as refunded.');
 });
 
+route('POST', '/admin/email', function () use ($adminBack) {
+    $u = require_admin();
+    if (input('action') === 'test') {
+        $to = (string) $u['email'];
+        if ((string) setting('smtp_host', '') === '') $adminBack('settings', 'Add the mail server details and save first.', '');
+        $from = (string) setting('mail_from', 'no-reply@' . (parse_url(base_url(), PHP_URL_HOST) ?: 'localhost'));
+        $r = smtp_send($to, '=?UTF-8?B?' . base64_encode('Vendor Hub test email') . '?=', "If you can read this, email from Vendor Hub works.\n", $from);
+        $adminBack('settings', $r === null ? null : 'Test failed: ' . $r, 'Test email sent to ' . $to . '. Check your inbox (and spam).');
+    }
+    $adminBack('settings', save_smtp_settings($_POST), 'Email settings saved.');
+});
 route('POST', '/admin/paystack', function () use ($adminBack) {
     require_admin();
     if (input('action') === 'test') {

@@ -216,20 +216,33 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 <?php endif; ?>
 
 <?php if ($tab === 'store'): ?>
-  <div class="grid g2" style="margin-top:20px">
-  <?php foreach (['logo' => 'Logo', 'banner' => 'Banner'] as $kind => $label): ?>
-    <div><p class="label"><?= $label ?></p>
-      <div class="imgbox<?= $kind === 'banner' ? ' banner-box' : '' ?>"><?php if ($store[$kind]): ?><img src="/files/store?p=<?= e(rawurlencode($store[$kind])) ?>" alt="<?= e($label) ?>"><?php endif; ?></div>
-      <form method="post" action="/store/image" enctype="multipart/form-data" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="kind" value="<?= $kind ?>"><input type="file" name="file" accept="image/jpeg,image/png,image/webp" required><button class="btn btn-outline btn-sm" name="action" value="upload">Upload</button><?php if ($store[$kind]): ?><button class="btn btn-ghost btn-sm" name="action" value="remove" formnovalidate>Remove</button><?php endif; ?></form></div>
-  <?php endforeach; ?></div>
-  <form method="post" action="/store/save" style="max-width:700px;margin-top:24px" data-keep><?= csrf_field() ?>
-    <?= f_text('tagline', 'Tagline', $store['tagline'], null, ['maxlength' => 160]) ?>
-    <?= f_area('description', 'About your store', $store['description'], null, ['rows' => 5, 'maxlength' => 3000]) ?>
-    <div class="grid g2"><?= f_text('phone', 'Store phone', $store['phone'], null, ['type' => 'tel', 'maxlength' => 30]) ?><?= f_text('support_email', 'Support email', $store['support_email'], null, ['type' => 'email']) ?></div>
-    <?= f_area('shipping_policy', 'Shipping policy', $store['shipping_policy'], null, ['rows' => 4, 'maxlength' => 3000]) ?>
-    <?= f_area('return_policy', 'Return policy', $store['return_policy'], null, ['rows' => 4, 'maxlength' => 3000]) ?>
-    <div class="card"><?= f_check('vacation', 'Vacation mode — hide all my products from the marketplace until I switch it off', $store['vacation']) ?>
+  <section class="storehead" style="margin-top:14px">
+    <div class="cover"><?php if ($store['banner']): ?><img src="/files/store?p=<?= e(rawurlencode($store['banner'])) ?>" alt="Banner"><?php else: ?><span>Banner · 1600×400 works best</span><?php endif; ?></div>
+    <div class="storeid">
+      <div class="logo-ring"><?php if ($store['logo']): ?><img src="/files/store?p=<?= e(rawurlencode($store['logo'])) ?>" alt="Logo"><?php else: ?><span>Logo</span><?php endif; ?></div>
+      <div class="grow"><strong class="store-title"><?= e($store['tagline'] !== '' ? $store['tagline'] : 'Your store') ?></strong><p class="muted small" style="margin:0">This is how customers see your store on the marketplace.</p></div>
+      <?php if ($store['vacation']): ?><span class="pill pill-warn">On vacation</span><?php endif; ?>
+    </div>
+    <div class="uploads">
+    <?php foreach (['logo' => 'Logo', 'banner' => 'Banner'] as $kind => $label): ?>
+      <form method="post" action="/store/image" enctype="multipart/form-data" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="kind" value="<?= $kind ?>"><span class="label small" style="min-width:48px"><?= $label ?></span><input type="file" name="file" accept="image/jpeg,image/png,image/webp" required><button class="btn btn-outline btn-sm" name="action" value="upload">Upload</button><?php if ($store[$kind]): ?><button class="btn btn-ghost btn-sm" name="action" value="remove" formnovalidate>Remove</button><?php endif; ?></form>
+    <?php endforeach; ?>
+    </div>
+  </section>
+  <form method="post" action="/store/save" data-keep><?= csrf_field() ?>
+    <div class="grid g2 cols">
+      <div class="card"><h3 style="margin-top:0">About</h3>
+        <?= f_text('tagline', 'Tagline', $store['tagline'], null, ['maxlength' => 160]) ?>
+        <?= f_area('description', 'About your store', $store['description'], null, ['rows' => 4, 'maxlength' => 3000]) ?>
+        <div class="grid g2"><?= f_text('phone', 'Store phone', $store['phone'], null, ['type' => 'tel', 'maxlength' => 30]) ?><?= f_text('support_email', 'Support email', $store['support_email'], null, ['type' => 'email']) ?></div>
+      </div>
+      <div class="card"><h3 style="margin-top:0">Policies</h3>
+        <?= f_area('shipping_policy', 'Shipping policy', $store['shipping_policy'], null, ['rows' => 3, 'maxlength' => 3000]) ?>
+        <?= f_area('return_policy', 'Return policy', $store['return_policy'], null, ['rows' => 3, 'maxlength' => 3000]) ?>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px"><?= f_check('vacation', 'Vacation mode: hide all my products from the marketplace until I switch it off', $store['vacation']) ?>
       <?= f_text('vacation_message', 'Message to customers', $store['vacation_message'], null, ['maxlength' => 300]) ?></div>
-    <p><button class="btn" type="submit">Save store</button></p>
+    <p style="margin-top:12px"><button class="btn" type="submit">Save store</button></p>
   </form>
 <?php endif; ?>

@@ -10,6 +10,12 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($pageTitle) ?> — Vendor Hub</title>
 <meta name="robots" content="noindex">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0c0d12">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vendor Hub"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap">
@@ -36,11 +42,12 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
           <?php foreach (nav_items($user) as [$label, $href]): ?><a class="m-only" href="<?= e($href) ?>"><?= e($label) ?></a><?php endforeach; ?>
           <a href="/notifications">Notifications</a>
           <a href="/account/security">Account security</a>
+          <button type="button" class="hidden" data-install>Install app</button>
           <form method="post" action="/logout"><?= csrf_field() ?><button type="submit">Sign out</button></form>
         </div></details>
     </div>
     <?php else: ?>
-    <div class="nav-end"><a class="btn btn-ghost btn-sm" href="/auth">Sign in</a><a class="btn btn-sm" href="/apply">Start application</a></div>
+    <div class="nav-end"><button type="button" class="btn btn-outline btn-sm hidden" data-install>Install app</button><a class="btn btn-ghost btn-sm" href="/auth">Sign in</a><a class="btn btn-sm" href="/apply">Start application</a></div>
     <?php endif; ?>
   </div>
 </header>
@@ -51,6 +58,7 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <dialog id="preview-dialog"><div class="dlg-head"><strong data-dlg-title>Document</strong><button class="btn btn-sm btn-outline" type="button" data-dlg-close>Close</button></div><div class="dlg-body"></div></dialog>
 <script src="/assets/app.js?v=2" defer></script>
+<script src="/assets/pwa.js" defer></script>
 <?php foreach (($scripts ?? []) as $src): ?><script src="/assets/<?= e($src) ?>?v=1" defer></script>
 <?php endforeach; ?>
 </body>

@@ -11,3 +11,11 @@ RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
   php_value upload_max_filesize 12M
   php_value post_max_size 64M
 </IfModule>
+
+# Installable app (PWA)
+AddType application/manifest+json .webmanifest
+<IfModule mod_headers.c>
+  <FilesMatch "^(sw\.js|manifest\.webmanifest|offline\.html)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

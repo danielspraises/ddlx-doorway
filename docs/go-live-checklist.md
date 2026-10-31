@@ -52,3 +52,11 @@ If a step fails, note the exact message and Admin → System check output; the l
 7. When all pass: replace the test key and webhook URL with the **live** ones, fund your Paystack balance, and repeat one small real withdrawal.
 
 Rules the app enforces: transfers and refunds only start from an admin click, a second click cannot send twice, Paystack is used only for NGN, and a manual "Mark paid / Mark done" is still available if you prefer your bank.
+
+## 7. Installable app (PWA)
+Vendor Hub installs like an app on phones and computers. It needs HTTPS (your live domain will have it).
+- **Android / Chrome / Edge (phone or desktop):** open the site, then use **Install app** in the account menu (or the address bar install icon).
+- **iPhone / iPad:** open the site in Safari, tap Share, then **Add to Home Screen**.
+- The app stores only its look (CSS, JS, icons) for speed, never pages or account data. Offline it shows a "You are offline" page.
+- After you change `sw.js`, bump `VERSION` inside it so phones pick up the new files.
+- For Play Store / App Store listings later, wrap this same site with PWABuilder or Capacitor.

@@ -13,7 +13,7 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="/assets/app.css?v=6">
+<link rel="stylesheet" href="/assets/app.css?v=7">
 </head>
 <body data-csrf="<?= e(csrf_token()) ?>" <?= $user ? 'data-live="1"' : '' ?> <?= !empty($live_refresh) ? 'data-refresh="1"' : '' ?>>
 <header class="site-header">

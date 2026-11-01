@@ -286,7 +286,6 @@ $docLinks = function (array $docs): string {
     <h3>Addresses</h3>
     <?= f_text('app_url', 'Vendor Hub address', (string) setting('app_url', ''), null, ['type' => 'url', 'placeholder' => 'https://vendor.ddlx.shop']) ?>
     <?= f_text('marketplace_url', 'Marketplace address', (string) setting('marketplace_url', ''), null, ['type' => 'url', 'placeholder' => 'https://ddlx.shop', 'hint' => 'Used to check SKUs against the store. Leave blank to skip.']) ?>
-    <?= f_text('mail_from', 'Email sender address', (string) setting('mail_from', ''), null, ['type' => 'email', 'placeholder' => 'no-reply@ddlx.shop']) ?>
     <h3>Ask DDLX assistant</h3>
     <p class="muted small">An AI helper for sellers and staff. Create a key at console.anthropic.com and paste it here. Without a key the assistant still answers from built-in help.</p>
     <label class="check"><input type="checkbox" name="ai_enabled" value="yes" <?= setting('ai_enabled', '1') === '1' ? 'checked' : '' ?>><span>Use the AI assistant</span></label>
@@ -298,12 +297,13 @@ $docLinks = function (array $docs): string {
   <h2>Email sending (SMTP)</h2>
   <p class="muted" style="max-width:700px">Makes order, payout and password emails land in inboxes instead of spam. Use a service such as Brevo (free tier) or your own mail account. Leave the server blank to use your host's built-in mail.</p>
   <form method="post" action="/admin/email" class="card" style="max-width:640px" data-keep><?= csrf_field() ?>
-    <div class="grid g2"><?= f_text('smtp_host', 'Mail server', (string) setting('smtp_host', ''), null, ['placeholder' => 'smtp-relay.brevo.com']) ?><?= f_text('smtp_port', 'Port', (string) setting('smtp_port', '587'), null, ['inputmode' => 'numeric', 'hint' => '587 for TLS, 465 for SSL.']) ?>
-      <?= f_text('smtp_user', 'Username', (string) setting('smtp_user', ''), null, ['autocomplete' => 'off']) ?><?= f_text('smtp_pass', 'Password', '', null, ['type' => 'password', 'autocomplete' => 'new-password', 'placeholder' => setting('smtp_pass', '') !== '' ? 'Saved. Type a new one to replace.' : '']) ?></div>
+    <div class="grid g2"><?= f_text('smtp_host', 'SMTP server', (string) setting('smtp_host', ''), null, ['placeholder' => 'smtp-relay.brevo.com']) ?><?= f_text('smtp_port', 'Port', (string) setting('smtp_port', '587'), null, ['inputmode' => 'numeric', 'hint' => '587 for TLS, 465 for SSL.']) ?>
+      <?= f_text('smtp_user', 'Login', (string) setting('smtp_user', ''), null, ['autocomplete' => 'off', 'placeholder' => 'xxxxxx@smtp-brevo.com']) ?><?= f_text('smtp_pass', 'SMTP key (password)', '', null, ['type' => 'password', 'autocomplete' => 'new-password', 'placeholder' => setting('smtp_pass', '') !== '' ? 'Saved. Type a new one to replace.' : 'Brevo: SMTP & API → SMTP keys']) ?></div>
+    <?= f_text('mail_from', 'Send emails from', (string) setting('mail_from', ''), null, ['type' => 'email', 'placeholder' => 'no-reply@ddlx.shop', 'hint' => 'The address people see. Not the Login above. On Brevo, add it under Senders & IP and verify it first.']) ?>
     <div class="field"><label for="smtp_secure">Connection</label><select id="smtp_secure" name="smtp_secure"><?php foreach (['tls' => 'TLS (port 587)', 'ssl' => 'SSL (port 465)', 'none' => 'None (not recommended)'] as $k => $l): ?><option value="<?= $k ?>" <?= setting('smtp_secure', 'tls') === $k ? 'selected' : '' ?>><?= $l ?></option><?php endforeach; ?></select></div>
     <?php if (setting('smtp_pass', '') !== ''): ?><label class="check"><input type="checkbox" name="smtp_clear" value="yes"><span>Remove the saved password</span></label><?php endif; ?>
     <div class="row"><button class="btn" name="action" value="save">Save email settings</button><button class="btn btn-outline" name="action" value="test" formnovalidate>Send me a test email</button></div>
-    <p class="hint" style="margin:8px 0 0">The sender address above must be allowed by your mail service.</p>
+    <p class="hint" style="margin:8px 0 0">Brevo shows the SMTP server, port and login on its SMTP &amp; API page. The password is an SMTP key you create there, not your Brevo account password.</p>
   </form>
   <h2>Phone app notifications (Firebase)</h2>
   <p class="muted" style="max-width:700px">Sends new orders, messages and alerts to people's phones through the Android app. In the Firebase console open Project settings → Service accounts → Generate new private key, then paste the whole file here.</p>

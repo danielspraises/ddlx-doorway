@@ -44,10 +44,11 @@ $docLink = function (string $kind, string $title) use ($docs): string {
           <div><p class="label">To get approved first time</p><ul><?php foreach ($def['tips'] as $t): ?><li><?= e($t) ?></li><?php endforeach; ?></ul></div>
         </div>
         <p class="muted small"><?= !empty($def['images_only']) ? 'JPG, PNG or WebP' : 'PDF, JPG, PNG or WebP' ?> · up to 10 MB</p>
-        <form method="post" action="/verification/upload" enctype="multipart/form-data" data-keep><?= csrf_field() ?>
+        <form method="post" action="/verification/upload" enctype="multipart/form-data" data-keep data-autoupload><?= csrf_field() ?>
           <input type="hidden" name="step" value="<?= $step ?>">
           <div class="field"><label for="file">Choose file</label><input id="file" type="file" name="file" required accept="<?= !empty($def['images_only']) ? 'image/jpeg,image/png,image/webp' : 'application/pdf,image/jpeg,image/png,image/webp' ?>"></div>
-          <button class="btn btn-outline" type="submit">Upload</button>
+          <noscript><button class="btn btn-outline" type="submit">Upload</button></noscript>
+          <div class="upbar hidden" data-upbar><i></i></div><p class="upstat hidden" data-upstat role="status"></p>
           <?php if (!empty($docs[$kind])): ?><span class="pill pill-ok">Document saved</span> <?= $docLink($kind, $def['label']) ?><?php endif; ?>
         </form>
         <?php if (!empty($errors['file'])): ?><p class="err" role="alert"><?= e($errors['file']) ?></p><?php endif; ?>

@@ -99,6 +99,9 @@ function save_smtp_settings(array $in): ?string
     if ($port < 1 || $port > 65535) return 'The mail server port should be a number such as 587 or 465.';
     $mode = (string) ($in['smtp_secure'] ?? 'tls');
     if (!in_array($mode, ['tls', 'ssl', 'none'], true)) return 'Choose a connection type.';
+    $from = trim((string) ($in['mail_from'] ?? setting('mail_from', '')));
+    if ($from !== '' && !filter_var($from, FILTER_VALIDATE_EMAIL)) return 'Enter a valid sender email.';
+    set_setting('mail_from', $from);
     set_setting('smtp_host', $host);
     set_setting('smtp_port', (string) $port);
     set_setting('smtp_secure', $mode);

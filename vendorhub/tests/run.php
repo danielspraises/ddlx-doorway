@@ -781,6 +781,9 @@ eq(setting('smtp_pass', ''), 'secret', 'blank password keeps the saved one');
 save_smtp_settings(['smtp_host' => '', 'smtp_port' => '587', 'smtp_secure' => 'tls', 'smtp_clear' => 'yes']);
 eq(setting('smtp_pass', ''), '', 'password can be removed');
 ok(!smtp_on(), 'smtp never used while testing');
+eq(save_smtp_settings(['smtp_host' => 'smtp-relay.brevo.com', 'smtp_port' => '587', 'smtp_secure' => 'tls', 'mail_from' => 'no-reply@ddlx.shop']), null, 'smtp: sender saved with mail settings');
+eq(setting('mail_from', ''), 'no-reply@ddlx.shop', 'sender address stored');
+ok(save_smtp_settings(['smtp_host' => 'smtp-relay.brevo.com', 'smtp_port' => '587', 'smtp_secure' => 'tls', 'mail_from' => 'nope']) !== null, 'smtp: bad sender refused');
 
 echo "$pass passed, $fail failed\n";
 exit($fail ? 1 : 0);

@@ -352,3 +352,10 @@ td input,td select{min-height:30px;padding:3px 7px;font-size:.82rem}
 .card table{table-layout:auto}
 .card th{white-space:normal;line-height:1.25;vertical-align:bottom}
 .card td input[type=number]{min-width:56px}
+
+/* Automatic upload progress */
+.upbar{height:6px;border-radius:99px;background:var(--line,#2a2c36);overflow:hidden;margin:8px 0 4px;max-width:360px}
+.upbar i{display:block;height:100%;width:0;background:var(--accent,#c8a96a);transition:width .15s}
+.upstat{margin:0 0 6px;font-size:.85rem}
+.upstat.is-err{color:#e5484d}
+.upstat.is-ok{color:#30a46c}

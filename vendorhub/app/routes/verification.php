@@ -18,7 +18,7 @@ function verification_page(array $u, ?array $errors = null, ?int $forceStep = nu
     }
     $ver = load_verification($u['id']);
     $step = $forceStep ?? max(1, min(8, (int) input('step', (string) ($ver['current_step'] ?? 1))));
-    render('verification', ['title' => 'Verification', 'app' => $app, 'ver' => $ver, 'step' => $step, 'errors' => $errors ?? [], 'user' => $u, 'registered' => (($app['registration']['registered'] ?? '') === 'yes')]);
+    render('verification', ['title' => 'Verification', 'app' => $app, 'ver' => $ver, 'step' => $step, 'scripts' => ['upload.js'], 'errors' => $errors ?? [], 'user' => $u, 'registered' => (($app['registration']['registered'] ?? '') === 'yes')]);
 }
 
 route('GET', '/verification', function () {
@@ -78,7 +78,8 @@ route('POST', '/verification/upload', function () {
     if ($kind === '') redirect('/verification?step=' . $step);
     $allowed = !empty($def['images_only']) ? Storage::IMAGE_TYPES : array_merge(Storage::IMAGE_TYPES, ['application/pdf']);
     $got = Storage::fromUpload($_FILES['file'] ?? [], $allowed, VERIFY_MAX_BYTES);
-    if (is_string($got)) redirect('/verification?step=' . $step, $got, 'error');
+    $ajax = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest';
+    if (is_string($got)) { if ($ajax) json_out(['ok' => false, 'error' => $got], 422); redirect('/verification?step=' . $step, $got, 'error'); }
     [$bytes, $mime] = $got;
     $bytes = Storage::cleanImage($bytes, $mime);
     $path = $u['id'] . '/' . $ver['id'] . '/' . $kind . '-' . uuid() . '.' . Storage::EXT[$mime];
@@ -88,6 +89,7 @@ route('POST', '/verification/upload', function () {
     $docs[$kind] = $path;
     db()->exec("UPDATE seller_verifications SET documents = ?, current_step = ?, updated_at = ? WHERE id = ? AND status IN ('draft', 'needs_corrections')", [jenc($docs), $step, now_db(), $ver['id']]);
     if (is_string($old) && preg_match(Storage::verificationRe(), $old)) Storage::remove('verification', $old);
+    if ($ajax) json_out(['ok' => true]);
     redirect('/verification?step=' . $step, 'Document uploaded and saved.');
 });
 

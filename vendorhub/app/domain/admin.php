@@ -123,7 +123,7 @@ function save_settings(array $in): ?string
     if ($url !== '' && !preg_match('#^https?://[^\s]+$#i', $url)) return 'The marketplace address must start with https://';
     $app = trim((string) ($in['app_url'] ?? ''));
     if ($app !== '' && !preg_match('#^https?://[^\s]+$#i', $app)) return 'The Vendor Hub address must start with https://';
-    $mail = trim((string) ($in['mail_from'] ?? ''));
+    $mail = trim((string) ($in['mail_from'] ?? setting('mail_from', '')));
     if ($mail !== '' && !filter_var($mail, FILTER_VALIDATE_EMAIL)) return 'Enter a valid sender email.';
     foreach ($map as $k => $v) set_setting($k, $k === 'payout_hold_days' ? (string) (int) $v : $v);
     set_setting('marketplace_url', rtrim($url, '/'));

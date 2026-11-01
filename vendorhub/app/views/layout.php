@@ -47,7 +47,7 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
         </div></details>
     </div>
     <?php else: ?>
-    <div class="nav-end"><button type="button" class="btn btn-outline btn-sm hidden" data-install>Install app</button><a class="btn btn-ghost btn-sm" href="/auth">Sign in</a><a class="btn btn-sm" href="/apply">Start application</a></div>
+    <div class="nav-end"><button type="button" class="btn btn-outline btn-sm hidden" data-install>Install app</button><a class="btn btn-sm" href="/auth">Sign in</a></div>
     <?php endif; ?>
   </div>
 </header>

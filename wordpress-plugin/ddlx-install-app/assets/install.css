@@ -1,0 +1,17 @@
+.ddlx-install-btn{display:inline-block;background:var(--ddlx-i-main,#14233A);color:#fff!important;padding:10px 20px;border-radius:999px;text-decoration:none!important;font-weight:600;font-size:15px;line-height:1.2;cursor:pointer}
+.ddlx-install-btn:hover{opacity:.9}
+.ddlx-i-hide{display:none!important}
+.ddlx-i-sheet{position:fixed;left:0;right:0;bottom:0;z-index:2147483000;display:flex;justify-content:center;padding:12px;transform:translateY(120%);transition:transform .35s ease;pointer-events:none}
+.ddlx-i-sheet.open{transform:none;pointer-events:auto}
+.ddlx-i-card{background:#fff;color:#14233A;max-width:460px;width:100%;border-radius:18px;padding:18px;box-shadow:0 12px 40px rgba(20,35,58,.28);border:1px solid var(--ddlx-i-soft,#D5E0EB);font-family:inherit}
+.ddlx-i-top{display:flex;gap:14px;align-items:center}
+.ddlx-i-icon{width:56px;height:56px;border-radius:14px;background:var(--ddlx-i-soft,#D5E0EB) center/cover no-repeat;flex:none}
+.ddlx-i-card h3{margin:0 0 3px;font-size:17px;line-height:1.25;color:#14233A}
+.ddlx-i-card p{margin:0;font-size:14px;line-height:1.45;color:#44546a}
+.ddlx-i-steps{margin:14px 0 0;padding-left:20px;font-size:14px;line-height:1.5;color:#14233A}
+.ddlx-i-steps li{margin:6px 0}
+.ddlx-i-row{display:flex;gap:10px;margin-top:14px}
+.ddlx-i-row button{flex:1;border:0;border-radius:999px;padding:11px 14px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+.ddlx-i-go{background:var(--ddlx-i-main,#14233A);color:#fff}
+.ddlx-i-no{background:var(--ddlx-i-soft,#D5E0EB);color:#14233A}
+.ddlx-i-arrow{text-align:center;font-size:22px;margin-top:8px;color:var(--ddlx-i-main,#14233A)}

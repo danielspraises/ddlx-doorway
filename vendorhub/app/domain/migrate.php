@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -74,6 +74,13 @@ function migration_steps(): array
                 $db->exec('CREATE TABLE coupons (id CHAR(36) NOT NULL PRIMARY KEY, seller_id CHAR(36) NOT NULL, code VARCHAR(30) NOT NULL, kind VARCHAR(10) NOT NULL, amount DECIMAL(12,2) NOT NULL, currency VARCHAR(3) NOT NULL DEFAULT \'NGN\', scope VARCHAR(10) NOT NULL DEFAULT \'all\', product_ids TEXT NULL, min_spend DECIMAL(12,2) NULL, usage_limit INT NULL, one_per_customer TINYINT NOT NULL DEFAULT 1, starts_at DATETIME(3) NULL, ends_at DATETIME(3) NULL, active TINYINT NOT NULL DEFAULT 1, admin_disabled TINYINT NOT NULL DEFAULT 0, used_count INT NOT NULL DEFAULT 0, discount_total DECIMAL(14,2) NOT NULL DEFAULT 0, sync_status VARCHAR(10) NOT NULL DEFAULT \'pending\', sync_note VARCHAR(250) NOT NULL DEFAULT \'\', created_at DATETIME(3) NOT NULL, updated_at DATETIME(3) NOT NULL)' . $engine($db));
                 $db->exec('CREATE UNIQUE INDEX coupons_code_unique ON coupons (code)');
                 $db->exec('CREATE INDEX coupons_seller_idx ON coupons (seller_id, created_at)');
+            }
+        },
+        9 => function (Db $db) use ($engine) {
+            if (!table_exists($db, 'push_devices')) {
+                $db->exec("CREATE TABLE push_devices (id CHAR(36) NOT NULL PRIMARY KEY, user_id CHAR(36) NOT NULL, token VARCHAR(255) NOT NULL, platform VARCHAR(10) NOT NULL DEFAULT 'android', created_at DATETIME(3) NOT NULL, last_seen_at DATETIME(3) NOT NULL, CONSTRAINT push_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)" . $engine($db));
+                $db->exec('CREATE UNIQUE INDEX push_devices_token_unique ON push_devices (token)');
+                $db->exec('CREATE INDEX push_devices_user_idx ON push_devices (user_id)');
             }
         },
         8 => function (Db $db) {

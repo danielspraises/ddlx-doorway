@@ -479,3 +479,15 @@ CREATE TABLE customer_refunds (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX customer_refunds_status_idx ON customer_refunds (status, created_at);
 CREATE INDEX customer_refunds_order_idx ON customer_refunds (order_id);
+
+CREATE TABLE push_devices (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  token VARCHAR(255) NOT NULL,
+  platform VARCHAR(10) NOT NULL DEFAULT 'android',
+  created_at DATETIME(3) NOT NULL,
+  last_seen_at DATETIME(3) NOT NULL,
+  CONSTRAINT push_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE UNIQUE INDEX push_devices_token_unique ON push_devices (token);
+CREATE INDEX push_devices_user_idx ON push_devices (user_id);

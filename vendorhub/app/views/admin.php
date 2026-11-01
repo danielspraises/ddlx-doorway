@@ -305,6 +305,15 @@ $docLinks = function (array $docs): string {
     <div class="row"><button class="btn" name="action" value="save">Save email settings</button><button class="btn btn-outline" name="action" value="test" formnovalidate>Send me a test email</button></div>
     <p class="hint" style="margin:8px 0 0">The sender address above must be allowed by your mail service.</p>
   </form>
+  <h2>Phone app notifications (Firebase)</h2>
+  <p class="muted" style="max-width:700px">Sends new orders, messages and alerts to people's phones through the Android app. In the Firebase console open Project settings → Service accounts → Generate new private key, then paste the whole file here.</p>
+  <form method="post" action="/admin/push" class="card" style="max-width:640px" data-keep><?= csrf_field() ?>
+    <?php $pa = push_account(); ?>
+    <?php if ($pa): ?><p class="small"><span class="pill pill-ok">Connected</span> project <strong><?= e($pa['project_id']) ?></strong></p><?php endif; ?>
+    <?= f_area('fcm_service_account', $pa ? 'Replace the key (optional)' : 'Firebase service-account key', '', null, ['rows' => 5, 'placeholder' => '{ "type": "service_account", ... }', 'autocomplete' => 'off']) ?>
+    <?php if ($pa): ?><label class="check"><input type="checkbox" name="push_clear" value="yes"><span>Remove the saved key</span></label><?php endif; ?>
+    <div class="row"><button class="btn" name="action" value="save">Save</button><?php if ($pa): ?><button class="btn btn-outline" name="action" value="test" formnovalidate>Send me a test notification</button><?php endif; ?></div>
+  </form>
   <p style="max-width:640px"><a class="btn btn-outline" href="/admin/health">Run system check</a> <span class="muted small">Checks PHP, the database, folders, HTTPS, email and the marketplace connection.</span></p>
   <h2>Seller levels</h2>
   <p class="muted" style="max-width:700px">Sellers earn Bronze, Silver, Gold and Blue from the last 90 days. The badge and marketplace placement always apply. Perks are optional: leave them at 0 to start, and raise them later as a reward.</p>

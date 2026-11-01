@@ -3,6 +3,18 @@ declare(strict_types=1);
 
 // ---------------------------------------------------------------- live updates (the browser asks every few seconds)
 
+// The phone app tells us which device to send this person's notifications to.
+route('POST', '/api/push/register', function () {
+    $u = require_user();
+    $err = push_register_device($u['id'], input_raw('token'), input('platform'));
+    json_out($err ? ['error' => $err] : ['ok' => true], $err ? 422 : 200);
+});
+route('POST', '/api/push/unregister', function () {
+    $u = require_user();
+    push_unregister_device($u['id'], input_raw('token'));
+    json_out(['ok' => true]);
+});
+
 route('GET', '/api/pulse', function () {
     $u = require_user();
     $db = db();

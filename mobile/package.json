@@ -1,0 +1,21 @@
+{
+  "name": "ddlx-vendor-hub-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DDLX Vendor Hub mobile app (Capacitor shell around https://vendor.ddlx.shop)",
+  "scripts": {
+    "assets": "capacitor-assets generate --android --iconBackgroundColor #0c0d12 --splashBackgroundColor #fbfbf8",
+    "sync": "cap sync",
+    "android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/push-notifications": "^6.0.2",
+    "@capacitor/splash-screen": "^6.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^6.1.2"
+  }
+}

@@ -287,6 +287,8 @@ function announce(string $audience, string $type, string $message = '', ?string 
 {
     try {
         db()->insert('events', ['audience' => $audience, 'seller_id' => $sellerId, 'type' => $type, 'message' => str_limit($message, 250), 'created_at' => now_db()]);
+        // Staff announcements also go to their phones (sellers get theirs through notify()).
+        if ($message !== '' && $audience !== 'seller') push_defer(push_audience_users($audience), 'Vendor Hub', $message, '/admin');
         if (random_int(1, 40) === 1) {
             db()->exec('DELETE FROM events WHERE created_at < ?', [db_plus('-3 days')]);
         }

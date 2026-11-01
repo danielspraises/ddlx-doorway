@@ -73,3 +73,6 @@ Upload plugin **1.4.0** first. For each seller who already sells on ddlx.shop:
 5. From then on, edits, stock and prices are made in Vendor Hub and follow to the store within minutes; new orders arrive as usual. Their store page and address on ddlx.shop are not changed.
 
 Tip: link one seller first and check one product and one order on both sides before doing the rest. Do not edit that seller's products in Dokan afterwards; Vendor Hub will overwrite them.
+
+## 10. Android app and phone notifications
+Full guide: `mobile/README.md`. Short version: create a Firebase project, paste its service-account key under Admin → Settings → Phone app notifications, build the app in Android Studio with `google-services.json`, test on a phone, then publish on Google Play (internal testing first).

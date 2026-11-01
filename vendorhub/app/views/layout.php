@@ -59,6 +59,7 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
 <dialog id="preview-dialog"><div class="dlg-head"><strong data-dlg-title>Document</strong><button class="btn btn-sm btn-outline" type="button" data-dlg-close>Close</button></div><div class="dlg-body"></div></dialog>
 <script src="/assets/app.js?v=3" defer></script>
 <script src="/assets/pwa.js" defer></script>
+<?php if ($user): ?><script src="/assets/native.js?v=1" defer></script><?php endif; ?>
 <?php foreach (($scripts ?? []) as $src): ?><script src="/assets/<?= e($src) ?>?v=1" defer></script>
 <?php endforeach; ?>
 </body>

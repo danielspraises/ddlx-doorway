@@ -256,6 +256,16 @@ route('POST', '/admin/email', function () use ($adminBack) {
     }
     $adminBack('settings', save_smtp_settings($_POST), 'Email settings saved.');
 });
+route('POST', '/admin/push', function () use ($adminBack) {
+    $u = require_admin();
+    if (input('action') === 'test') {
+        if (!push_configured()) $adminBack('settings', 'Save the Firebase key first.', '');
+        if (!push_device_count($u['id'])) $adminBack('settings', 'No phone is signed in to the app with your account yet. Open the Android app and sign in, then try again.', '');
+        $n = push_send_user($u['id'], 'Vendor Hub test', 'If you can read this, phone notifications work.', '/notifications');
+        $adminBack('settings', $n > 0 ? null : 'Firebase did not accept the message. Check the key and that the app uses the same Firebase project.', 'Test notification sent to ' . $n . ' device' . ($n === 1 ? '' : 's') . '.');
+    }
+    $adminBack('settings', save_push_settings($_POST), 'Phone notification settings saved.');
+});
 route('POST', '/admin/paystack', function () use ($adminBack) {
     require_admin();
     if (input('action') === 'test') {

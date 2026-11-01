@@ -8,6 +8,7 @@ function notify(string $userId, string $type, string $title, string $body = '', 
     try {
         db()->insert('notifications', ['id' => uuid(), 'user_id' => $userId, 'type' => $type, 'title' => str_limit($title, 200), 'body' => str_limit($body, 1000), 'link' => str_limit($link, 250), 'created_at' => now_db()]);
         if (random_int(1, 50) === 1) db()->exec('DELETE FROM notifications WHERE created_at < ?', [db_plus('-90 days')]);
+        push_defer([$userId], $title, $body, $link);
         if ($email) {
             $u = db()->one('SELECT email, email_alerts FROM users WHERE id = ?', [$userId]);
             if ($u && (int) $u['email_alerts'] === 1) {

@@ -729,6 +729,47 @@ eq((float) db()->val("SELECT COALESCE(SUM(amount),0) FROM wallet_entries WHERE s
 ok(unlink_seller($admin, $lk) !== null, 'cannot unlink after importing');
 unset($GLOBALS['vh_market_stub'], $GLOBALS['vh_fetch_stub']); set_setting('marketplace_url', ''); set_setting('marketplace_api_key', '');
 
+// ---- phone push notifications (Firebase) ----
+$pu = uuid(); db()->insert('users', ['id' => $pu, 'email' => 'phone@x.test', 'password_hash' => 'x', 'created_at' => now_db()]);
+ok(!push_configured(), 'push is off until a key is saved');
+ok(save_push_settings(['fcm_service_account' => '{"nope":1}']) !== null, 'a wrong file is refused');
+$key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]); openssl_pkey_export($key, $pem); $pub = openssl_pkey_get_details($key)['key'];
+$svc = json_encode(['type' => 'service_account', 'project_id' => 'ddlx-test', 'client_email' => 'fb@ddlx-test.iam.gserviceaccount.com', 'private_key' => $pem, 'extra' => 'dropped']);
+eq(save_push_settings(['fcm_service_account' => $svc]), null, 'service account saved'); ok(push_configured(), 'push configured'); ok(!str_contains((string) setting('fcm_service_account', ''), 'dropped'), 'only needed fields stored');
+ok(push_register_device($pu, 'short', 'android') !== null, 'short token refused');
+$tok = str_repeat('a1b2c3d4e5', 16);
+eq(push_register_device($pu, $tok, 'android'), null, 'device registered'); push_register_device($pu, $tok, 'android');
+eq(push_device_count($pu), 1, 'same token is stored once');
+$pushed = [];
+$GLOBALS['vh_push_stub'] = function ($url, $h, $body) use (&$pushed, $pub) {
+    if (str_contains($url, 'oauth2')) {
+        parse_str($body, $f); [$hd, $cl, $sg] = explode('.', $f['assertion']);
+        $ok = openssl_verify($hd . '.' . $cl, base64_decode(strtr($sg, '-_', '+/')), $pub, OPENSSL_ALGO_SHA256) === 1;
+        $c = json_decode(base64_decode(strtr($cl, '-_', '+/')), true);
+        $pushed[] = ['token', $ok, $c['iss'], $c['aud']];
+        return $ok ? [200, json_encode(['access_token' => 'ya29.test', 'expires_in' => 3600])] : [401, ''];
+    }
+    $m = json_decode($body, true); $pushed[] = ['send', $url, $h, $m];
+    return str_contains($m['message']['token'], 'dead') ? [404, '{"error":{"status":"NOT_FOUND","details":[{"errorCode":"UNREGISTERED"}]}}'] : [200, '{"name":"ok"}'];
+};
+eq(push_send_user($pu, 'Hello', 'World', '/seller?tab=sales'), 1, 'one device reached');
+ok($pushed[0][1] === true && $pushed[0][2] === 'fb@ddlx-test.iam.gserviceaccount.com', 'the sign-in token is signed with the service key');
+$sent = array_values(array_filter($pushed, fn ($p) => $p[0] === 'send'))[0];
+ok(str_contains($sent[1], '/projects/ddlx-test/messages:send'), 'sent to the project'); ok(in_array('Authorization: Bearer ya29.test', $sent[2], true), 'bearer token used');
+eq($sent[3]['message']['notification']['title'], 'Hello', 'title'); eq($sent[3]['message']['data']['link'], '/seller?tab=sales', 'link carried');
+$before = count($pushed); push_send_user($pu, 'Again'); eq(count(array_filter(array_slice($pushed, $before), fn ($p) => $p[0] === 'token')), 0, 'access token is cached');
+notify($pu, 'sale', 'New order 1', 'two shirts', '/seller?tab=sales', false);
+ok(count(array_filter($pushed, fn ($p) => $p[0] === 'send' && $p[3]['message']['notification']['title'] === 'New order 1')) === 1, 'a notification also goes to the phone');
+push_register_device($pu, 'dead' . str_repeat('x', 30), 'android'); eq(push_device_count($pu), 2, 'second device');
+push_send_user($pu, 'Cleanup'); eq(push_device_count($pu), 1, 'a phone that removed the app is forgotten');
+$adm = uuid(); db()->insert('users', ['id' => $adm, 'email' => 'adm@x.test', 'password_hash' => 'x', 'created_at' => now_db()]); db()->insert('user_roles', ['user_id' => $adm, 'role' => 'admin']);
+$stf = uuid(); db()->insert('users', ['id' => $stf, 'email' => 'stf@x.test', 'password_hash' => 'x', 'created_at' => now_db()]); db()->insert('staff_members', ['user_id' => $stf, 'permissions' => 'orders', 'active' => 1, 'created_at' => now_db()]);
+ok(in_array($adm, push_audience_users('reviewers'), true) && !in_array($stf, push_audience_users('reviewers'), true), 'reviewers: admins, not order staff');
+ok(in_array($stf, push_audience_users('orders'), true), 'order staff get order alerts');
+push_unregister_device($pu, $tok); eq(push_device_count($pu), 0, 'device can be removed');
+save_push_settings(['push_clear' => 'yes']); ok(!push_configured(), 'key can be removed');
+unset($GLOBALS['vh_push_stub']);
+
 // ---- SMTP settings ----
 ok(save_smtp_settings(['smtp_host' => 'bad host!', 'smtp_port' => '587', 'smtp_secure' => 'tls']) !== null, 'smtp: bad host refused');
 ok(save_smtp_settings(['smtp_host' => 'smtp.example.com', 'smtp_port' => '99999', 'smtp_secure' => 'tls']) !== null, 'smtp: bad port refused');

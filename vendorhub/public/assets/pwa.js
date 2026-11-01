@@ -3,6 +3,7 @@
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
     window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
   }
+  if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) return; // already the installed app
   var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   var btns = document.querySelectorAll('[data-install]');
   if (standalone || !btns.length) return;

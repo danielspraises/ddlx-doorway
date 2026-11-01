@@ -3,6 +3,8 @@
 $status = $app['status'] ?? 'draft';
 $err = fn (string $k) => $errors[$k] ?? null;
 $v = fn (string $k) => (string) ($data[$k] ?? '');
+// Shows a block only while another answer has a given value (public/assets/app.js flips it as the person chooses).
+$if = fn (string $field, string $value) => 'data-if="' . e($field . '=' . $value) . '"' . ($v($field) === $value ? '' : ' hidden');
 ?>
 <p class="eyebrow">Stage 1</p>
 <div class="row between"><h1>Seller application</h1><?= pill($status, APP_STATUS_LABEL) ?></div>
@@ -62,9 +64,9 @@ $v = fn (string $k) => (string) ($data[$k] ?? '');
       <?= f_text('name', 'Business name', $v('name'), $err('name'), ['required' => 1]) ?>
       <div class="grid g2">
         <?= f_select('type', 'Business type', BUSINESS_TYPES, $v('type'), $err('type'), ['required' => 1]) ?>
-        <?= f_text('type_other', 'If other, specify', $v('type_other'), $err('type_other')) ?>
+        <div <?= $if('type', 'Other') ?>><?= f_text('type_other', 'Specify business type', $v('type_other'), $err('type_other')) ?></div>
         <?= f_select('category', 'Business category', BUSINESS_CATEGORIES, $v('category'), $err('category'), ['required' => 1]) ?>
-        <?= f_text('category_other', 'If others, specify', $v('category_other'), $err('category_other')) ?>
+        <div <?= $if('category', 'Others') ?>><?= f_text('category_other', 'Specify category', $v('category_other'), $err('category_other')) ?></div>
         <?= f_text('phone', 'Business phone', $v('phone'), $err('phone'), ['type' => 'tel']) ?>
         <?= f_text('email', 'Business email', $v('email'), $err('email'), ['type' => 'email']) ?>
       </div>
@@ -86,16 +88,18 @@ $v = fn (string $k) => (string) ($data[$k] ?? '');
       <?php if ($err('socials')): ?><p class="err" role="alert"><?= e($err('socials')) ?></p><?php endif; ?>
       <div class="grid g2"><?php foreach (SOCIALS as $k => $label): ?><?= f_text($k, $label, $v($k), null, ['placeholder' => '@handle or link']) ?><?php endforeach; ?></div>
       <?= f_select('owns_brand', 'Do you own a brand?', ['yes' => 'Yes', 'no' => 'No'], $v('owns_brand'), $err('owns_brand'), ['required' => 1]) ?>
-      <div class="grid g2">
-        <?= f_text('brand_name', 'Brand name', $v('brand_name'), $err('brand_name')) ?>
-        <?= f_select('brand_category', 'Brand category', BUSINESS_CATEGORIES, $v('brand_category'), $err('brand_category')) ?>
-        <?= f_text('brand_category_other', 'If others, specify', $v('brand_category_other'), $err('brand_category_other')) ?>
+      <div <?= $if('owns_brand', 'yes') ?>>
+        <div class="grid g2">
+          <?= f_text('brand_name', 'Brand name', $v('brand_name'), $err('brand_name')) ?>
+          <?= f_select('brand_category', 'Brand category', BUSINESS_CATEGORIES, $v('brand_category'), $err('brand_category')) ?>
+          <div <?= $if('brand_category', 'Others') ?>><?= f_text('brand_category_other', 'Specify brand category', $v('brand_category_other'), $err('brand_category_other')) ?></div>
+        </div>
+        <?= f_area('brand_description', 'About the brand', $v('brand_description'), $err('brand_description'), ['rows' => 3, 'maxlength' => 2000]) ?>
       </div>
-      <?= f_area('brand_description', 'About the brand', $v('brand_description'), $err('brand_description'), ['rows' => 3, 'maxlength' => 2000, 'hint' => 'Only needed if you own a brand.']) ?>
     <?php elseif ($step === 4): ?>
       <?= f_select('registered', 'Is your business registered (CAC)?', ['yes' => 'Yes', 'no' => 'No'], $v('registered'), $err('registered'), ['required' => 1]) ?>
-      <div class="grid g2">
-        <?= f_text('reg_number', 'Registration number', $v('reg_number'), $err('reg_number'), ['hint' => 'RC or BN number. Only if registered.']) ?>
+      <div class="grid g2" <?= $if('registered', 'yes') ?>>
+        <?= f_text('reg_number', 'Registration number', $v('reg_number'), $err('reg_number'), ['hint' => 'RC or BN number.']) ?>
         <?= f_text('reg_name', 'Registered business name', $v('reg_name'), $err('reg_name')) ?>
       </div>
     <?php else: $decl = $app['declaration'] ?? []; ?>

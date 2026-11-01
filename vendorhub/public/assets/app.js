@@ -142,6 +142,21 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden) tick(); });
   }
 
+  // Questions that only appear for a certain answer: <div data-if="owns_brand=yes">
+  var conds = document.querySelectorAll('[data-if]');
+  if (conds.length) {
+    var refresh = function () {
+      conds.forEach(function (el) {
+        var p = el.getAttribute('data-if').split('=');
+        var ctl = document.querySelector('[name="' + p[0] + '"]');
+        var on = ctl && ctl.value === p.slice(1).join('=');
+        if (on) el.removeAttribute('hidden'); else el.setAttribute('hidden', '');
+      });
+    };
+    document.addEventListener('change', function (e) { if (e.target && e.target.name) refresh(); });
+    refresh();
+  }
+
   // Landing page: the five application steps
   var cards = document.querySelectorAll('[data-step]');
   if (cards.length) {

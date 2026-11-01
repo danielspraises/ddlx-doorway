@@ -8,7 +8,9 @@ const APP_COUNTRIES = ['Nigeria', 'Ghana', 'Kenya', 'South Africa', 'United King
 const APP_ROLES = ['Owner', 'Director', 'Manager', 'Authorised Representative'];
 const ID_TYPES = ['National Identity Number (NIN)', 'International Passport', "Driver's Licence", "Voter's Card"];
 const BUSINESS_TYPES = ['Individual / Sole proprietorship', 'Partnership', 'Other'];
-const BUSINESS_CATEGORIES = ['Clothing', 'Footwear', 'Accessories', 'Others'];
+const BUSINESS_CATEGORIES = ['Clothing', 'Footwear', 'Accessories', 'Bags & Luggage', 'Jewellery & Watches', 'Beauty & Personal Care', 'Health & Wellness', 'Phones & Tablets', 'Computers & Office',
+    'Electronics', 'Home & Kitchen', 'Furniture & Decor', 'Appliances', 'Groceries & Food', 'Baby & Kids', 'Toys & Games', 'Sports & Outdoors', 'Automotive', 'Books & Stationery', 'Art & Crafts',
+    'Pets', 'Building & Industrial', 'Agriculture', 'Others'];
 const SOCIALS = ['instagram' => 'Instagram', 'facebook' => 'Facebook', 'tiktok' => 'TikTok', 'x' => 'X / Twitter', 'whatsapp' => 'WhatsApp Business', 'snapchat' => 'Snapchat', 'other' => 'Other social media'];
 const APP_STEPS = [1 => ['personal', 'Personal Information'], 2 => ['business', 'Business Information'], 3 => ['brand', 'Brand & Store'], 4 => ['registration', 'Business Registration'], 5 => ['review', 'Review & Submit']];
 const APP_STATUS_LABEL = ['draft' => 'Draft', 'submitted' => 'Under review', 'needs_corrections' => 'Needs corrections', 'approved' => 'Approved', 'rejected' => 'Rejected'];
@@ -42,6 +44,17 @@ function section_from_post(int $step): array
     foreach ($keys as $k) {
         $out[$k] = str_limit(input($k), $k === 'description' || $k === 'brand_description' ? 2000 : 500);
     }
+    // Answers that no longer apply are dropped, so old text never lingers behind a "No".
+    $drop = fn (array $names) => array_walk($names, function ($n) use (&$out) { if (array_key_exists($n, $out)) $out[$n] = ''; });
+    if ($step === 2) {
+        if (($out['type'] ?? '') !== 'Other') $drop(['type_other']);
+        if (($out['category'] ?? '') !== 'Others') $drop(['category_other']);
+    }
+    if ($step === 3) {
+        if (($out['owns_brand'] ?? '') !== 'yes') $drop(['brand_name', 'brand_category', 'brand_category_other', 'brand_description']);
+        elseif (($out['brand_category'] ?? '') !== 'Others') $drop(['brand_category_other']);
+    }
+    if ($step === 4 && ($out['registered'] ?? '') !== 'yes') $drop(['reg_number', 'reg_name']);
     return $out;
 }
 

@@ -30,7 +30,7 @@
   </div></div>
 </div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
-<script src="/assets/app.js?v=2" defer></script>
+<script src="/assets/app.js?v=3" defer></script>
 <script src="/assets/pwa.js" defer></script>
 </body>
 </html>

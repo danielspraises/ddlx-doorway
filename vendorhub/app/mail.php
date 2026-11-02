@@ -106,7 +106,7 @@ function save_smtp_settings(array $in): ?string
     set_setting('smtp_port', (string) $port);
     set_setting('smtp_secure', $mode);
     set_setting('smtp_user', trim((string) ($in['smtp_user'] ?? '')));
-    $pass = (string) ($in['smtp_pass'] ?? '');
+    $pass = trim((string) ($in['smtp_pass'] ?? ''));
     if (($in['smtp_clear'] ?? '') === 'yes') set_setting('smtp_pass', '');
     elseif ($pass !== '') set_setting('smtp_pass', $pass);
     return null;

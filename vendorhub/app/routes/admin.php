@@ -249,10 +249,12 @@ route('POST', '/admin/email', function () use ($adminBack) {
     $u = require_admin();
     if (input('action') === 'test') {
         $to = (string) $u['email'];
-        if ((string) setting('smtp_host', '') === '') $adminBack('settings', 'Add the mail server details and save first.', '');
+        if ($err = save_smtp_settings($_POST)) $adminBack('settings', $err, '');
+        if ((string) setting('smtp_host', '') === '') $adminBack('settings', 'Add the mail server details first.', '');
         $from = (string) setting('mail_from', 'no-reply@' . (parse_url(base_url(), PHP_URL_HOST) ?: 'localhost'));
         $r = smtp_send($to, '=?UTF-8?B?' . base64_encode('Vendor Hub test email') . '?=', "If you can read this, email from Vendor Hub works.\n", $from);
-        $adminBack('settings', $r === null ? null : 'Test failed: ' . $r, 'Test email sent to ' . $to . '. Check your inbox (and spam).');
+        $kp = (string) setting('smtp_pass', '');
+        $adminBack('settings', $r === null ? null : 'Test failed: ' . $r . ' (Login used: ' . setting('smtp_user', '') . '; password: ' . ($kp === '' ? 'none saved' : strlen($kp) . ' characters, starts with "' . substr($kp, 0, 4) . '…"') . '. A Brevo SMTP key is about 80+ characters and starts with "xsmt".)', 'Test email sent to ' . $to . '. Check your inbox (and spam).');
     }
     $adminBack('settings', save_smtp_settings($_POST), 'Email settings saved.');
 });

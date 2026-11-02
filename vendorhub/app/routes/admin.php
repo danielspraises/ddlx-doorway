@@ -247,14 +247,23 @@ route('POST', '/admin/refund', function () use ($adminBack) {
 
 route('POST', '/admin/email', function () use ($adminBack) {
     $u = require_admin();
-    if (input('action') === 'test') {
-        $to = (string) $u['email'];
-        if ((string) setting('smtp_host', '') === '') $adminBack('settings', 'Add the mail server details and save first.', '');
-        $from = (string) setting('mail_from', 'no-reply@' . (parse_url(base_url(), PHP_URL_HOST) ?: 'localhost'));
-        $r = smtp_send($to, '=?UTF-8?B?' . base64_encode('Vendor Hub test email') . '?=', "If you can read this, email from Vendor Hub works.\n", $from);
-        $adminBack('settings', $r === null ? null : 'Test failed: ' . $r, 'Test email sent to ' . $to . '. Check your inbox (and spam).');
+    try {
+        if (input('action') === 'test') {
+            $to = (string) $u['email'];
+            $err = save_smtp_settings($_POST);
+            if ($err) $adminBack('settings', $err, '');
+            if ((string) setting('smtp_host', '') === '') $adminBack('settings', 'Add the mail server details first.', '');
+            $from = (string) setting('mail_from', 'no-reply@' . (parse_url(base_url(), PHP_URL_HOST) ?: 'localhost'));
+            $r = smtp_send($to, '=?UTF-8?B?' . base64_encode('Vendor Hub test email') . '?=', "If you can read this, email from Vendor Hub works.\n", $from);
+            $kp = (string) setting('smtp_pass', '');
+            $note = $r === null ? null : 'Test failed: ' . $r . ' | Login used: ' . setting('smtp_user', '') . ' | Server: ' . setting('smtp_host', '') . ':' . setting('smtp_port', '') . ' (' . setting('smtp_secure', '') . ') | Sender: ' . $from . ' | Password saved: ' . ($kp === '' ? 'none' : strlen($kp) . ' characters, starts with ' . substr($kp, 0, 4));
+            $adminBack('settings', $note, 'Test email sent to ' . $to . '. Check your inbox (and spam).');
+        }
+        $adminBack('settings', save_smtp_settings($_POST), 'Email settings saved.');
+    } catch (Throwable $e) {
+        log_error('Email settings error: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+        $adminBack('settings', 'Email error: ' . get_class($e) . ': ' . $e->getMessage() . ' (' . basename($e->getFile()) . ' line ' . $e->getLine() . ')', '');
     }
-    $adminBack('settings', save_smtp_settings($_POST), 'Email settings saved.');
 });
 route('POST', '/admin/push', function () use ($adminBack) {
     $u = require_admin();

@@ -56,6 +56,12 @@ function vh_run(): void
         }
         http_response_code(500);
         $detail = cfg('debug', false) ? $e->getMessage() : 'Something went wrong on our side. Please try again in a moment.';
+        // Signed-in admins see the real error so problems can be fixed quickly.
+        try {
+            $who = function_exists('current_user') ? current_user() : null;
+            if (!empty($who['isAdmin'])) $detail = get_class($e) . ': ' . $e->getMessage() . ' (' . basename($e->getFile()) . ' line ' . $e->getLine() . ')';
+        } catch (Throwable) {
+        }
         if (str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/api/')) {
             header('Content-Type: application/json');
             echo json_encode(['error' => $detail]);

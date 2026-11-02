@@ -72,9 +72,12 @@ function smtp_send(string $to, string $subjectEncoded, string $body, string $fro
         if ($e = $cmd('EHLO ' . $ehlo, [250])) return $fail($e);
     }
     if ($user !== '') {
-        if ($e = $cmd('AUTH LOGIN', [334])) return $fail($e);
-        if ($e = $cmd(base64_encode($user), [334])) return $fail($e);
-        if ($e = $cmd(base64_encode($pass), [235])) return $fail('Sign-in to the mail server failed: ' . $e);
+        $e = $cmd('AUTH LOGIN', [334]) ?? $cmd(base64_encode($user), [334]) ?? $cmd(base64_encode($pass), [235]);
+        if ($e !== null) {
+            // Some servers only accept AUTH PLAIN; try it once before giving up.
+            $e2 = $cmd('AUTH PLAIN ' . base64_encode("\0" . $user . "\0" . $pass), [235]);
+            if ($e2 !== null) return $fail('Sign-in to the mail server failed: ' . $e);
+        }
     }
     if ($e = $cmd('MAIL FROM:<' . $from . '>', [250])) return $fail($e);
     if ($e = $cmd('RCPT TO:<' . $to . '>', [250, 251])) return $fail($e);

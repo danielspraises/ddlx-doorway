@@ -118,6 +118,14 @@ function assistant_ready(): bool
     return assistant_provider() !== 'builtin' && (string) setting('ai_api_key', '') !== '' && setting('ai_enabled', '1') === '1';
 }
 
+// Models tried in order when the chosen one is busy (Gemini's free models are often overloaded for a few minutes).
+function assistant_model_chain(): array
+{
+    $first = assistant_model();
+    $more = ['gemini' => ['gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash'], 'groq' => ['llama-3.1-8b-instant'], 'anthropic' => []][assistant_provider()] ?? [];
+    return array_values(array_unique(array_merge([$first], $more)));
+}
+
 // Asks the chosen AI service. Returns the reply text or null if it could not be reached (the built-in help then answers).
 function assistant_call(string $system, array $messages): ?string
 {
@@ -125,12 +133,28 @@ function assistant_call(string $system, array $messages): ?string
     if (defined('VH_TESTING') || !function_exists('curl_init')) return null;
     $p = assistant_provider();
     $key = (string) setting('ai_api_key', '');
+    $last = '';
+    foreach (assistant_model_chain() as $i => $model) {
+        [$text, $code, $err] = assistant_call_model($p, $key, $model, $system, $messages, $i === 0 ? 25 : 20);
+        if ($text !== null) { set_setting('ai_last_error', ''); return $text; }
+        $last = $model . ': ' . $err;
+        log_error('Assistant call failed (' . $p . ' ' . $model . '): ' . $err);
+        if (!in_array($code, [0, 429, 500, 502, 503, 504, 404], true)) break; // a bad key or bad request will not improve with another model
+        if ($code === 503 && $i === 0) usleep(700000);
+    }
+    set_setting('ai_last_error', gmdate('Y-m-d H:i') . ' UTC, ' . $p . ', ' . $last);
+    return null;
+}
+
+// One request. Returns [text|null, http code (0 = no connection), error text].
+function assistant_call_model(string $p, string $key, string $model, string $system, array $messages, int $timeout): array
+{
     if ($p === 'anthropic') {
         $url = 'https://api.anthropic.com/v1/messages';
         $headers = ['content-type: application/json', 'x-api-key: ' . $key, 'anthropic-version: 2023-06-01'];
-        $body = ['model' => assistant_model(), 'max_tokens' => 700, 'system' => $system, 'messages' => $messages];
+        $body = ['model' => $model, 'max_tokens' => 700, 'system' => $system, 'messages' => $messages];
     } elseif ($p === 'gemini') { // Google's own Gemini API
-        $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode(assistant_model()) . ':generateContent';
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent';
         $headers = ['content-type: application/json', 'x-goog-api-key: ' . $key];
         $contents = [];
         foreach ($messages as $m) $contents[] = ['role' => $m['role'] === 'assistant' ? 'model' : 'user', 'parts' => [['text' => (string) $m['content']]]];
@@ -138,27 +162,23 @@ function assistant_call(string $system, array $messages): ?string
     } else { // Groq speaks the common "chat completions" format
         $url = AI_PROVIDERS[$p]['url'];
         $headers = ['content-type: application/json', 'Authorization: Bearer ' . $key];
-        $body = ['model' => assistant_model(), 'max_tokens' => 700, 'messages' => array_merge([['role' => 'system', 'content' => $system]], $messages)];
+        $body = ['model' => $model, 'max_tokens' => 700, 'messages' => array_merge([['role' => 'system', 'content' => $system]], $messages)];
     }
     $ch = curl_init($url);
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 40, CURLOPT_CONNECTTIMEOUT => 6, CURLOPT_POST => true,
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 6, CURLOPT_POST => true,
         CURLOPT_HTTPHEADER => $headers, CURLOPT_POSTFIELDS => json_encode($body)]);
     $res = curl_exec($ch);
     $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
     if ($res === false || $code !== 200) {
-        $msg = $res === false ? 'could not reach the service' : 'HTTP ' . $code . ' ' . trim(substr(preg_replace('/\s+/', ' ', (string) $res), 0, 300));
-        log_error('Assistant call failed (' . $p . '): ' . $msg);
-        set_setting('ai_last_error', gmdate('Y-m-d H:i') . ' UTC, ' . $p . ': ' . $msg);
-        return null;
+        return [null, $res === false ? 0 : $code, $res === false ? 'could not reach the service' : 'HTTP ' . $code . ' ' . trim(substr((string) preg_replace('/\s+/', ' ', (string) $res), 0, 300))];
     }
-    set_setting('ai_last_error', '');
     $d = json_decode((string) $res, true);
     $text = '';
     if ($p === 'anthropic') { foreach ($d['content'] ?? [] as $blk) if (($blk['type'] ?? '') === 'text') $text .= $blk['text']; }
     elseif ($p === 'gemini') { foreach ($d['candidates'][0]['content']['parts'] ?? [] as $part) $text .= (string) ($part['text'] ?? ''); }
     else $text = (string) ($d['choices'][0]['message']['content'] ?? '');
-    return trim($text) !== '' ? trim($text) : null;
+    return trim($text) !== '' ? [trim($text), 200, ''] : [null, 200, 'empty answer'];
 }
 
 function assistant_history(string $userId): array

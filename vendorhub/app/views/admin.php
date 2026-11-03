@@ -287,11 +287,13 @@ $docLinks = function (array $docs): string {
     <?= f_text('app_url', 'Vendor Hub address', (string) setting('app_url', ''), null, ['type' => 'url', 'placeholder' => 'https://vendor.ddlx.shop']) ?>
     <?= f_text('marketplace_url', 'Marketplace address', (string) setting('marketplace_url', ''), null, ['type' => 'url', 'placeholder' => 'https://ddlx.shop', 'hint' => 'Used to check SKUs against the store. Leave blank to skip.']) ?>
     <h3>Ask DDLX assistant</h3>
-    <p class="muted small">An AI helper for sellers and staff. Create a key at console.anthropic.com and paste it here. Without a key the assistant still answers from built-in help.</p>
-    <label class="check"><input type="checkbox" name="ai_enabled" value="yes" <?= setting('ai_enabled', '1') === '1' ? 'checked' : '' ?>><span>Use the AI assistant</span></label>
-    <?= f_text('ai_api_key', 'Anthropic API key', '', null, ['type' => 'password', 'autocomplete' => 'off', 'placeholder' => setting('ai_api_key', '') !== '' ? 'Saved (ends ' . substr((string) setting('ai_api_key', ''), -4) . '). Paste a new key to replace it.' : 'sk-ant-...']) ?>
+    <p class="muted small">Answers questions for sellers and staff. It works for free with the built-in help, or you can connect a free Google Gemini or Groq key for fuller answers.</p>
+    <label class="check"><input type="checkbox" name="ai_enabled" value="yes" <?= setting('ai_enabled', '1') === '1' ? 'checked' : '' ?>><span>Use the assistant</span></label>
+    <div class="field"><label for="ai_provider">Assistant type</label><select id="ai_provider" name="ai_provider"><?php foreach (AI_PROVIDERS as $k => $d): ?><option value="<?= $k ?>" <?= assistant_provider() === $k ? 'selected' : '' ?>><?= e($d['label']) ?></option><?php endforeach; ?></select>
+      <p class="hint">Built-in help needs no key and never costs anything. Gemini and Groq have free plans: create a key at aistudio.google.com or console.groq.com. If the service is down or over its free limit, the built-in help answers instead.</p></div>
+    <?= f_text('ai_api_key', 'API key', '', null, ['type' => 'password', 'autocomplete' => 'off', 'placeholder' => setting('ai_api_key', '') !== '' ? 'Saved (ends ' . substr((string) setting('ai_api_key', ''), -4) . '). Paste a new key to replace it.' : 'Paste the key from your chosen service']) ?>
     <?php if (setting('ai_api_key', '') !== ''): ?><label class="check"><input type="checkbox" name="ai_clear_key" value="yes"><span>Remove the saved key</span></label><?php endif; ?>
-    <?= f_text('ai_model', 'Model', (string) setting('ai_model', 'claude-sonnet-5-5'), null, ['hint' => 'Leave as is unless told otherwise.']) ?>
+    <?= f_text('ai_model', 'Model (optional)', (string) setting('ai_model', ''), null, ['placeholder' => assistant_model() ?: 'Chosen automatically', 'hint' => 'Leave blank to use the recommended model for the chosen type.']) ?>
     <button class="btn">Save settings</button>
   </form>
   <h2>Email sending (SMTP)</h2>

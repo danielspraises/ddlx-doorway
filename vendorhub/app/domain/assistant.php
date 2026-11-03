@@ -73,27 +73,61 @@ function assistant_system_prompt(array $u): string
         . "FACTS ABOUT VENDOR HUB:\n" . $facts . "\nACCOUNT SUMMARY FOR THIS PERSON:\n" . assistant_context($u) . "\n";
 }
 
-function assistant_ready(): bool
+const AI_PROVIDERS = [
+    'builtin'   => ['label' => 'Built-in help (free, no key needed)', 'model' => ''],
+    'gemini'    => ['label' => 'Google Gemini (free tier)', 'model' => 'gemini-2.5-flash', 'url' => 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'],
+    'groq'      => ['label' => 'Groq (free tier)', 'model' => 'llama-3.3-70b-versatile', 'url' => 'https://api.groq.com/openai/v1/chat/completions'],
+    'anthropic' => ['label' => 'Anthropic Claude (paid)', 'model' => 'claude-sonnet-5-5'],
+];
+
+function assistant_provider(): string
 {
-    return (string) setting('ai_api_key', '') !== '' && setting('ai_enabled', '1') === '1';
+    $p = (string) setting('ai_provider', '');
+    if (isset(AI_PROVIDERS[$p])) return $p;
+    return (string) setting('ai_api_key', '') !== '' ? 'anthropic' : 'builtin'; // installs from before providers existed
 }
 
-// Calls the Anthropic Messages API. Returns the reply text or null if it could not be reached.
+function assistant_model(): string
+{
+    $m = trim((string) setting('ai_model', ''));
+    $p = assistant_provider();
+    // A model name left over from another provider is ignored.
+    foreach (AI_PROVIDERS as $k => $d) if ($k !== $p && $d['model'] !== '' && $m === $d['model']) $m = '';
+    return $m !== '' ? $m : AI_PROVIDERS[$p]['model'];
+}
+
+function assistant_ready(): bool
+{
+    return assistant_provider() !== 'builtin' && (string) setting('ai_api_key', '') !== '' && setting('ai_enabled', '1') === '1';
+}
+
+// Asks the chosen AI service. Returns the reply text or null if it could not be reached (the built-in help then answers).
 function assistant_call(string $system, array $messages): ?string
 {
     if (!empty($GLOBALS['vh_ai_stub'])) return ($GLOBALS['vh_ai_stub'])($system, $messages);
     if (defined('VH_TESTING') || !function_exists('curl_init')) return null;
-    $ch = curl_init('https://api.anthropic.com/v1/messages');
+    $p = assistant_provider();
+    $key = (string) setting('ai_api_key', '');
+    if ($p === 'anthropic') {
+        $url = 'https://api.anthropic.com/v1/messages';
+        $headers = ['content-type: application/json', 'x-api-key: ' . $key, 'anthropic-version: 2023-06-01'];
+        $body = ['model' => assistant_model(), 'max_tokens' => 700, 'system' => $system, 'messages' => $messages];
+    } else { // Gemini and Groq both speak the common "chat completions" format
+        $url = AI_PROVIDERS[$p]['url'];
+        $headers = ['content-type: application/json', 'Authorization: Bearer ' . $key];
+        $body = ['model' => assistant_model(), 'max_tokens' => 700, 'messages' => array_merge([['role' => 'system', 'content' => $system]], $messages)];
+    }
+    $ch = curl_init($url);
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 40, CURLOPT_CONNECTTIMEOUT => 6, CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => ['content-type: application/json', 'x-api-key: ' . (string) setting('ai_api_key', ''), 'anthropic-version: 2023-06-01'],
-        CURLOPT_POSTFIELDS => json_encode(['model' => (string) setting('ai_model', 'claude-sonnet-5-5'), 'max_tokens' => 700, 'system' => $system, 'messages' => $messages])]);
+        CURLOPT_HTTPHEADER => $headers, CURLOPT_POSTFIELDS => json_encode($body)]);
     $res = curl_exec($ch);
     $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    if ($res === false || $code !== 200) { log_error('Assistant call failed: HTTP ' . $code); return null; }
+    if ($res === false || $code !== 200) { log_error('Assistant call failed (' . $p . '): HTTP ' . $code . ' ' . substr((string) $res, 0, 200)); return null; }
     $d = json_decode((string) $res, true);
     $text = '';
-    foreach ($d['content'] ?? [] as $b) if (($b['type'] ?? '') === 'text') $text .= $b['text'];
+    if ($p === 'anthropic') { foreach ($d['content'] ?? [] as $blk) if (($blk['type'] ?? '') === 'text') $text .= $blk['text']; }
+    else $text = (string) ($d['choices'][0]['message']['content'] ?? '');
     return trim($text) !== '' ? trim($text) : null;
 }
 

@@ -540,8 +540,14 @@ eq(assistant_provider(), 'builtin', 'no key and no choice means built-in');
 set_setting('ai_provider', 'builtin');
 eq(count(assistant_history($sid)), 6, 'history kept');
 db()->exec("DELETE FROM assistant_messages WHERE user_id = ?", [$sid]);
-for ($i = 0; $i < AI_DAILY_LIMIT; $i++) db()->insert('assistant_messages', ['id' => uuid(), 'user_id' => $sid, 'role' => 'user', 'body' => 'q', 'created_at' => now_db()]);
-ok(!assistant_ask($u, 'one more')['ok'], 'daily limit enforced');
+ok(assistant_left_today($sid) === PHP_INT_MAX, 'no daily question limit by default');
+set_setting('ai_daily_limit', '40');
+for ($i = 0; $i < 40; $i++) db()->insert('assistant_messages', ['id' => uuid(), 'user_id' => $sid, 'role' => 'user', 'body' => 'q', 'created_at' => now_db()]);
+ok(!assistant_ask($u, 'one more')['ok'], 'daily limit enforced when the admin sets one');
+set_setting('ai_daily_limit', '0');
+ok(str_contains(assistant_fallback('What is the platform name?'), 'Vendor Hub'), 'fallback knows the platform name');
+ok(str_contains(assistant_fallback('What is the marketplace link?'), 'ddlx.shop'), 'fallback knows the marketplace link');
+ok(str_contains(assistant_fallback('What do I need to get a blue seller badge?'), '150+ delivered orders'), 'fallback explains the blue badge');
 db()->exec("DELETE FROM assistant_messages WHERE user_id = ?", [$sid]);
 eq(save_settings(['commission_percent' => '10', 'payout_hold_days' => '7', 'min_withdrawal' => '1000', 'withdrawal_fee' => '0', 'ai_api_key' => 'bad key!']), 'That does not look like a valid API key. Copy it again without spaces.', 'bad AI key rejected');
 

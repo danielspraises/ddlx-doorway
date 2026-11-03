@@ -6,7 +6,6 @@ declare(strict_types=1);
 // person's own account summary. Without a key, or when the AI is unreachable, it falls back to matching these same
 // facts, so the page always gives a useful answer. It only answers questions; it never changes anything.
 
-const AI_DAILY_LIMIT = 40;
 const AI_HISTORY = 12;
 const AI_MAX_QUESTION = 1500;
 
@@ -16,7 +15,12 @@ function assistant_facts(): array
     $hold = (int) setting('payout_hold_days', '7');
     $min = number_format((float) setting('min_withdrawal', '1000'));
     $fee = number_format((float) setting('withdrawal_fee', '0'));
+    $mkt = rtrim((string) setting('marketplace_url', '') ?: 'https://ddlx.shop', '/');
+    $levelText = assistant_level_text();
     return [
+        ['keys' => ['platform', 'name', 'what is this', 'what is vendor', 'who are you', 'ddlx', 'vendor hub', 'about'], 'title' => 'The platform', 'text' => 'This is Vendor Hub, the seller portal for DDLX. You apply, get verified, list products, manage stock and orders, and withdraw earnings here. Your approved products are sold on the DDLX marketplace.'],
+        ['keys' => ['marketplace', 'link', 'website', 'site', 'url', 'shop', 'ddlx.shop', 'store link', 'where do customers'], 'title' => 'The marketplace', 'text' => 'The DDLX marketplace is at ' . $mkt . '. Customers browse and pay there; the orders appear in your Sales tab here.'],
+        ['keys' => ['badge', 'blue', 'gold', 'silver', 'bronze', 'level', 'levels', 'tier', 'rank', 'elite'], 'title' => 'Seller levels and badges', 'text' => $levelText],
         ['keys' => ['start', 'begin', 'apply', 'application', 'register', 'become', 'join', 'steps', 'how does it work'], 'title' => 'Getting started', 'text' => "To sell on DDLX: 1) create an account and fill in the five-step seller application (business, brand, products, bank/payout, declarations); 2) wait for the team to approve it; 3) complete verification (identity and business documents); 4) once verified, open Seller Center and add products. Each step shows its status and the team's feedback if corrections are needed. Drafts save as you go."],
         ['keys' => ['verification', 'verify', 'document', 'id', 'identity', 'cac'], 'title' => 'Verification', 'text' => 'After the application is approved you upload identity and business documents on the Verification page. The team reviews them. If something is unclear you get a note explaining exactly what to fix, and you can upload again. Photos should be clear, uncropped and readable. You can start selling only after verification is approved.'],
         ['keys' => ['product', 'add product', 'list', 'listing', 'create product', 'upload product'], 'title' => 'Adding products', 'text' => 'Seller Center → Products → Add product. Fill in name, category (choose the most specific one), price, stock, weight and dimensions, and add a main photo and optional gallery photos. Save as a draft, then press Submit for review. Approved products go live on the DDLX marketplace. You can also add many at once with Products → Import CSV.'],
@@ -32,6 +36,19 @@ function assistant_facts(): array
         ['keys' => ['message', 'contact', 'support', 'help', 'human', 'team', 'talk', 'complain'], 'title' => 'Talking to the team', 'text' => 'Use Messages (envelope icon) to write to the DDLX team. Replies arrive there and as notifications and email. For anything about a specific order or payout, include the order number.'],
         ['keys' => ['notification', 'email', 'alert'], 'title' => 'Notifications', 'text' => 'The bell shows new orders, order progress, product decisions, payouts and messages. You can switch email alerts on or off on the Notifications page.'],
     ];
+}
+
+function assistant_level_text(): string
+{
+    $r = level_rules();
+    $line = function (string $lv) use ($r): string {
+        $x = $r[$lv];
+        $parts = [$x['orders'] . '+ delivered orders in the last ' . LEVEL_WINDOW_DAYS . ' days', 'returns at most ' . $x['returns'] . '%'];
+        if ($x['dispatch'] > 0) $parts[] = 'at least ' . $x['dispatch'] . '% of orders packed within ' . DISPATCH_HOURS . ' hours';
+        if ($x['rating'] > 0) $parts[] = 'average rating ' . $x['rating'] . '+ from at least ' . $x['min_ratings'] . ' customer ratings';
+        return LEVEL_LABEL[$lv] . ': ' . implode(', ', $parts) . '.';
+    };
+    return 'Seller levels are earned from your activity in the last ' . LEVEL_WINDOW_DAYS . " days: Starter, Bronze, Silver, Gold and Blue. To earn the Blue badge (the top level) you need: " . $line('blue') . "\nOther levels. " . $line('bronze') . ' ' . $line('silver') . ' ' . $line('gold') . ' Your Overview tab shows how close you are.';
 }
 
 function assistant_fallback(string $question): string
@@ -75,7 +92,7 @@ function assistant_system_prompt(array $u): string
 
 const AI_PROVIDERS = [
     'builtin'   => ['label' => 'Built-in help (free, no key needed)', 'model' => ''],
-    'gemini'    => ['label' => 'Google Gemini (free tier)', 'model' => 'gemini-2.5-flash', 'url' => 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'],
+    'gemini'    => ['label' => 'Google Gemini (free tier)', 'model' => 'gemini-2.5-flash'],
     'groq'      => ['label' => 'Groq (free tier)', 'model' => 'llama-3.3-70b-versatile', 'url' => 'https://api.groq.com/openai/v1/chat/completions'],
     'anthropic' => ['label' => 'Anthropic Claude (paid)', 'model' => 'claude-sonnet-5-5'],
 ];
@@ -112,7 +129,13 @@ function assistant_call(string $system, array $messages): ?string
         $url = 'https://api.anthropic.com/v1/messages';
         $headers = ['content-type: application/json', 'x-api-key: ' . $key, 'anthropic-version: 2023-06-01'];
         $body = ['model' => assistant_model(), 'max_tokens' => 700, 'system' => $system, 'messages' => $messages];
-    } else { // Gemini and Groq both speak the common "chat completions" format
+    } elseif ($p === 'gemini') { // Google's own Gemini API
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode(assistant_model()) . ':generateContent';
+        $headers = ['content-type: application/json', 'x-goog-api-key: ' . $key];
+        $contents = [];
+        foreach ($messages as $m) $contents[] = ['role' => $m['role'] === 'assistant' ? 'model' : 'user', 'parts' => [['text' => (string) $m['content']]]];
+        $body = ['systemInstruction' => ['parts' => [['text' => $system]]], 'contents' => $contents, 'generationConfig' => ['maxOutputTokens' => 900]];
+    } else { // Groq speaks the common "chat completions" format
         $url = AI_PROVIDERS[$p]['url'];
         $headers = ['content-type: application/json', 'Authorization: Bearer ' . $key];
         $body = ['model' => assistant_model(), 'max_tokens' => 700, 'messages' => array_merge([['role' => 'system', 'content' => $system]], $messages)];
@@ -123,10 +146,17 @@ function assistant_call(string $system, array $messages): ?string
     $res = curl_exec($ch);
     $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    if ($res === false || $code !== 200) { log_error('Assistant call failed (' . $p . '): HTTP ' . $code . ' ' . substr((string) $res, 0, 200)); return null; }
+    if ($res === false || $code !== 200) {
+        $msg = $res === false ? 'could not reach the service' : 'HTTP ' . $code . ' ' . trim(substr(preg_replace('/\s+/', ' ', (string) $res), 0, 300));
+        log_error('Assistant call failed (' . $p . '): ' . $msg);
+        set_setting('ai_last_error', gmdate('Y-m-d H:i') . ' UTC, ' . $p . ': ' . $msg);
+        return null;
+    }
+    set_setting('ai_last_error', '');
     $d = json_decode((string) $res, true);
     $text = '';
     if ($p === 'anthropic') { foreach ($d['content'] ?? [] as $blk) if (($blk['type'] ?? '') === 'text') $text .= $blk['text']; }
+    elseif ($p === 'gemini') { foreach ($d['candidates'][0]['content']['parts'] ?? [] as $part) $text .= (string) ($part['text'] ?? ''); }
     else $text = (string) ($d['choices'][0]['message']['content'] ?? '');
     return trim($text) !== '' ? trim($text) : null;
 }
@@ -140,7 +170,8 @@ function assistant_history(string $userId): array
 function assistant_left_today(string $userId): int
 {
     $used = (int) db()->val("SELECT COUNT(*) FROM assistant_messages WHERE user_id = ? AND role = 'user' AND created_at > ?", [$userId, db_plus('-1 day')]);
-    return max(0, AI_DAILY_LIMIT - $used);
+    $limit = (int) setting('ai_daily_limit', '0'); // 0 = no limit
+    return $limit <= 0 ? PHP_INT_MAX : max(0, $limit - $used);
 }
 
 function assistant_ask(array $u, string $question): array
@@ -148,7 +179,7 @@ function assistant_ask(array $u, string $question): array
     $question = trim(preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', str_replace("\r\n", "\n", $question)) ?? '');
     if ($question === '') return ['ok' => false, 'error' => 'Type your question.'];
     if (mb_strlen($question) > AI_MAX_QUESTION) return ['ok' => false, 'error' => 'Keep the question under ' . AI_MAX_QUESTION . ' characters.'];
-    if (assistant_left_today($u['id']) <= 0) return ['ok' => false, 'error' => 'You have reached today\'s limit of ' . AI_DAILY_LIMIT . ' questions. Write to the team from Messages, or try again tomorrow.'];
+    if (assistant_left_today($u['id']) <= 0) return ['ok' => false, 'error' => 'You have reached today\'s limit of ' . (int) setting('ai_daily_limit', '0') . ' questions. Write to the team from Messages, or try again tomorrow.'];
     $hist = assistant_history($u['id']);
     $msgs = [];
     foreach ($hist as $h) $msgs[] = ['role' => $h['role'] === 'user' ? 'user' : 'assistant', 'content' => $h['body']];

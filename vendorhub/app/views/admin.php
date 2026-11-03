@@ -293,6 +293,7 @@ $docLinks = function (array $docs): string {
       <p class="hint">Built-in help needs no key and never costs anything. Gemini and Groq have free plans: create a key at aistudio.google.com or console.groq.com. If the service is down or over its free limit, the built-in help answers instead.</p></div>
     <?= f_text('ai_api_key', 'API key', '', null, ['type' => 'password', 'autocomplete' => 'off', 'placeholder' => setting('ai_api_key', '') !== '' ? 'Saved (ends ' . substr((string) setting('ai_api_key', ''), -4) . '). Paste a new key to replace it.' : 'Paste the key from your chosen service']) ?>
     <?php if (setting('ai_api_key', '') !== ''): ?><label class="check"><input type="checkbox" name="ai_clear_key" value="yes"><span>Remove the saved key</span></label><?php endif; ?>
+    <?php if ((string) setting('ai_last_error', '') !== ''): ?><p class="flash flash-error">Last problem reaching the assistant service: <?= e((string) setting('ai_last_error', '')) ?></p><?php endif; ?>
     <?= f_text('ai_model', 'Model (optional)', (string) setting('ai_model', ''), null, ['placeholder' => assistant_model() ?: 'Chosen automatically', 'hint' => 'Leave blank to use the recommended model for the chosen type.']) ?>
     <button class="btn">Save settings</button>
   </form>

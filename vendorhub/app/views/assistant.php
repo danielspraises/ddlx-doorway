@@ -14,6 +14,6 @@
   <?php if (!empty($error)): ?><p class="err" role="alert"><?= e($error) ?></p><?php endif; ?>
   <form method="post" action="/assistant" data-keep><?= csrf_field() ?>
     <?= f_area('question', 'Your question', $draft !== '' ? $draft : (string) input('ask'), null, ['rows' => 3, 'maxlength' => AI_MAX_QUESTION, 'required' => 1, 'placeholder' => 'For example: why is my product still in review?']) ?>
-    <div class="row between"><button class="btn" type="submit">Ask</button><span class="muted small"><?= (int) $left ?> question<?= $left === 1 ? '' : 's' ?> left today<?= $ai ? '' : ' · built-in help' ?></span></div>
+    <div class="row between"><button class="btn" type="submit">Ask</button><span class="muted small"><?= $left === PHP_INT_MAX ? '' : (int) $left . ' question' . ($left === 1 ? '' : 's') . ' left today' ?><?= $ai ? '' : ($left === PHP_INT_MAX ? 'Built-in help' : ' · built-in help') ?></span></div>
   </form>
 </div>

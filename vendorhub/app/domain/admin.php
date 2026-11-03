@@ -139,7 +139,7 @@ function save_settings(array $in): ?string
     $key = trim((string) ($in['ai_api_key'] ?? ''));
     if (($in['ai_clear_key'] ?? '') === 'yes') set_setting('ai_api_key', '');
     elseif ($key !== '') {
-        if (!preg_match('/^[A-Za-z0-9_-]{20,200}$/', $key)) return 'That does not look like a valid API key. Copy it again without spaces.';
+        if (!preg_match('/^[A-Za-z0-9._~+\/=-]{20,400}$/', $key)) return 'That does not look like a valid API key. Copy it again without spaces.';
         set_setting('ai_api_key', $key);
     }
     return null;

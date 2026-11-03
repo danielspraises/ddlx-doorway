@@ -1,7 +1,8 @@
+<div class="narrow-col">
 <p class="eyebrow">Help</p>
 <h1>Ask DDLX</h1>
-<p class="muted" style="max-width:640px">Quick answers about selling on DDLX, from applying to getting paid. It cannot change anything in your account. For anything it cannot answer, <a href="/messages<?= !empty($user['canMessages']) ? '' : '?new=1' ?>">write to the team</a>.</p>
-<div class="card" style="max-width:760px">
+<p class="muted">Quick answers about selling on DDLX, from applying to getting paid. It cannot change anything in your account. For anything it cannot answer, <a href="/messages<?= !empty($user['canMessages']) ? '' : '?new=1' ?>">write to the team</a>.</p>
+<div class="card">
   <div class="chat" role="log" aria-live="polite" aria-label="Conversation">
   <?php if (!$history): ?>
     <p class="muted">Try one of these:</p>
@@ -16,4 +17,5 @@
     <?= f_area('question', 'Your question', $draft !== '' ? $draft : (string) input('ask'), null, ['rows' => 3, 'maxlength' => AI_MAX_QUESTION, 'required' => 1, 'placeholder' => 'For example: why is my product still in review?']) ?>
     <div class="row between"><button class="btn" type="submit">Ask</button><span class="muted small"><?= $left === PHP_INT_MAX ? '' : (int) $left . ' question' . ($left === 1 ? '' : 's') . ' left today' ?><?= $ai ? '' : ($left === PHP_INT_MAX ? 'Built-in help' : ' · built-in help') ?></span></div>
   </form>
+</div>
 </div>

@@ -2,7 +2,7 @@
 <p class="eyebrow">Team inbox</p>
 <h1>New message</h1>
 <?php if (!empty($error)): ?><p class="notice error" role="alert"><?= e($error) ?></p><?php endif; ?>
-<form method="post" action="/messages/compose" data-keep class="card" style="max-width:820px"><?= csrf_field() ?>
+<form method="post" action="/messages/compose" data-keep class="card" style="max-width:820px;margin-inline:auto"><?= csrf_field() ?>
   <fieldset style="border:0;padding:0;margin:0 0 14px"><legend class="label">Who is this for?</legend>
     <?php foreach (MSG_AUDIENCE as $k => $l): if ($k !== 'selected' && !$user['isAdmin']) continue; ?>
       <label class="check"><input type="radio" name="audience" value="<?= e($k) ?>"<?= $form['audience'] === $k ? ' checked' : '' ?> data-audience><span><?= e($l) ?></span></label>

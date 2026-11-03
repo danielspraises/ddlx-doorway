@@ -130,17 +130,12 @@ function save_settings(array $in): ?string
     set_setting('app_url', rtrim($app, '/'));
     set_setting('mail_from', $mail);
     set_setting('ai_enabled', ($in['ai_enabled'] ?? '') === 'yes' ? '1' : '0');
-    $model = trim((string) ($in['ai_model'] ?? ''));
-    if ($model !== '' && !preg_match('/^[A-Za-z0-9._:\/-]{3,80}$/', $model)) return 'The AI model name looks wrong.';
-    $prov = (string) ($in['ai_provider'] ?? assistant_provider());
-    if (!isset(AI_PROVIDERS[$prov])) return 'Choose an assistant type.';
-    set_setting('ai_provider', $prov);
-    set_setting('ai_model', $model);
-    $key = trim((string) ($in['ai_api_key'] ?? ''));
-    if (($in['ai_clear_key'] ?? '') === 'yes') set_setting('ai_api_key', '');
-    elseif ($key !== '') {
-        if (!preg_match('/^[A-Za-z0-9._~+\/=-]{20,400}$/', $key)) return 'That does not look like a valid API key. Copy it again without spaces.';
-        set_setting('ai_api_key', $key);
+    foreach (array_keys(AI_PROVIDERS) as $prov) {
+        if (($in['ai_clear_' . $prov] ?? '') === 'yes') { set_setting('ai_key_' . $prov, ''); if (assistant_key($prov) !== '') set_setting('ai_api_key', ''); continue; }
+        $key = trim((string) ($in['ai_key_' . $prov] ?? ''));
+        if ($key === '') continue;
+        if (!preg_match('/^[A-Za-z0-9._~+\/=-]{20,400}$/', $key)) return 'That does not look like a valid ' . AI_PROVIDERS[$prov]['label'] . ' key. Copy it again without spaces.';
+        set_setting('ai_key_' . $prov, $key);
     }
     return null;
 }

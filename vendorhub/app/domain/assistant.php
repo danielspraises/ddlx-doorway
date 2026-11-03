@@ -90,59 +90,69 @@ function assistant_system_prompt(array $u): string
         . "FACTS ABOUT VENDOR HUB:\n" . $facts . "\nACCOUNT SUMMARY FOR THIS PERSON:\n" . assistant_context($u) . "\n";
 }
 
+// Services in order of preference: the better free one first. Every service that has a key is used, in this order,
+// and the built-in help answers when none of them can.
 const AI_PROVIDERS = [
-    'builtin'   => ['label' => 'Built-in help (free, no key needed)', 'model' => ''],
-    'gemini'    => ['label' => 'Google Gemini (free tier)', 'model' => 'gemini-2.5-flash'],
-    'groq'      => ['label' => 'Groq (free tier)', 'model' => 'llama-3.3-70b-versatile', 'url' => 'https://api.groq.com/openai/v1/chat/completions'],
-    'anthropic' => ['label' => 'Anthropic Claude (paid)', 'model' => 'claude-sonnet-5-5'],
+    'gemini'    => ['label' => 'Google Gemini', 'model' => 'gemini-2.5-flash', 'help' => 'Free key at aistudio.google.com'],
+    'groq'      => ['label' => 'Groq', 'model' => 'llama-3.3-70b-versatile', 'url' => 'https://api.groq.com/openai/v1/chat/completions', 'help' => 'Free key at console.groq.com'],
+    'anthropic' => ['label' => 'Anthropic Claude (paid)', 'model' => 'claude-sonnet-5-5', 'help' => 'Optional, paid'],
 ];
 
-function assistant_provider(): string
+function assistant_key(string $p): string
 {
-    $p = (string) setting('ai_provider', '');
-    if (isset(AI_PROVIDERS[$p])) return $p;
-    return (string) setting('ai_api_key', '') !== '' ? 'anthropic' : 'builtin'; // installs from before providers existed
+    $k = (string) setting('ai_key_' . $p, '');
+    if ($k !== '') return $k;
+    // A key saved before each service had its own box.
+    $legacy = (string) setting('ai_api_key', '');
+    if ($legacy === '') return '';
+    $was = (string) setting('ai_provider', '');
+    return ($was === $p || ($was === '' && $p === 'anthropic')) ? $legacy : '';
 }
 
-function assistant_model(): string
+// Services that have a key, best first.
+function assistant_providers(): array
 {
-    $m = trim((string) setting('ai_model', ''));
-    $p = assistant_provider();
-    // A model name left over from another provider is ignored.
-    foreach (AI_PROVIDERS as $k => $d) if ($k !== $p && $d['model'] !== '' && $m === $d['model']) $m = '';
-    return $m !== '' ? $m : AI_PROVIDERS[$p]['model'];
+    if (setting('ai_enabled', '1') !== '1') return [];
+    return array_values(array_filter(array_keys(AI_PROVIDERS), fn ($p) => assistant_key($p) !== ''));
 }
 
 function assistant_ready(): bool
 {
-    return assistant_provider() !== 'builtin' && (string) setting('ai_api_key', '') !== '' && setting('ai_enabled', '1') === '1';
+    return assistant_providers() !== [];
 }
 
-// Models tried in order when the chosen one is busy (Gemini's free models are often overloaded for a few minutes).
-function assistant_model_chain(): array
+function assistant_model(string $p): string
 {
-    $first = assistant_model();
-    $more = ['gemini' => ['gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash'], 'groq' => ['llama-3.1-8b-instant'], 'anthropic' => []][assistant_provider()] ?? [];
-    return array_values(array_unique(array_merge([$first], $more)));
+    $m = trim((string) setting('ai_model', ''));
+    // A custom model name only applies to Gemini, the first choice.
+    return ($p === 'gemini' && $m !== '' && str_starts_with($m, 'gemini')) ? $m : AI_PROVIDERS[$p]['model'];
 }
 
-// Asks the chosen AI service. Returns the reply text or null if it could not be reached (the built-in help then answers).
+// Models tried in order within one service when the first is busy (free models are often overloaded for a few minutes).
+function assistant_model_chain(string $p): array
+{
+    $more = ['gemini' => ['gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash'], 'groq' => ['llama-3.1-8b-instant'], 'anthropic' => []][$p] ?? [];
+    return array_values(array_unique(array_merge([assistant_model($p)], $more)));
+}
+
+// Asks the connected services one after another until one answers. Returns null if none could (built-in help then answers).
 function assistant_call(string $system, array $messages): ?string
 {
     if (!empty($GLOBALS['vh_ai_stub'])) return ($GLOBALS['vh_ai_stub'])($system, $messages);
     if (defined('VH_TESTING') || !function_exists('curl_init')) return null;
-    $p = assistant_provider();
-    $key = (string) setting('ai_api_key', '');
-    $last = '';
-    foreach (assistant_model_chain() as $i => $model) {
-        [$text, $code, $err] = assistant_call_model($p, $key, $model, $system, $messages, $i === 0 ? 25 : 20);
-        if ($text !== null) { set_setting('ai_last_error', ''); return $text; }
-        $last = $model . ': ' . $err;
-        log_error('Assistant call failed (' . $p . ' ' . $model . '): ' . $err);
-        if (!in_array($code, [0, 429, 500, 502, 503, 504, 404], true)) break; // a bad key or bad request will not improve with another model
-        if ($code === 503 && $i === 0) usleep(700000);
+    $problems = [];
+    foreach (assistant_providers() as $p) {
+        $key = assistant_key($p);
+        foreach (assistant_model_chain($p) as $i => $model) {
+            [$text, $code, $err] = assistant_call_model($p, $key, $model, $system, $messages, $i === 0 ? 20 : 15);
+            if ($text !== null) { set_setting('ai_last_error', $problems ? gmdate('Y-m-d H:i') . ' UTC (answered by ' . $p . ') ' . implode(' | ', $problems) : ''); set_setting('ai_last_used', $p); return $text; }
+            log_error('Assistant call failed (' . $p . ' ' . $model . '): ' . $err);
+            $problems[] = $p . ' ' . $model . ': ' . $err;
+            if (!in_array($code, [0, 429, 500, 502, 503, 504, 404], true)) break; // a bad key or request will not improve with another model
+            if ($code === 503 && $i === 0) usleep(500000);
+        }
     }
-    set_setting('ai_last_error', gmdate('Y-m-d H:i') . ' UTC, ' . $p . ', ' . $last);
+    if ($problems) set_setting('ai_last_error', gmdate('Y-m-d H:i') . ' UTC, ' . implode(' | ', array_slice($problems, 0, 4)));
     return null;
 }
 

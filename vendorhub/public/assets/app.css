@@ -359,3 +359,6 @@ td input,td select{min-height:30px;padding:3px 7px;font-size:.82rem}
 .upstat{margin:0 0 6px;font-size:.85rem}
 .upstat.is-err{color:#e5484d}
 .upstat.is-ok{color:#30a46c}
+
+/* Centered single-column pages */
+.narrow-col{max-width:760px;margin:0 auto}

@@ -249,11 +249,10 @@ route('POST', '/admin/assistant-test', function () use ($adminBack) {
     require_admin();
     $err = save_settings($_POST);
     if ($err) $adminBack('settings', $err, '');
-    if (assistant_provider() === 'builtin') $adminBack('settings', null, 'The assistant is set to Built-in help, which needs no connection. Choose Google Gemini or Groq to use an AI service.');
-    if ((string) setting('ai_api_key', '') === '') $adminBack('settings', 'Paste an API key first.', '');
+    if (!assistant_ready()) $adminBack('settings', null, 'No service key is saved, so the built-in help answers. Paste a Gemini or Groq key to use an AI service.');
     $r = assistant_call('You are a test. Reply with the single word OK.', [['role' => 'user', 'content' => 'Say OK']]);
-    if ($r !== null) $adminBack('settings', null, 'The assistant service answered: "' . str_limit($r, 80) . '". It is working.');
-    $adminBack('settings', 'The assistant service did not answer. ' . (string) setting('ai_last_error', 'No details were returned.'), '');
+    if ($r !== null) $adminBack('settings', null, 'Working. ' . (AI_PROVIDERS[(string) setting('ai_last_used', '')]['label'] ?? 'The service') . ' answered: "' . str_limit($r, 60) . '".' . ((string) setting('ai_last_error', '') !== '' ? ' (Another service had a problem, see the note below.)' : ''));
+    $adminBack('settings', 'No service answered. ' . (string) setting('ai_last_error', 'No details were returned.'), '');
 });
 route('POST', '/admin/email', function () use ($adminBack) {
     $u = require_admin();

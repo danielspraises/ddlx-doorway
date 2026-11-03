@@ -245,6 +245,16 @@ route('POST', '/admin/refund', function () use ($adminBack) {
     $adminBack('refunds', $err, input('action') === 'paystack' ? 'Refund sent to Paystack. It shows as refunded when Paystack confirms.' : 'Marked as refunded.');
 });
 
+route('POST', '/admin/assistant-test', function () use ($adminBack) {
+    require_admin();
+    $err = save_settings($_POST);
+    if ($err) $adminBack('settings', $err, '');
+    if (assistant_provider() === 'builtin') $adminBack('settings', null, 'The assistant is set to Built-in help, which needs no connection. Choose Google Gemini or Groq to use an AI service.');
+    if ((string) setting('ai_api_key', '') === '') $adminBack('settings', 'Paste an API key first.', '');
+    $r = assistant_call('You are a test. Reply with the single word OK.', [['role' => 'user', 'content' => 'Say OK']]);
+    if ($r !== null) $adminBack('settings', null, 'The assistant service answered: "' . str_limit($r, 80) . '". It is working.');
+    $adminBack('settings', 'The assistant service did not answer. ' . (string) setting('ai_last_error', 'No details were returned.'), '');
+});
 route('POST', '/admin/email', function () use ($adminBack) {
     $u = require_admin();
     try {

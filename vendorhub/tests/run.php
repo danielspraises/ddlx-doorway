@@ -545,6 +545,7 @@ set_setting('ai_daily_limit', '40');
 for ($i = 0; $i < 40; $i++) db()->insert('assistant_messages', ['id' => uuid(), 'user_id' => $sid, 'role' => 'user', 'body' => 'q', 'created_at' => now_db()]);
 ok(!assistant_ask($u, 'one more')['ok'], 'daily limit enforced when the admin sets one');
 set_setting('ai_daily_limit', '0');
+ok(str_contains(assistant_fallback('When can I sell?'), 'five-step'), 'fallback answers when can I sell');
 ok(str_contains(assistant_fallback('What is the platform name?'), 'Vendor Hub'), 'fallback knows the platform name');
 ok(str_contains(assistant_fallback('What is the marketplace link?'), 'ddlx.shop'), 'fallback knows the marketplace link');
 ok(str_contains(assistant_fallback('What do I need to get a blue seller badge?'), '150+ delivered orders'), 'fallback explains the blue badge');

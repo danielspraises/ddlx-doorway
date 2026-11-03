@@ -295,7 +295,7 @@ $docLinks = function (array $docs): string {
     <?php if (setting('ai_api_key', '') !== ''): ?><label class="check"><input type="checkbox" name="ai_clear_key" value="yes"><span>Remove the saved key</span></label><?php endif; ?>
     <?php if ((string) setting('ai_last_error', '') !== ''): ?><p class="flash flash-error">Last problem reaching the assistant service: <?= e((string) setting('ai_last_error', '')) ?></p><?php endif; ?>
     <?= f_text('ai_model', 'Model (optional)', (string) setting('ai_model', ''), null, ['placeholder' => assistant_model() ?: 'Chosen automatically', 'hint' => 'Leave blank to use the recommended model for the chosen type.']) ?>
-    <button class="btn">Save settings</button>
+    <div class="row"><button class="btn">Save settings</button><button class="btn btn-outline" type="submit" formaction="/admin/assistant-test" formnovalidate>Save and test the assistant</button></div>
   </form>
   <h2>Email sending (SMTP)</h2>
   <p class="muted" style="max-width:700px">Makes order, payout and password emails land in inboxes instead of spam. Use a service such as Brevo (free tier) or your own mail account. Leave the server blank to use your host's built-in mail.</p>

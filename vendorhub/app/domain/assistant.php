@@ -93,7 +93,7 @@ function assistant_system_prompt(array $u): string
 // Services in order of preference: the better free one first. Every service that has a key is used, in this order,
 // and the built-in help answers when none of them can.
 const AI_PROVIDERS = [
-    'gemini'    => ['label' => 'Google Gemini', 'model' => 'gemini-2.5-flash', 'help' => 'Free key at aistudio.google.com'],
+    'gemini'    => ['label' => 'Google Gemini', 'model' => 'gemini-3.8-flash', 'help' => 'Free key at aistudio.google.com'],
     'groq'      => ['label' => 'Groq', 'model' => 'llama-3.3-70b-versatile', 'url' => 'https://api.groq.com/openai/v1/chat/completions', 'help' => 'Free key at console.groq.com'],
     'anthropic' => ['label' => 'Anthropic Claude (paid)', 'model' => 'claude-sonnet-5-5', 'help' => 'Optional, paid'],
 ];
@@ -131,7 +131,7 @@ function assistant_model(string $p): string
 // Models tried in order within one service when the first is busy (free models are often overloaded for a few minutes).
 function assistant_model_chain(string $p): array
 {
-    $more = ['gemini' => ['gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash'], 'groq' => ['llama-3.1-8b-instant'], 'anthropic' => []][$p] ?? [];
+    $more = ['gemini' => ['gemini-flash-latest', 'gemini-3.5-flash-lite', 'gemini-flash-lite-latest'], 'groq' => ['llama-3.1-8b-instant', 'openai/gpt-oss-20b'], 'anthropic' => []][$p] ?? [];
     return array_values(array_unique(array_merge([assistant_model($p)], $more)));
 }
 

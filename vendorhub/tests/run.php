@@ -531,7 +531,7 @@ unset($GLOBALS['vh_ai_stub']);
 eq(assistant_providers(), ['anthropic'], 'old installs with one saved key keep using it');
 set_setting('ai_key_groq', 'gsk_testtesttesttesttesttest'); set_setting('ai_key_gemini', 'AIzaTestTestTestTestTestTest');
 eq(assistant_providers(), ['gemini', 'groq', 'anthropic'], 'every service with a key is used, best first');
-eq(assistant_model_chain('gemini')[0], 'gemini-2.5-flash', 'gemini default model'); ok(count(assistant_model_chain('gemini')) > 1, 'busy model falls back to other models');
+eq(assistant_model_chain('gemini')[0], 'gemini-3.8-flash', 'gemini default model'); ok(count(assistant_model_chain('gemini')) > 1, 'busy model falls back to other models');
 eq(assistant_model_chain('groq')[0], 'llama-3.3-70b-versatile', 'groq default model');
 set_setting('ai_enabled', '0'); eq(assistant_providers(), [], 'assistant switched off uses no service'); set_setting('ai_enabled', '1');
 foreach (['ai_api_key', 'ai_key_groq', 'ai_key_gemini', 'ai_provider'] as $k) set_setting($k, '');

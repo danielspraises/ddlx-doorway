@@ -9,6 +9,11 @@ declare(strict_types=1);
 const AI_HISTORY = 12;
 const AI_MAX_QUESTION = 1500;
 
+function assistant_today(): string
+{
+    return (new DateTime('now', new DateTimeZone('Africa/Lagos')))->format('l, j F Y, H:i') . ' (West Africa Time)';
+}
+
 function assistant_facts(): array
 {
     $c = rtrim(rtrim(number_format((float) setting('commission_percent', '10'), 2, '.', ''), '0'), '.');
@@ -18,6 +23,7 @@ function assistant_facts(): array
     $mkt = rtrim((string) setting('marketplace_url', '') ?: 'https://ddlx.shop', '/');
     $levelText = assistant_level_text();
     return [
+        ['keys' => ['date', 'today', 'what day', 'current time', 'what time', 'time now'], 'title' => 'Today', 'text' => 'It is ' . assistant_today() . '.'],
         ['keys' => ['platform', 'name', 'what is this', 'what is vendor', 'who are you', 'ddlx', 'vendor hub', 'about'], 'title' => 'The platform', 'text' => 'This is Vendor Hub, the seller portal for DDLX. You apply, get verified, list products, manage stock and orders, and withdraw earnings here. Your approved products are sold on the DDLX marketplace.'],
         ['keys' => ['marketplace', 'link', 'website', 'site', 'url', 'shop', 'ddlx.shop', 'store link', 'where do customers'], 'title' => 'The marketplace', 'text' => 'The DDLX marketplace is at ' . $mkt . '. Customers browse and pay there; the orders appear in your Sales tab here.'],
         ['keys' => ['badge', 'blue', 'gold', 'silver', 'bronze', 'level', 'levels', 'tier', 'rank', 'elite'], 'title' => 'Seller levels and badges', 'text' => $levelText],
@@ -86,7 +92,7 @@ function assistant_system_prompt(array $u): string
     $facts = '';
     foreach (assistant_facts() as $f) $facts .= '- ' . $f['title'] . ': ' . $f['text'] . "\n";
     return "You are Ask DDLX, the help assistant inside DDLX Vendor Hub, the seller portal for the DDLX marketplace (ddlx.shop). You help sellers and the DDLX team use Vendor Hub.\n"
-        . "Rules: answer only from the facts below and the account summary; if you do not know, say so and suggest writing to the team from Messages. Never invent policies, fees, dates or order details. You cannot change anything in the account, approve anything, or see other people's data. Never ask for passwords, bank details or verification documents. Be brief, friendly and practical: short paragraphs or a few steps. Reply in the language the person writes in. Do not use markdown headings.\n\n"
+        . "Rules: answer only from the facts below and the account summary; if you do not know, say so and suggest writing to the team from Messages. Never invent policies, fees, dates or order details. You cannot change anything in the account, approve anything, or see other people's data. Never ask for passwords, bank details or verification documents. Be brief, friendly and practical: short paragraphs or a few steps. Reply in the language the person writes in. Today is " . assistant_today() . ". Do not use markdown headings.\n\n"
         . "FACTS ABOUT VENDOR HUB:\n" . $facts . "\nACCOUNT SUMMARY FOR THIS PERSON:\n" . assistant_context($u) . "\n";
 }
 

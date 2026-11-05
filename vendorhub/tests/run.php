@@ -731,6 +731,16 @@ eq(link_seller($admin, $lk, 7, 'Old Shop'), null, 'linked');
 ok(link_seller($admin, $lk, 7, 'Old Shop') !== null, 'cannot link twice');
 $lk2 = uuid(); db()->insert('users', ['id' => $lk2, 'email' => 'second@shop.test', 'password_hash' => 'x', 'created_at' => now_db()]);
 eq(seller_link($lk)['uid'], 7, 'link stored');
+
+// marketplace -> Vendor Hub sync
+$sy = marketplace_sync_run($admin, false);
+eq([$sy['seen'], $sy['already'], $sy['skipped'], $sy['created']], [2, 1, 1, 0], 'sync without create only reports');
+$sy = marketplace_sync_run($admin, true);
+eq($sy['created'], 1, 'sync creates an account for the marketplace-only seller');
+$nu = db()->one("SELECT id, marketplace_user_id FROM users WHERE email = 'other@shop.test'");
+eq((int) $nu['marketplace_user_id'], 8, 'new account is linked');
+ok(is_verified_seller($nu['id']), 'new account is verified');
+eq(marketplace_sync_run($admin, true)['created'], 0, 'sync is repeatable');
 $r = import_products_batch($admin, $lk, 0);
 eq($r['created'], 2, 'two products imported');
 ok(count($r['notes']) === 2, 'grouped and SKU clash reported: ' . implode(' | ', $r['notes']));

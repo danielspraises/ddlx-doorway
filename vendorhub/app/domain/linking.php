@@ -336,3 +336,56 @@ function import_orders_batch(array $admin, string $sellerId, int $after = 0): ar
     }
     return $n + ['next' => $next, 'remaining' => (int) ($d['remaining'] ?? 0)];
 }
+
+// ---------------------------------------------------------------- marketplace -> Vendor Hub
+
+/**
+ * Walks every seller on the marketplace. A seller whose email matches a verified Vendor Hub seller is linked.
+ * With $create, the rest get a verified Vendor Hub account (random password) and an email to set their own.
+ * Safe to repeat. Returns counts, or ['error' => ...] when the marketplace cannot be reached.
+ */
+function marketplace_sync_run(array $admin, bool $create): array
+{
+    $db = db();
+    $res = ['seen' => 0, 'linked' => 0, 'created' => 0, 'already' => 0, 'skipped' => 0, 'errors' => []];
+    for ($page = 1; $page <= 50; $page++) {
+        $d = marketplace_call('/vendors?page=' . $page, 'GET', null, 30);
+        if (!$d || !isset($d['vendors']) || !is_array($d['vendors'])) {
+            if ($page === 1) return ['error' => 'Could not reach the marketplace. Check the connection under Settings.'];
+            break;
+        }
+        foreach ($d['vendors'] as $v) {
+            $uid = (int) ($v['id'] ?? 0);
+            if ($uid < 1) continue;
+            $res['seen']++;
+            if ($db->val('SELECT 1 FROM users WHERE marketplace_user_id = ?', [$uid])) { $res['already']++; continue; }
+            $email = strtolower(trim((string) ($v['email'] ?? '')));
+            $name = trim((string) ($v['name'] ?? '')) ?: $email;
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { $res['skipped']++; continue; }
+            $row = $db->one('SELECT id FROM users WHERE email = ?', [$email]);
+            if ($row) {
+                if (!is_verified_seller($row['id'])) { $res['skipped']++; continue; }
+                $err = link_seller($admin, $row['id'], $uid, $name);
+                if ($err) $res['errors'][] = $name . ': ' . $err; else $res['linked']++;
+                continue;
+            }
+            if (!$create) { $res['skipped']++; continue; }
+            $id = uuid(); $app = uuid(); $now = now_db();
+            $db->insert('users', ['id' => $id, 'email' => $email, 'password_hash' => password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT), 'created_at' => $now]);
+            $db->insert('seller_applications', ['id' => $app, 'user_id' => $id, 'status' => 'approved', 'current_step' => 5, 'personal' => '{}', 'business' => '{}',
+                'brand' => jenc(['store_name' => $name]), 'registration' => '{}', 'declaration' => '{}', 'applicant_email' => $email, 'reviewed_by' => $admin['id'], 'reviewed_at' => $now, 'submitted_at' => $now, 'created_at' => $now, 'updated_at' => $now]);
+            $db->insert('seller_verifications', ['id' => uuid(), 'application_id' => $app, 'user_id' => $id, 'status' => 'approved', 'current_step' => 5, 'details' => '{}', 'documents' => '{}',
+                'reviewed_by' => $admin['id'], 'reviewed_at' => $now, 'submitted_at' => $now, 'created_at' => $now, 'updated_at' => $now]);
+            $db->insert('store_profiles', ['seller_id' => $id, 'description' => '', 'return_policy' => '', 'shipping_policy' => '', 'updated_at' => $now]);
+            $err = link_seller($admin, $id, $uid, $name);
+            if ($err) { $res['errors'][] = $name . ': ' . $err; continue; }
+            $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+            $db->insert('password_resets', ['token_hash' => token_hash($token), 'user_id' => $id, 'expires_at' => db_plus('+7 days'), 'created_at' => $now]);
+            send_mail($email, 'Your DDLX Vendor Hub account', "Your store \"" . $name . "\" on DDLX now has a Vendor Hub account.\n\nChoose your password here (valid for 7 days):\n\n" . base_url() . "/auth?token=" . $token . "\n\nThen open Seller Center to manage your products, inventory, orders and payouts.");
+            audit($admin, 'seller.import', 'Created Vendor Hub account for marketplace seller #' . $uid . ' (' . $name . ')', $id);
+            $res['created']++;
+        }
+        if (empty($d['has_more'])) break;
+    }
+    return $res;
+}

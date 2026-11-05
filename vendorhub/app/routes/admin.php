@@ -178,6 +178,16 @@ route('POST', '/admin/link', function () {
     redirect('/admin/link?seller=' . $id, $err ?? (input('action') === 'unlink' ? 'Link removed.' : 'Linked. Now import their products, then their past orders.'), $err ? 'error' : 'ok');
 });
 
+route('POST', '/admin/marketplace-sync', function () {
+    $u = require_admin();
+    @set_time_limit(240);
+    $r = marketplace_sync_run($u, input('create') === '1');
+    if (isset($r['error'])) redirect('/admin?tab=sellers', $r['error'], 'error');
+    $m = $r['seen'] . ' marketplace sellers checked: ' . $r['linked'] . ' linked, ' . $r['created'] . ' accounts created, ' . $r['already'] . ' already linked, ' . $r['skipped'] . ' skipped (no matching verified seller' . ($r['skipped'] ? ' or no valid email' : '') . ').';
+    if ($r['errors']) $m .= ' Problems: ' . implode('; ', array_slice($r['errors'], 0, 3));
+    redirect('/admin?tab=sellers', $m, $r['errors'] ? 'error' : 'ok');
+});
+
 route('POST', '/admin/link/run', function () {
     $u = require_admin();
     $id = input('seller');

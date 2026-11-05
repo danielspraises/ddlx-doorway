@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.4.0
+ * Version: 1.5.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -442,7 +442,7 @@ final class Verola_Connector {
 				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
 			];
 		}
-		return ['vendors' => $out];
+		return ['vendors' => $out, 'has_more' => count($ids) === 20 && $search === ''];
 	}
 
 	public static function rest_link($request) {
@@ -773,6 +773,7 @@ final class Verola_Connector {
 				}
 			}
 			self::sync_coupons();
+			self::sync_sellers();
 			self::set_state(['last_sync' => time(), 'last_count' => $count]);
 		} catch (Throwable $e) {
 			self::set_state(['last_sync' => time(), 'last_count' => $count, 'last_error' => $e->getMessage()]);
@@ -780,6 +781,35 @@ final class Verola_Connector {
 		delete_transient('verola_sync_lock');
 	}
 
+
+	// Opens (or refreshes) a marketplace store for every verified seller, even before they have a product, so each
+	// verified Vendor Hub seller is listed on the store page with their current logo, banner and details.
+	private static function sync_sellers() {
+		$s = self::settings();
+		for ($page = 1; $page <= 20; $page++) {
+			$res = wp_remote_get($s['url'] . '/api/marketplace/sellers?limit=50&page=' . $page, ['timeout' => 30, 'headers' => ['Authorization' => 'Bearer ' . $s['api_key']]]);
+			if (is_wp_error($res) || wp_remote_retrieve_response_code($res) !== 200) {
+				return; // an older Vendor Hub without this feature, or a short outage: products still sync
+			}
+			$data = json_decode(wp_remote_retrieve_body($res), true);
+			if (!is_array($data) || !isset($data['sellers'])) {
+				return;
+			}
+			foreach ($data['sellers'] as $seller) {
+				try {
+					$uid = self::vendor_user($seller);
+					if (!empty($seller['badge']['level'])) {
+						update_user_meta($uid, '_verola_level', sanitize_key($seller['badge']['level']));
+					}
+				} catch (Throwable $e) {
+					self::set_state(['last_error' => 'Seller ' . ($seller['store_name'] ?? '?') . ': ' . $e->getMessage()]);
+				}
+			}
+			if (empty($data['has_more'])) {
+				break;
+			}
+		}
+	}
 
 	// ------------------------------------------------------------------ seller discount codes (Vendor Hub -> store)
 

@@ -63,6 +63,28 @@ function media_url(?string $path): ?string
     return $path ? base_url() . '/media?p=' . rawurlencode($path) : null;
 }
 
+// How one seller is described to the marketplace: store name and address, contact, profile pictures and level.
+function marketplace_seller_payload(string $sid): array
+{
+    $db = db();
+    $a = $db->one('SELECT applicant_email, brand, business FROM seller_applications WHERE user_id = ?', [$sid]) ?: [];
+    $brand = jdec($a['brand'] ?? '', []);
+    $business = jdec($a['business'] ?? '', []);
+    $profile = store_profile($sid);
+    $level = seller_level($sid);
+    $storeName = trim((string) ($brand['store_name'] ?? '')) ?: 'DDLX seller';
+    $pf = fn (string $k) => (string) ($profile[$k] ?? '');
+    $email = $a['applicant_email'] ?? null;
+    if (!$email) $email = $db->val('SELECT email FROM users WHERE id = ?', [$sid]);
+    return [
+        'badge' => ['level' => $level, 'label' => LEVEL_LABEL[$level], 'rank' => level_rank($level)],
+        'id' => $sid, 'store_name' => $storeName, 'store_slug' => slugify($storeName) . '-' . substr($sid, 0, 6), 'email' => $email,
+        'city' => $business['city'] ?? null, 'state' => $business['state'] ?? null,
+        'profile' => ['tagline' => $pf('tagline'), 'description' => $pf('description'), 'phone' => $pf('phone'), 'support_email' => $pf('support_email'), 'return_policy' => $pf('return_policy'),
+            'shipping_policy' => $pf('shipping_policy'), 'logo' => media_url($profile['logo']), 'banner' => media_url($profile['banner']), 'vacation' => (bool) $profile['vacation'], 'vacation_message' => $pf('vacation_message')],
+    ];
+}
+
 // Approved products, grouped under their seller. Stock is live; everything else is the approved version.
 // Without updated_since only live products are returned. With it, every product changed since then is returned,
 // including ones that went offline (live = false) so the marketplace can hide them.
@@ -81,6 +103,7 @@ function marketplace_catalogue(?string $sinceDb, int $limit): array
     $apps = [];
     $profiles = [];
     $levels = [];
+    $sellerCache = [];
     $products = [];
     foreach ($rows as $r) {
         $s = jdec($r['published_snapshot'], []);
@@ -91,6 +114,7 @@ function marketplace_catalogue(?string $sinceDb, int $limit): array
             $apps[$sid] = ['brand' => jdec($a['brand'] ?? '', []), 'business' => jdec($a['business'] ?? '', []), 'email' => $a['applicant_email'] ?? null];
             $profiles[$sid] = store_profile($sid);
             $levels[$sid] = ['level' => seller_level($sid)];
+            $sellerCache[$sid] = marketplace_seller_payload($sid);
         }
         $brand = $apps[$sid]['brand'];
         $profile = $profiles[$sid];
@@ -100,13 +124,7 @@ function marketplace_catalogue(?string $sinceDb, int $limit): array
         $pf = fn (string $k) => (string) ($profile[$k] ?? '');
         $products[] = [
             'id' => $r['id'], 'live' => (int) $r['live'] === 1 && !$profile['vacation'], 'updated_at' => iso($r['updated_at']), 'published_at' => iso($r['published_at']),
-            'seller' => [
-                'badge' => ['level' => $levels[$sid]['level'], 'label' => LEVEL_LABEL[$levels[$sid]['level']], 'rank' => level_rank($levels[$sid]['level'])],
-                'id' => $sid, 'store_name' => $storeName, 'store_slug' => slugify($storeName) . '-' . substr($sid, 0, 6), 'email' => $apps[$sid]['email'],
-                'city' => $apps[$sid]['business']['city'] ?? null, 'state' => $apps[$sid]['business']['state'] ?? null,
-                'profile' => ['tagline' => $pf('tagline'), 'description' => $pf('description'), 'phone' => $pf('phone'), 'support_email' => $pf('support_email'), 'return_policy' => $pf('return_policy'),
-                    'shipping_policy' => $pf('shipping_policy'), 'logo' => media_url($profile['logo']), 'banner' => media_url($profile['banner']), 'vacation' => (bool) $profile['vacation'], 'vacation_message' => $pf('vacation_message')],
-            ],
+            'seller' => $sellerCache[$sid],
             'name' => $s['name'], 'slug' => $s['slug'], 'sku' => $s['sku'], 'type' => $s['type'], 'brand' => $s['brand'], 'category' => $s['category'],
             'category_path' => $s['category_path'] ?? ($s['category'] ? [$s['category']] : []), 'tags' => $s['tags'],
             'short_description' => $s['short_description'], 'description' => $s['description'], 'currency' => $s['currency'],
@@ -132,6 +150,17 @@ route('GET', '/api/marketplace/products', function () {
     }
     $limit = min(500, max(1, (int) ($_GET['limit'] ?? 100) ?: 100));
     market_json(marketplace_catalogue($sinceDb, $limit));
+}, ['api' => true]);
+
+// Every verified seller, so the marketplace can open (and keep up to date) their store even before they have a product.
+route('GET', '/api/marketplace/sellers', function () {
+    market_check_key();
+    $limit = min(100, max(1, (int) ($_GET['limit'] ?? 50) ?: 50));
+    $page = max(1, (int) ($_GET['page'] ?? 1));
+    $ids = db()->all("SELECT user_id FROM seller_verifications WHERE status = 'approved' ORDER BY user_id LIMIT " . $limit . ' OFFSET ' . (($page - 1) * $limit));
+    $out = [];
+    foreach ($ids as $r) $out[] = marketplace_seller_payload((string) $r['user_id']);
+    market_json(['sellers' => $out, 'has_more' => count($ids) === $limit]);
 }, ['api' => true]);
 
 // ---------------------------------------------------------------- marketplace: sales and refunds (signed)

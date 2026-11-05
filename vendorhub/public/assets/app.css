@@ -367,3 +367,13 @@ td input,td select{min-height:30px;padding:3px 7px;font-size:.82rem}
 .bubble .rich p{margin:0 0 8px}.bubble .rich p:last-child{margin-bottom:0}
 .bubble .rich ol,.bubble .rich ul{margin:4px 0 8px;padding-left:20px}.bubble .rich li{margin:3px 0}
 .bubble .rich code{background:rgba(0,0,0,.07);padding:1px 5px;border-radius:5px;font-size:.85em}
+
+/* Help "?" icons and their pop-up */
+.help{display:inline-grid;place-items:center;width:17px;height:17px;margin-left:5px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--soft);color:var(--muted);font:600 .68rem/1 var(--font-sans);cursor:help;vertical-align:middle;min-height:0;box-shadow:none;transition:background .15s,color .15s,border-color .15s}
+.help:hover,.help:focus-visible,.help.on{background:var(--ink);color:#fff;border-color:var(--ink);outline:none}
+h1 .help,h2 .help,h3 .help{width:18px;height:18px;margin-left:8px;position:relative;top:-2px}
+.help-pop{position:fixed;z-index:2147483000;max-width:min(300px,calc(100vw - 24px));padding:9px 12px;border-radius:10px;background:var(--ink);color:#fff;font-size:.8rem;line-height:1.45;font-weight:400;box-shadow:0 8px 28px rgba(0,0,0,.25);pointer-events:none;opacity:0;transform:translateY(3px);transition:opacity .12s,transform .12s;white-space:normal;text-align:left}
+.help-pop.on{opacity:1;transform:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.set{scroll-margin-top:80px}
+[id^="s-"]{scroll-margin-top:80px}

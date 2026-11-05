@@ -1,7 +1,6 @@
 <div class="narrow-col">
 <p class="eyebrow">Help</p>
-<h1>Ask DDLX</h1>
-<p class="muted">Quick answers about selling on DDLX, from applying to getting paid. It cannot change anything in your account. For anything it cannot answer, <a href="/messages<?= !empty($user['canMessages']) ? '' : '?new=1' ?>">write to the team</a>.</p>
+<h1>Ask DDLX <?= help('Quick answers about selling on DDLX, from applying to getting paid. It cannot change anything in your account. For anything it cannot answer, write to the team from Messages.') ?></h1>
 <div class="card">
   <div class="chat" role="log" aria-live="polite" aria-label="Conversation">
   <?php if (!$history): ?>

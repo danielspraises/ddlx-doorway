@@ -32,18 +32,13 @@ $docLink = function (string $kind, string $title) use ($docs): string {
     <ol class="steps" aria-label="Verification progress">
       <?php foreach (VERIFY_STEPS as $n => $s): ?><li><a href="/verification?step=<?= $n ?>" class="<?= $n === $step ? 'active' : ($n < $step ? 'done' : '') ?>" <?= $n === $step ? 'aria-current="step"' : '' ?>><span class="num">0<?= $n ?></span><?= e($s['title']) ?></a></li><?php endforeach; ?>
     </ol>
-    <p class="muted small">Step <?= $step ?> of 8</p>
-    <h2 style="margin-top:4px"><?= e($def['title']) ?></h2>
-    <p class="muted"><?= e($def['lead']) ?></p>
+    <div class="narrow-col">
+    <h2 style="margin-top:4px"><?= e($def['title']) ?> <span class="muted small" style="font-weight:400">Step <?= $step ?> of 8</span> <?= help((string) $def['lead']) ?></h2>
 
     <?php if ($def['file'] !== '' && ($def['file'] !== 'registration' || $registered)): $kind = $def['file']; ?>
       <div class="card" style="margin:18px 0">
-        <h3 style="margin-top:0"><?= e($def['label']) ?></h3>
-        <div class="grid g2">
-          <div><p class="label">What to upload</p><ul><?php foreach ($def['accepted'] as $t): ?><li><?= e($t) ?></li><?php endforeach; ?></ul></div>
-          <div><p class="label">To get approved first time</p><ul><?php foreach ($def['tips'] as $t): ?><li><?= e($t) ?></li><?php endforeach; ?></ul></div>
-        </div>
-        <p class="muted small"><?= !empty($def['images_only']) ? 'JPG, PNG or WebP' : 'PDF, JPG, PNG or WebP' ?> · up to 10 MB</p>
+        <h3 style="margin-top:0"><?= e($def['label']) ?> <?= help('Accepted: ' . implode('; ', $def['accepted']) . '.') ?><span class="muted small" style="font-weight:400;margin-left:10px">Tips <?= help(implode(' ', array_map(fn ($t) => rtrim($t, '.') . '.', $def['tips']))) ?></span></h3>
+        <p class="muted small" style="margin-top:-4px"><?= !empty($def['images_only']) ? 'JPG, PNG or WebP' : 'PDF, JPG, PNG or WebP' ?> · up to 10 MB</p>
         <form method="post" action="/verification/upload" enctype="multipart/form-data" data-keep data-autoupload><?= csrf_field() ?>
           <input type="hidden" name="step" value="<?= $step ?>">
           <div class="field"><label for="file">Choose file</label><input id="file" type="file" name="file" required accept="<?= !empty($def['images_only']) ? 'image/jpeg,image/png,image/webp' : 'application/pdf,image/jpeg,image/png,image/webp' ?>"></div>
@@ -77,5 +72,6 @@ $docLink = function (string $kind, string $title) use ($docs): string {
         <?php else: ?><button class="btn btn-accent" name="action" value="submit" type="submit" data-confirm="Submit your verification for review?">Submit verification</button><?php endif; ?>
       </div>
     </form>
+    </div>
   <?php endif; ?>
 <?php endif; ?>

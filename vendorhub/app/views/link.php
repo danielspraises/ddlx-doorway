@@ -1,6 +1,6 @@
 <p class="eyebrow">Admin</p>
 <h1>Link to the marketplace</h1>
-<p class="muted" style="max-width:640px"><strong><?= e($store) ?></strong> (<?= e($email) ?>). Match this seller to their existing store on ddlx.shop. After the link, their products and past orders are brought across and kept in step from here.</p>
+<p class="muted"><strong><?= e($store) ?></strong> (<?= e($email) ?>) <?= help('Match this seller to their existing store on ddlx.shop. After the link, their products and past orders are brought across and kept in step from here. After importing, the products here are the master copy: edit them in Vendor Hub and the store follows within a few minutes. Their store page and address on ddlx.shop stay as they are.') ?></p>
 <p><a class="btn btn-ghost btn-sm" href="/admin?tab=sellers">&larr; Back to sellers</a></p>
 
 <?php if (!$connected): ?>
@@ -25,15 +25,12 @@
     <div class="row between"><div><span class="pill pill-ok">Linked</span> <strong><?= e($link['name']) ?></strong> <span class="muted small">marketplace seller #<?= (int) $link['uid'] ?></span></div>
       <?php if (!$counts['products'] && !$counts['orders']): ?><form method="post" action="/admin/link" data-keep><?= csrf_field() ?><input type="hidden" name="seller" value="<?= e($sid) ?>"><input type="hidden" name="action" value="unlink"><button class="btn btn-sm btn-ghost" type="submit">Remove link</button></form><?php endif; ?></div>
     <hr class="sep">
-    <h3 style="margin-top:0">1. Products</h3>
-    <p class="muted small">Copies their existing products (with photos, prices, stock and variations) into Vendor Hub and ties each to the same product on the store, so nothing is duplicated. Safe to run again.</p>
+    <h3 style="margin-top:0">1. Products <?= help('Copies their existing products (with photos, prices, stock and variations) into Vendor Hub and ties each to the same product on the store, so nothing is duplicated. Safe to run again.') ?></h3>
     <p class="row"><button class="btn" type="button" data-run="products">Import products</button><span class="muted small" data-count="products"><?= (int) $counts['products'] ?> imported so far</span></p>
     <hr class="sep">
-    <h3 style="margin-top:0">2. Past orders</h3>
-    <p class="muted small">Brings in their sales history so charts and levels are complete. Finished orders are shown for history only and add nothing to the wallet. Orders still on their way are paid out normally once delivered. Import products first.</p>
+    <h3 style="margin-top:0">2. Past orders <?= help('Brings in their sales history so charts and levels are complete. Finished orders are shown for history only and add nothing to the wallet. Orders still on their way are paid out normally once delivered. Import products first.') ?></h3>
     <p class="row"><button class="btn" type="button" data-run="orders"<?= $counts['products'] ? '' : ' disabled' ?>>Import past orders</button><span class="muted small" data-count="orders"><?= (int) $counts['orders'] ?> orders imported so far</span></p>
     <p class="muted small" data-status role="status"></p>
     <ul class="list hidden" data-notes style="margin-top:8px"></ul>
   </div>
-  <p class="muted small" style="max-width:720px;margin-top:12px">After importing, this seller's products here are the master copy: edit them in Vendor Hub and the store follows within a few minutes. Their store page and address on ddlx.shop stay exactly as they are.</p>
 <?php endif; ?>

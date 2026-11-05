@@ -1,6 +1,6 @@
 <?php $stock = !empty($stock_mode); ?>
 <p class="eyebrow"><?= $stock ? 'Inventory' : 'Products' ?></p>
-<h1><?= $stock ? 'Update stock from CSV' : 'Import products from CSV' ?></h1>
+<h1><?= $stock ? 'Update stock from CSV' : 'Import products from CSV' ?><?= $stock ? '' : ' ' . help('Add many simple products at once. They are created as drafts: add photos to each, then submit them for review. Up to ' . IMPORT_MAX_ROWS . ' rows per file. Every row is checked first; if any row has a problem nothing is imported. Required columns: name, category, regular_price, weight_kg, length_cm, width_cm, height_cm. Leave sku empty to get one automatically.') ?>
 <?php if ($result && !$result['ok']): ?>
   <div class="notice error"><strong><?= e($result['error']) ?></strong>
   <?php if ($result['errors']): ?><ul><?php foreach ($result['errors'] as $line => $list): ?><li>Row <?= (int) $line ?>: <?= e(implode('; ', $list)) ?></li><?php endforeach; ?></ul><?php endif; ?></div>
@@ -8,12 +8,7 @@
 <?php if ($stock): ?>
   <p><a class="btn btn-outline" href="/seller?tab=inventory">Back to inventory</a></p>
 <?php else: ?>
-  <p class="muted">Add many simple products at once. They are created as drafts: add photos to each, then submit them for review. Up to <?= IMPORT_MAX_ROWS ?> rows per file.</p>
-  <ol>
-    <li><a href="/products/import/template">Download the template</a> and open it in Excel or Google Sheets.</li>
-    <li>Fill one product per row. Leave <code>sku</code> empty to get one automatically. Required: name, category, regular_price, weight_kg, length_cm, width_cm, height_cm.</li>
-    <li>Save as CSV and upload it here. Every row is checked first; if any row has a problem nothing is imported.</li>
-  </ol>
+  <p class="small"><a href="/products/import/template">Download the template</a>, fill one product per row, save as CSV and upload it here.</p>
   <form method="post" action="/products/import" enctype="multipart/form-data" class="card" data-keep><?= csrf_field() ?>
     <label>CSV file<input type="file" name="file" accept=".csv,text/csv" required></label>
     <div class="row"><button class="btn" type="submit">Import products</button><a class="btn btn-ghost" href="/seller?tab=products">Cancel</a></div>

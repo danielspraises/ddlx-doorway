@@ -11,14 +11,12 @@
   </dl>
   <p><a class="btn" href="/auth">Sign in as admin</a></p>
 <?php else: ?>
-  <h1>Install Vendor Hub</h1>
-  <p class="muted">Create an empty MySQL database and user in cPanel (MySQL® Databases) first, then fill this in. It takes a few seconds.</p>
-  <p class="notice small"><strong>Testing on your own computer?</strong> You do not need MySQL. Close this page and run <code>php dev/setup.php</code> in the <code>vendorhub</code> folder instead (see README, “Test on your own computer”). Use this form only on your real hosting.</p>
-  <?php if (!empty($error)): ?><p class="err" role="alert"><?= e($error) ?></p><?php endif; ?>
+  <h1>Install Vendor Hub <?= help('Create an empty MySQL database and user in cPanel (MySQL Databases) first, then fill this in. Testing on your own computer? You do not need MySQL: close this page and run php dev/setup.php in the vendorhub folder instead.') ?></h1>
+    <?php if (!empty($error)): ?><p class="err" role="alert"><?= e($error) ?></p><?php endif; ?>
   <form method="post" action="/install">
     <h2>Database</h2>
     <div class="field"><label for="db_host">Host</label><input id="db_host" name="db_host" value="<?= e($v['db_host'] ?? 'localhost') ?>" required></div>
-    <div class="field"><label for="db_name">Database name</label><input id="db_name" name="db_name" value="<?= e($v['db_name'] ?? '') ?>" required><span class="hint">cPanel adds a prefix, for example <code>cpuser_vendorhub</code>.</span></div>
+    <div class="field"><label for="db_name">Database name <?= help("cPanel adds a prefix, for example cpuser_vendorhub.") ?></label><input id="db_name" name="db_name" value="<?= e($v['db_name'] ?? '') ?>" required></div>
     <div class="field"><label for="db_user">Database user</label><input id="db_user" name="db_user" value="<?= e($v['db_user'] ?? '') ?>" required></div>
     <div class="field"><label for="db_pass">Database password</label><input id="db_pass" name="db_pass" type="password" autocomplete="off"></div>
     <h2>Administrator</h2>

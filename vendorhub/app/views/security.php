@@ -3,14 +3,12 @@
 <?php if (!empty($error)): ?><p class="notice error" role="alert"><?= e($error) ?></p><?php endif; ?>
 <?php if ($codes): ?>
   <div class="card" style="max-width:520px">
-    <h2 style="margin-top:0">Save your backup codes</h2>
-    <p class="muted">Each code works once if you lose your phone. They are shown only now. Keep them somewhere safe.</p>
+    <h2 style="margin-top:0">Save your backup codes <?= help('Each code works once if you lose your phone. They are shown only now. Keep them somewhere safe.') ?></h2>
     <ul class="list" style="font-family:ui-monospace,monospace;columns:2"><?php foreach ($codes as $c): ?><li><?= e($c) ?></li><?php endforeach; ?></ul>
   </div>
 <?php endif; ?>
-<h2>Two-step sign-in <?= pill($on ? 'OK' : 'Check', [], ['OK' => 'ok', 'Check' => 'warn']) ?></h2>
+<h2>Two-step sign-in <?= pill($on ? 'OK' : 'Check', [], ['OK' => 'ok', 'Check' => 'warn']) ?> <?= help('Adds a 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator, Authy, 1Password) to signing in, so a stolen password is not enough.') ?></h2>
 <?php if (!$on): ?>
-  <p class="muted" style="max-width:560px">Adds a 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator, Authy, 1Password) to signing in, so a stolen password is not enough.</p>
   <ol style="max-width:560px">
     <li>In your authenticator app choose <em>Add account</em> then <em>Enter a setup key</em>.</li>
     <li>Type this key: <code style="font-size:1.05em;letter-spacing:.06em;word-break:break-all"><?= e(trim(chunk_split((string) $secret, 4, ' '))) ?></code><br><span class="muted small">Account name: <?= e($user['email']) ?>. Type of key: time based. On a phone you can also <a href="<?= e($uri) ?>">tap here to add it</a>.</span></li>

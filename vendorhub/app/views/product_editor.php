@@ -43,9 +43,8 @@ $doneN = count(array_filter($checks, fn ($c) => $c[1]));
   <div class="card">
     <?= f_text('name', 'Product name', $v('name'), null, ['required' => 1, 'maxlength' => 200]) ?>
     <div class="grid g2">
-      <div class="field"><label for="f-sku">SKU <span class="err">*</span></label>
-        <div class="row"><input id="f-sku" name="sku" value="<?= e($v('sku')) ?>" maxlength="100" style="flex:1;min-width:140px"><button class="btn btn-outline btn-sm" type="submit" name="action" value="generate_sku" data-gen-sku formnovalidate>Generate</button></div>
-        <span class="hint"><?= $market ? 'Checked against the whole marketplace so it cannot clash.' : 'Must be unique across all sellers.' ?></span></div>
+      <div class="field"><label for="f-sku">SKU <span class="err">*</span> <?= help($market ? 'Checked against the whole marketplace so it cannot clash.' : 'Must be unique across all sellers.') ?></label>
+        <div class="row"><input id="f-sku" name="sku" value="<?= e($v('sku')) ?>" maxlength="100" style="flex:1;min-width:140px"><button class="btn btn-outline btn-sm" type="submit" name="action" value="generate_sku" data-gen-sku formnovalidate>Generate</button></div></div>
       <div class="field"><label for="f-product_type">Product type</label><select id="f-product_type" name="product_type"><option value="simple"<?= $v('product_type') === 'simple' ? ' selected' : '' ?>>Simple product</option><option value="variable"<?= $v('product_type') === 'variable' ? ' selected' : '' ?>>Variable (sizes, colours…)</option></select></div>
     </div>
     <div class="grid g2">
@@ -80,9 +79,8 @@ $doneN = count(array_filter($checks, fn ($c) => $c[1]));
     <?= f_check('allow_backorders', 'Allow backorders', !empty($form['allow_backorders'])) ?>
   </div>
 
-  <h2>Shipping</h2>
+  <h2>Shipping <?= help('Required. The marketplace uses weight and size to price delivery, so keep them accurate.') ?></h2>
   <div class="card">
-    <p class="muted small" style="margin-top:0">Required. The marketplace uses these to price delivery.</p>
     <div class="grid g4">
       <?= f_text('weight_kg', 'Weight (kg)', $num($form['weight_kg'] ?? null), null, ['inputmode' => 'decimal', 'required' => 1]) ?>
       <?= f_text('length_cm', 'Length (cm)', $num($form['length_cm'] ?? null), null, ['inputmode' => 'decimal', 'required' => 1]) ?>
@@ -129,7 +127,7 @@ $doneN = count(array_filter($checks, fn ($c) => $c[1]));
 </form>
 
 <?php if ($saved): ?>
-  <h2>Photos</h2>
+  <h2>Photos <?= help("Use bright, square photos on a plain background. Put size, material and care in the description. Accurate weight and size keep delivery costs right.") ?></h2>
   <div class="card">
     <h3 style="margin-top:0">Featured image</h3>
     <div class="imgs"><?= $saved['featured_image'] ? $img($saved['featured_image'], 'featured') : '<span class="muted">None yet</span>' ?></div>
@@ -169,13 +167,12 @@ $doneN = count(array_filter($checks, fn ($c) => $c[1]));
 <?php endif; ?>
 </div>
 <aside class="split-side">
-  <div class="card tip"><p class="eyebrow" style="margin:0 0 8px">Ready to submit <?= $doneN ?>/<?= count($checks) ?></p>
+  <div class="card tip"><p class="eyebrow" style="margin:0 0 8px">Ready to submit <?= $doneN ?>/<?= count($checks) ?> <?= help('Saved changes update this list.') ?></p>
     <div class="meter" aria-hidden="true"><i style="width:<?= (int) round($doneN / count($checks) * 100) ?>%"></i></div>
     <ul class="checks"><?php foreach ($checks as [$label, $okc]): ?><li class="<?= $okc ? 'ok' : '' ?>"><?= icon($okc ? 'check' : 'arrow-right') ?><?= e($label) ?></li><?php endforeach; ?></ul>
-    <p class="muted small" style="margin:10px 0 0">Saved changes update this list.</p></div>
+  </div>
   <?php if ($saved && $saved['featured_image']): ?><div class="card tip"><p class="eyebrow" style="margin:0 0 8px">Preview</p>
     <img src="<?= e(product_image_url($saved['featured_image'])) ?>" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px;border:1px solid var(--line)">
     <p style="margin:10px 0 0"><strong><?= e($saved['name']) ?></strong><br><span class="muted"><?= $saved['regular_price'] ? e($saved['currency'] . ' ' . number_format((float) $saved['regular_price'])) : '' ?></span></p></div><?php endif; ?>
-  <div class="card tip"><p class="eyebrow" style="margin:0 0 6px">Tips</p><ul class="muted small" style="margin:0;padding-left:18px"><li>Use bright, square photos on a plain background.</li><li>Put size, material and care in the description.</li><li>Accurate weight and size keep delivery costs right.</li></ul></div>
 </aside></div>
 

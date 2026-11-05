@@ -3,7 +3,13 @@
 $m = fn ($x, $c = 'NGN') => money($x, $c);
 ?>
 <p class="eyebrow">Seller Center</p>
-<h1><?= e(SELLER_TABS[$tab]) ?></h1>
+<?php $tabHelp = [
+  'inventory' => 'Stock changes apply straight away, even on live products. To change many at once, download your stock, edit the stock numbers in Excel and upload it back. Prices are not changed here because price changes go through review.',
+  'promotions' => 'Discount codes for your own products. You fund the discount: customers pay less and your earnings are worked out on the lower price. Codes appear on the DDLX marketplace within a minute or two. Money off applies to each item, so two items get it twice. Set an end date and a use limit so a code cannot run forever.',
+  'returns' => 'When a customer complains, DDLX opens a case here. Accept it, or explain why you disagree. DDLX makes the final decision.',
+  'payouts' => 'Withdrawals go to your saved bank account. Sales become available to withdraw after the payout hold, and the smallest withdrawal and any fee are shown on the form.',
+]; ?>
+<h1><?= e(SELLER_TABS[$tab]) ?><?= isset($tabHelp[$tab]) ? ' ' . help($tabHelp[$tab]) : '' ?></h1>
 <?= tabs_nav(SELLER_TABS, $tab, '/seller', ['returns' => $user['pending']['returns'] ?? 0]) ?>
 
 <?php if (in_array($tab, ['overview', 'sales', 'payouts'], true)):
@@ -14,11 +20,10 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
       $mo = current(array_filter($month, fn ($x) => $x['currency'] === $c)) ?: ['net' => 0, 'units' => 0, 'gross' => 0]; ?>
     <div class="grid g3" style="margin-top:20px">
       <div class="stat"><p class="muted small">Available to withdraw</p><p class="n"><?= e($m($b['available'], $c)) ?></p></div>
-      <div class="stat"><p class="muted small">Pending (<?= hold_days() ?>-day hold)</p><p class="n"><?= e($m($b['pending'], $c)) ?></p></div>
+      <div class="stat"><p class="muted small">Pending (<?= hold_days() ?>-day hold) <?= help('Your earnings are each sale minus the ' . rtrim(rtrim(number_format(commission_percent(), 2), '0'), '.') . '% marketplace commission. Sales become available to withdraw after ' . hold_days() . ' days.') ?></p><p class="n"><?= e($m($b['pending'], $c)) ?></p></div>
       <div class="stat"><p class="muted small">Last 30 days</p><p class="n"><?= e($m($mo['net'], $c)) ?></p><p class="muted small"><?= (int) $mo['units'] ?> units · <?= e($m($mo['gross'], $c)) ?> sold</p></div>
     </div>
   <?php endforeach; ?>
-  <p class="muted small">Your earnings are each sale minus the <?= e(rtrim(rtrim(number_format(commission_percent(), 2), '0'), '.')) ?>% marketplace commission. Sales become available to withdraw after <?= hold_days() ?> days.</p>
 <?php else: ?><p class="notice">No sales yet. When a customer buys one of your products on the marketplace, it shows up here.</p><?php endif; endif; ?>
 
 <?php if ($tab === 'overview'):
@@ -35,7 +40,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
   <div class="card level-card" style="margin-top:24px">
     <div class="level-big lvl-<?= e($curLv) ?>"><?= icon('shield') ?></div>
     <div>
-      <p class="muted small" style="margin:0">Your seller level</p>
+      <p class="muted small" style="margin:0">Your seller level <?= help('Based on the last ' . LEVEL_WINDOW_DAYS . ' days. Higher levels get a badge and better placement on the marketplace' . (function () use ($curLv) { $pk = level_perks($curLv); return $pk['commission_off'] > 0 || $pk['hold_off'] > 0 ? ', plus ' . ($pk['commission_off'] > 0 ? $pk['commission_off'] . ' points off commission' : '') . ($pk['commission_off'] > 0 && $pk['hold_off'] > 0 ? ' and ' : '') . ($pk['hold_off'] > 0 ? 'payouts ' . $pk['hold_off'] . ' days sooner' : '') : ''; })() . '.') ?></p>
       <p style="margin:2px 0 4px"><?= level_badge($curLv) ?> <?php if ($level['override_level']): ?><span class="muted small">set by the DDLX team</span><?php endif; ?></p>
       <p class="muted" style="margin:0"><?= e(LEVEL_NOTE[$curLv]) ?><?= $rating['count'] ? ' Rating ' . number_format((float) $rating['average'], 1) . ' from ' . (int) $rating['count'] . ' customer ratings.' : '' ?></p>
       <?php if (!empty($level['below_since']) && !$level['override_level']): $pol = level_policy(); ?><p class="notice" style="margin:12px 0 0"><strong>Your <?= e(LEVEL_LABEL[$curLv]) ?> level is at risk.</strong> You no longer meet its requirements<?= $pol['mode'] === 'grace' ? '. Meet them again by ' . e(human_date(db_plus('+' . $pol['grace_days'] . ' days', $level['below_since']), false)) . ' to keep it' : '' ?>.</p>
@@ -43,7 +48,6 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
       <?php if ($nextLv): ?><p style="margin:12px 0 0"><strong>To reach <?= e(LEVEL_LABEL[$nextLv]) ?>:</strong></p>
       <ul class="need"><?php foreach ($nextChecks as $c): ?><li class="<?= $c['ok'] ? 'ok' : '' ?>"><?= icon($c['ok'] ? 'check' : 'arrow-right') ?><span><?= e($c['label']) ?>: <strong><?= e($c['have']) ?></strong> <span class="muted">(<?= e($c['need']) ?>)</span></span></li><?php endforeach; ?></ul>
       <?php else: ?><p style="margin:12px 0 0"><strong>You are at the top level.</strong> Keep returns low and orders moving to stay here.</p><?php endif; ?>
-      <p class="muted small" style="margin:10px 0 0">Based on the last <?= LEVEL_WINDOW_DAYS ?> days. Higher levels get a badge and better placement on the marketplace<?php $pk = level_perks($curLv); echo $pk['commission_off'] > 0 || $pk['hold_off'] > 0 ? ', plus ' . ($pk['commission_off'] > 0 ? $pk['commission_off'] . ' points off commission' : '') . ($pk['commission_off'] > 0 && $pk['hold_off'] > 0 ? ' and ' : '') . ($pk['hold_off'] > 0 ? 'payouts ' . $pk['hold_off'] . ' days sooner' : '') : ''; ?>.</p>
     </div>
   </div>
   <div class="grid g4" style="margin-top:24px">
@@ -79,9 +83,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 <?php endif; ?>
 
 <?php if ($tab === 'inventory'): ?>
-  <p class="muted">Stock changes apply straight away, even on live products.</p>
   <?php if ($products): ?><details class="card" style="margin:12px 0"><summary><strong>Update many at once (CSV)</strong></summary>
-    <p class="muted small">Download your current stock, change the <code>stock</code> numbers in Excel, and upload it back. Prices are not changed here because price changes go through review.</p>
     <form method="post" action="/inventory/import" enctype="multipart/form-data" class="row" data-keep><?= csrf_field() ?><a class="btn btn-outline btn-sm" href="/inventory/export">Download stock list</a><input type="file" name="file" accept=".csv,text/csv" required style="max-width:240px"><button class="btn btn-sm" type="submit">Upload</button></form></details><?php endif; ?>
   <?php if (!$products): ?><p class="notice">Add a product first.</p><?php endif; ?>
   <div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th class="t-right">In stock</th><th>Change</th></tr></thead><tbody>
@@ -102,9 +104,8 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 <?php if ($tab === 'promotions'):
     $e = $edit ?? null; $isEdit = $e && empty($e['form_only']) || ($e && !empty($e['id']));
     $ev = fn (string $k, $d = '') => $e[$k] ?? $d; ?>
-  <p class="muted" style="max-width:680px">Create discount codes for your own products. <strong>You fund the discount</strong>: customers pay less and your earnings are worked out on the lower price. Codes appear on the DDLX marketplace within a minute or two.</p>
   <?php if (!empty($err)): ?><p class="flash flash-error" role="alert"><?= e($err) ?></p><?php endif; ?>
-  <div class="split"><div class="split-main">
+  <div class="narrow-col"><div>
   <h2 style="margin-top:0"><?= $isEdit ? 'Edit ' . e((string) $ev('code')) : 'New discount code' ?></h2>
   <form method="post" action="/promotions/save" data-keep class="card"><?= csrf_field() ?>
     <input type="hidden" name="id" value="<?= e((string) $ev('id')) ?>">
@@ -129,7 +130,6 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
     <p class="row" style="margin-top:16px"><button class="btn" type="submit"><?= $isEdit ? 'Save changes' : 'Create code' ?></button><?php if ($isEdit): ?><a class="btn btn-ghost" href="/seller?tab=promotions">Cancel</a><?php endif; ?></p>
   </form>
   </div>
-  <aside class="split-side"><div class="card tip"><p class="eyebrow" style="margin:0 0 6px">Tips</p><ul class="muted small" style="margin:0;padding-left:18px"><li>Money off applies to each item, so two items get it twice.</li><li>Set an end date and a use limit so a code cannot run forever.</li><li>Codes only work on your products, never on other sellers'.</li></ul></div></aside>
   </div>
   <h2>Your codes</h2>
   <?php if (!$coupons): ?><p class="notice">No codes yet.</p><?php else: ?>
@@ -169,7 +169,6 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 <?php endif; ?>
 
 <?php if ($tab === 'returns'): ?>
-  <p class="muted">When a customer complains, DDLX opens a case here. Accept it, or explain why you disagree. DDLX makes the final decision.</p>
   <ul class="list"><?php foreach ($cases as $c): ?><li>
     <div class="row between"><strong><?= e($c['item_name']) ?></strong> <?= pill($c['status'], RETURN_LABEL, RETURN_KINDS) ?></div>
     <div class="muted small">Order <?= e($c['number'] ?: $c['marketplace_order_id']) ?> · <?= e($m($c['line_total'], $c['currency'])) ?> · opened <?= e(human_date($c['created_at'], true)) ?></div>
@@ -202,8 +201,8 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
     <?php if (!$accounts): ?><li class="muted">No bank accounts yet.</li><?php endif; ?></ul>
   <?php if (count($accounts) < MAX_BANK_ACCOUNTS): ?>
   <form method="post" action="/payouts/bank" class="card" style="max-width:520px;margin-top:16px" data-keep><?= csrf_field() ?><h3 style="margin-top:0">Add a bank account</h3>
-    <?= f_text('bank_name', 'Bank', '', null, ['required' => 1, 'placeholder' => 'e.g. GTBank', 'list' => 'banklist', 'autocomplete' => 'off']) ?>
-    <?php $bl = paystack_on() ? paystack_banks() : []; if ($bl): ?><datalist id="banklist"><?php foreach ($bl as $bn): ?><option value="<?= e($bn) ?>"></option><?php endforeach; ?></datalist><p class="muted small" style="margin-top:-8px">Pick your bank from the list. We check the account number with the bank and use the name it gives.</p><?php endif; ?>
+    <?= f_text('bank_name', 'Bank', '', null, ['required' => 1, 'placeholder' => 'e.g. GTBank', 'list' => 'banklist', 'autocomplete' => 'off', 'hint' => 'Pick your bank from the list. We check the account number with the bank and use the name it gives.']) ?>
+    <?php $bl = paystack_on() ? paystack_banks() : []; if ($bl): ?><datalist id="banklist"><?php foreach ($bl as $bn): ?><option value="<?= e($bn) ?>"></option><?php endforeach; ?></datalist><?php endif; ?>
     <?= f_text('account_number', 'Account number', '', null, ['required' => 1, 'inputmode' => 'numeric', 'maxlength' => 10]) ?>
     <?= f_text('account_name', 'Account name', '', null, ['required' => 1]) ?>
     <button class="btn" type="submit">Save account</button></form><?php endif; ?>
@@ -220,7 +219,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
     <div class="cover"><?php if ($store['banner']): ?><img src="/files/store?p=<?= e(rawurlencode($store['banner'])) ?>" alt="Banner"><?php else: ?><span>Banner · 1600×400 works best</span><?php endif; ?></div>
     <div class="storeid">
       <div class="logo-ring"><?php if ($store['logo']): ?><img src="/files/store?p=<?= e(rawurlencode($store['logo'])) ?>" alt="Logo"><?php else: ?><span>Logo</span><?php endif; ?></div>
-      <div class="grow"><strong class="store-title"><?= e($store['tagline'] !== '' ? $store['tagline'] : 'Your store') ?></strong><p class="muted small" style="margin:0">This is how customers see your store on the marketplace.</p></div>
+      <div class="grow"><strong class="store-title"><?= e($store['tagline'] !== '' ? $store['tagline'] : 'Your store') ?></strong><span class="muted small">Preview of your marketplace store <?= help('This is how customers see your store on the marketplace.') ?></span></div>
       <?php if ($store['vacation']): ?><span class="pill pill-warn">On vacation</span><?php endif; ?>
     </div>
     <div class="uploads">

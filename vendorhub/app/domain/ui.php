@@ -13,9 +13,10 @@ function f_text(string $name, string $label, string $value = '', ?string $error 
     }
     if (!empty($o['required'])) $attrs .= ' required';
     if (!empty($o['readonly'])) $attrs .= ' readonly';
-    $hint = isset($o['hint']) ? '<span class="hint">' . e($o['hint']) . '</span>' : '';
+    $hint = '';
+    $helpIcon = isset($o['hint']) && $o['hint'] !== '' ? ' ' . help((string) $o['hint']) : '';
     $err = $error ? '<p class="err" role="alert">' . e($error) . '</p>' : '';
-    return '<div class="field"><label for="' . $id . '">' . e($label) . (!empty($o['required']) ? ' <span class="err">*</span>' : '') . '</label>'
+    return '<div class="field"><label for="' . $id . '">' . e($label) . (!empty($o['required']) ? ' <span class="err">*</span>' : '') . $helpIcon . '</label>'
         . '<input id="' . $id . '" name="' . e($name) . '" type="' . e($type) . '" value="' . e($value) . '"' . $attrs . '>' . $hint . $err . '</div>';
 }
 
@@ -24,9 +25,10 @@ function f_area(string $name, string $label, string $value = '', ?string $error 
     $id = 'f-' . $name;
     $attrs = isset($o['maxlength']) ? ' maxlength="' . (int) $o['maxlength'] . '"' : '';
     $attrs .= isset($o['rows']) ? ' rows="' . (int) $o['rows'] . '"' : '';
-    $hint = isset($o['hint']) ? '<span class="hint">' . e($o['hint']) . '</span>' : '';
+    $hint = '';
+    $helpIcon = isset($o['hint']) && $o['hint'] !== '' ? ' ' . help((string) $o['hint']) : '';
     $err = $error ? '<p class="err" role="alert">' . e($error) . '</p>' : '';
-    return '<div class="field"><label for="' . $id . '">' . e($label) . (!empty($o['required']) ? ' <span class="err">*</span>' : '') . '</label>'
+    return '<div class="field"><label for="' . $id . '">' . e($label) . (!empty($o['required']) ? ' <span class="err">*</span>' : '') . $helpIcon . '</label>'
         . '<textarea id="' . $id . '" name="' . e($name) . '"' . $attrs . '>' . e($value) . '</textarea>' . $hint . $err . '</div>';
 }
 
@@ -38,9 +40,10 @@ function f_select(string $name, string $label, array $options, string $value = '
         $key = is_int($k) ? (string) $text : (string) $k;
         $opts .= '<option value="' . e($key) . '"' . ($key === $value ? ' selected' : '') . '>' . e((string) $text) . '</option>';
     }
-    $hint = isset($o['hint']) ? '<span class="hint">' . e($o['hint']) . '</span>' : '';
+    $hint = '';
+    $helpIcon = isset($o['hint']) && $o['hint'] !== '' ? ' ' . help((string) $o['hint']) : '';
     $err = $error ? '<p class="err" role="alert">' . e($error) . '</p>' : '';
-    return '<div class="field"><label for="' . $id . '">' . e($label) . (!empty($o['required']) ? ' <span class="err">*</span>' : '') . '</label>'
+    return '<div class="field"><label for="' . $id . '">' . e($label) . (!empty($o['required']) ? ' <span class="err">*</span>' : '') . $helpIcon . '</label>'
         . '<select id="' . $id . '" name="' . e($name) . '">' . $opts . '</select>' . $hint . $err . '</div>';
 }
 
@@ -114,8 +117,8 @@ function category_select(?string $selected, ?string $error = null): string
         foreach ($items as $c) $html .= '<option value="' . e($c['id']) . '"' . ($c['id'] === $selected ? ' selected' : '') . '>' . e($c['name']) . ($c['active'] ? '' : ' (hidden)') . '</option>';
         $html .= $label !== '' ? '</optgroup>' : '';
     }
-    return '<div class="field"><label for="f-category_id">Category <span class="err">*</span></label><select id="f-category_id" name="category_id">' . $html . '</select>'
-        . '<span class="hint">Pick the most specific category that fits.</span>' . ($error ? '<p class="err" role="alert">' . e($error) . '</p>' : '') . '</div>';
+    return '<div class="field"><label for="f-category_id">Category <span class="err">*</span> ' . help('Pick the most specific category that fits.') . '</label><select id="f-category_id" name="category_id">' . $html . '</select>'
+        . '' . ($error ? '<p class="err" role="alert">' . e($error) . '</p>' : '') . '</div>';
 }
 
 function product_image_url(?string $path): string
@@ -124,6 +127,12 @@ function product_image_url(?string $path): string
 }
 
 // Small inline icons (outline style). Names: store package chart wallet arrow-up-right arrow-right check user building file-check send bell truck undo shield
+// A small "?" that shows a short explanation on hover, keyboard focus or tap. Keeps pages clean.
+function help(string $text): string
+{
+    return '<button type="button" class="help" data-help="' . e($text) . '" aria-label="Help: ' . e(str_limit($text, 60)) . '">?</button>';
+}
+
 function icon(string $name, string $class = ''): string
 {
     static $p = [

@@ -22,7 +22,13 @@ $docLinks = function (array $docs): string {
 };
 ?>
 <p class="eyebrow"><?= $user['isAdmin'] ? 'Admin' : 'Staff desk' ?></p>
-<h1><?= e($tabs[$tab]) ?></h1>
+<?php $tabHelp = [
+  'orders' => 'Move orders from here or from WooCommerce; both places stay in step. Sellers pack their items in Vendor Hub, you collect, ship and close the order.',
+  'payouts' => $ps ?? false ? 'Press Send with Paystack to pay a seller\'s bank account automatically. The request shows as sending until the bank confirms.' : 'Pay the seller from your bank or Paystack dashboard, then enter the transfer reference here. Add your Paystack key in Settings to pay with one click.',
+  'refunds' => 'When an order is refunded or cancelled the seller\'s earnings are taken back automatically. The customer\'s money is returned here: press Refund with Paystack, or mark it done if you refunded it elsewhere. Never refund the same order twice.',
+  'categories' => 'Sellers pick the most specific category. Up to ' . MAX_CATEGORY_DEPTH . ' levels.',
+]; ?>
+<h1><?= e($tabs[$tab]) ?><?= isset($tabHelp[$tab]) ? ' ' . help($tabHelp[$tab]) : '' ?></h1>
 <?= tabs_nav($nav, $tab, '/admin', ['applications' => $badges['applications'], 'verifications' => $badges['verifications'], 'products' => $badges['products'], 'payouts' => $badges['payouts'], 'orders' => $badges['orders'] ?? 0, 'returns' => $badges['returns'] ?? 0]) ?>
 
 <?php if ($tab === 'overview'): $top = $o['sales'][0] ?? null; $cur = $top['currency'] ?? 'NGN'; ?>
@@ -134,12 +140,11 @@ $docLinks = function (array $docs): string {
       <input name="note" maxlength="500" placeholder="Note to the seller (required to reject)" aria-label="Note">
       <label class="check"><input type="checkbox" name="restock" value="yes"><span>Item comes back to stock</span></label>
       <div class="row"><button class="btn btn-sm" name="decision" value="refund" type="submit" data-confirm="Refund this item and take the earnings back from the seller?">Refund</button><button class="btn btn-sm btn-outline" name="decision" value="reject" type="submit" data-confirm="Reject this case?">Reject</button></div>
-      <span class="muted small">Refund reverses the seller's earnings. Return the customer's money in WooCommerce.</span></form><?php endif; ?></div></li><?php endforeach; ?>
+      <?= help('Refund reverses the seller\'s earnings. Return the customer\'s money in WooCommerce.') ?></form><?php endif; ?></div></li><?php endforeach; ?>
     <?php if (!$items): ?><li class="muted">No cases here.</li><?php endif; ?></ul>
 <?php endif; ?>
 
 <?php if ($tab === 'orders'): ?>
-  <p class="muted">Move orders from here or from WooCommerce. Either way both places stay in step. Sellers pack their items in Vendor Hub; you collect, ship and close the order.</p>
   <form method="get" action="/admin/export" class="row" style="margin:8px 0" data-keep><input type="hidden" name="kind" value="orders"><label class="small muted" for="oe-from">Download as spreadsheet, from</label><input id="oe-from" type="date" name="from" style="width:auto"><label class="small muted" for="oe-to">to</label><input id="oe-to" type="date" name="to" style="width:auto"><button class="btn btn-outline btn-sm" type="submit">Download CSV</button></form>
   <div class="row" style="margin:16px 0"><?php foreach (ADMIN_ORDER_FILTERS as $k => $l): ?><a class="btn btn-sm <?= $filter === $k ? '' : 'btn-outline' ?>" href="/admin?tab=orders&filter=<?= $k ?>"><?= e($l) ?></a><?php endforeach; ?></div>
   <ul class="list"><?php foreach ($items as $o): $state = $o['state']; ?><li>
@@ -179,7 +184,7 @@ $docLinks = function (array $docs): string {
 <?php endif; ?>
 
 <?php if ($tab === 'payouts'): ?>
-  <p class="muted"><?= $ps ? 'Press <strong>Send with Paystack</strong> to pay a seller\'s bank account automatically. The request shows as sending until the bank confirms.' : 'Pay the seller from your bank or Paystack dashboard, then enter the transfer reference here. Add your Paystack key in Settings to pay with one click.' ?> <a href="/admin/export?kind=payouts">Download all withdrawals (CSV)</a></p>
+  <p class="small"><a href="/admin/export?kind=payouts">Download all withdrawals (CSV)</a></p>
   <ul class="list"><?php foreach ($items as $w): ?><li>
     <div class="row between"><div><strong><?= e($w['store_name']) ?></strong> <span class="muted">· <?= e($w['seller_email']) ?></span>
       <div>Pay <strong><?= e($m((float) $w['amount'] - (float) $w['fee'], $w['currency'])) ?></strong><?= (float) $w['fee'] > 0 ? ' <span class="muted small">(' . e($m($w['amount'], $w['currency'])) . ' less ' . e($m($w['fee'], $w['currency'])) . ' fee)</span>' : '' ?></div>
@@ -197,7 +202,6 @@ $docLinks = function (array $docs): string {
 <?php endif; ?>
 
 <?php if ($tab === 'refunds'): ?>
-  <p class="muted" style="max-width:720px">When an order is refunded or cancelled, the seller's earnings are taken back automatically. The <strong>customer's money</strong> is returned here. Press <strong>Refund with Paystack</strong> to send it back to the customer's card or bank, or mark it done if you refunded it somewhere else. Do not refund the same order twice.</p>
   <div class="row" style="margin:12px 0"><?php foreach (['open' => 'To do', 'done' => 'Done', 'all' => 'All'] as $k => $l): ?><a class="chip" style="<?= $filter === $k ? 'border-color:var(--ink);font-weight:700' : '' ?>" href="/admin?tab=refunds&amp;filter=<?= e($k) ?>"><?= e($l) ?></a><?php endforeach; ?></div>
   <ul class="list"><?php foreach ($items as $r): ?><li>
     <div class="row between"><div><strong>Order <?= e($r['number'] ?: $r['marketplace_order_id']) ?></strong> <span class="muted">· <?= e($r['customer_name']) ?> · <?= e(human_date($r['created_at'], true)) ?></span>
@@ -213,7 +217,7 @@ $docLinks = function (array $docs): string {
 <?php endif; ?>
 
 <?php if ($tab === 'categories'): $flat = category_flat($all); ?>
-  <p class="muted"><?= count($all) ?> categories · up to <?= MAX_CATEGORY_DEPTH ?> levels. Sellers pick the most specific one.</p>
+  <p class="muted small"><?= count($all) ?> categories</p>
   <form method="post" action="/admin/category" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="action" value="create"><input name="name" placeholder="New top-level category" maxlength="80" required style="max-width:300px"><button class="btn">Add</button></form>
   <ul class="tree" style="margin-top:16px"><?php foreach ($flat as $row): $c = $row['category']; $d = $row['depth']; ?>
     <li style="padding-left:<?= $d * 22 ?>px"><details><summary><span class="name<?= $c['active'] ? '' : ' off' ?>"><?= e($c['name']) ?></span> <span class="muted small"><?= (int) $c['product_count'] ?> product<?= $c['product_count'] === 1 ? '' : 's' ?><?= $c['active'] ? '' : ' · hidden' ?><?= $c['commission_percent'] !== null ? ' · ' . e((string) $c['commission_percent']) . '% commission' : '' ?></span></summary>
@@ -241,7 +245,7 @@ $docLinks = function (array $docs): string {
 <?php if ($tab === 'sellers'): ?>
   <form method="get" action="/admin" class="row" style="margin:12px 0" data-keep><input type="hidden" name="tab" value="sellers"><input type="search" name="q" value="<?= e($q) ?>" placeholder="Search sellers" style="max-width:260px"><button class="btn btn-sm btn-outline">Search</button>
     </form>
-  <form method="post" action="/admin/level" data-keep style="margin-bottom:12px"><?= csrf_field() ?><input type="hidden" name="action" value="recalculate"><button class="btn btn-sm btn-outline" type="submit">Recalculate all levels</button> <span class="muted small">Levels also update when orders are delivered and ratings change.</span></form>
+  <form method="post" action="/admin/level" data-keep style="margin-bottom:12px"><?= csrf_field() ?><input type="hidden" name="action" value="recalculate"><button class="btn btn-sm btn-outline" type="submit">Recalculate all levels</button> <?= help('Levels also update when orders are delivered and ratings change.') ?></form>
   <div class="table-wrap"><table><thead><tr><th>Seller</th><th>Level</th><th class="t-right">Delivered (90d)</th><th class="t-right">Returns</th><th class="t-right">Packed in 48h</th><th class="t-right">Rating</th><th>Pin a level</th><th>Marketplace</th></tr></thead><tbody>
   <?php foreach ($items as $s): $m = $s['m']; ?>
     <tr><td><strong><?= e($s['store']) ?></strong><br><span class="muted small"><?= e($s['email']) ?></span></td>
@@ -279,17 +283,16 @@ $docLinks = function (array $docs): string {
 <?php endif; ?>
 
 <?php if ($tab === 'settings'): ?>
-  <form method="post" action="/admin/settings" class="card" style="max-width:640px" data-keep><?= csrf_field() ?>
-    <h3 style="margin-top:0">Money</h3>
+  <nav class="chips" aria-label="Settings sections"><a class="chip" href="#s-general">General</a><a class="chip" href="#s-assistant">Assistant</a><a class="chip" href="#s-email">Email</a><a class="chip" href="#s-phone">Phone app</a><a class="chip" href="#s-levels">Seller levels</a><a class="chip" href="#s-paystack">Paystack</a><a class="chip" href="#s-backup">Backup</a><a class="chip" href="#s-connect">Marketplace link</a></nav>
+  <form method="post" action="/admin/settings" class="card set" style="max-width:640px" data-keep><?= csrf_field() ?>
+    <h3 id="s-general" style="margin-top:0">Money</h3>
     <div class="grid g2"><?= f_text('commission_percent', 'Marketplace commission (%)', (string) setting('commission_percent', '10'), null, ['inputmode' => 'decimal']) ?><?= f_text('payout_hold_days', 'Payout hold (days)', (string) setting('payout_hold_days', '7'), null, ['inputmode' => 'numeric', 'hint' => 'Sales become withdrawable after this many days.']) ?>
       <?= f_text('min_withdrawal', 'Smallest withdrawal', (string) setting('min_withdrawal', '1000'), null, ['inputmode' => 'decimal']) ?><?= f_text('withdrawal_fee', 'Fee per withdrawal', (string) setting('withdrawal_fee', '0'), null, ['inputmode' => 'decimal']) ?></div>
     <h3>Addresses</h3>
     <?= f_text('app_url', 'Vendor Hub address', (string) setting('app_url', ''), null, ['type' => 'url', 'placeholder' => 'https://vendor.ddlx.shop']) ?>
     <?= f_text('marketplace_url', 'Marketplace address', (string) setting('marketplace_url', ''), null, ['type' => 'url', 'placeholder' => 'https://ddlx.shop', 'hint' => 'Used to check SKUs against the store. Leave blank to skip.']) ?>
-    <h3>Ask DDLX assistant</h3>
-    <p class="muted small">Answers questions for sellers and staff. It works for free with the built-in help, or you can connect a free Google Gemini or Groq key for fuller answers.</p>
+    <h3 id="s-assistant">Ask DDLX assistant <?= help('Answers questions for sellers and staff. It always works with the built-in help. Add a free Gemini and/or Groq key for fuller answers: Gemini is asked first, Groq answers if Gemini is busy, and the built-in help answers if neither can.') ?></h3>
     <label class="check"><input type="checkbox" name="ai_enabled" value="yes" <?= setting('ai_enabled', '1') === '1' ? 'checked' : '' ?>><span>Use the assistant</span></label>
-    <p class="hint">Add a key for one or both free services. Gemini is asked first; if it is busy or fails, Groq answers; if neither can, the built-in help answers. With no key, the built-in help always answers.</p>
     <?php foreach (AI_PROVIDERS as $prov => $d): $has = assistant_key($prov) !== ''; ?>
       <?= f_text('ai_key_' . $prov, $d['label'] . ' key', '', null, ['type' => 'password', 'autocomplete' => 'off', 'hint' => $d['help'], 'placeholder' => $has ? 'Saved (ends ' . substr(assistant_key($prov), -4) . '). Paste a new key to replace it.' : 'Paste the key here']) ?>
       <?php if ($has): ?><label class="check"><input type="checkbox" name="ai_clear_<?= $prov ?>" value="yes"><span>Remove the saved <?= e($d['label']) ?> key</span></label><?php endif; ?>
@@ -297,29 +300,25 @@ $docLinks = function (array $docs): string {
     <?php if ((string) setting('ai_last_error', '') !== ''): ?><p class="flash flash-error">Last problem reaching an assistant service: <?= e((string) setting('ai_last_error', '')) ?></p><?php endif; ?>
     <div class="row"><button class="btn">Save settings</button><button class="btn btn-outline" type="submit" formaction="/admin/assistant-test" formnovalidate>Save and test the assistant</button></div>
   </form>
-  <h2>Email sending (SMTP)</h2>
-  <p class="muted" style="max-width:700px">Makes order, payout and password emails land in inboxes instead of spam. Use a service such as Brevo (free tier) or your own mail account. Leave the server blank to use your host's built-in mail.</p>
-  <form method="post" action="/admin/email" class="card" style="max-width:640px" data-keep><?= csrf_field() ?>
+  <h2 id="s-email">Email sending (SMTP) <?= help('Makes order, payout and password emails reach inboxes instead of spam. Use a service such as Brevo (free tier) or your own mail account. Leave the server blank to use your host\'s built-in mail. On Brevo: the server, port and login are on its SMTP & API page, and the password is an SMTP key you create there (not your account password).') ?></h2>
+  <form method="post" action="/admin/email" class="card set" style="max-width:640px" data-keep><?= csrf_field() ?>
     <div class="grid g2"><?= f_text('smtp_host', 'SMTP server', (string) setting('smtp_host', ''), null, ['placeholder' => 'smtp-relay.brevo.com']) ?><?= f_text('smtp_port', 'Port', (string) setting('smtp_port', '587'), null, ['inputmode' => 'numeric', 'hint' => '587 for TLS, 465 for SSL.']) ?>
       <?= f_text('smtp_user', 'Login', (string) setting('smtp_user', ''), null, ['autocomplete' => 'off', 'placeholder' => 'xxxxxx@smtp-brevo.com']) ?><?= f_text('smtp_pass', 'SMTP key (password)', '', null, ['type' => 'password', 'autocomplete' => 'new-password', 'placeholder' => setting('smtp_pass', '') !== '' ? 'Saved. Type a new one to replace.' : 'Brevo: SMTP & API → SMTP keys']) ?></div>
     <?= f_text('mail_from', 'Send emails from', (string) setting('mail_from', ''), null, ['type' => 'email', 'placeholder' => 'no-reply@ddlx.shop', 'hint' => 'The address people see. Not the Login above. On Brevo, add it under Senders & IP and verify it first.']) ?>
     <div class="field"><label for="smtp_secure">Connection</label><select id="smtp_secure" name="smtp_secure"><?php foreach (['tls' => 'TLS (port 587)', 'ssl' => 'SSL (port 465)', 'none' => 'None (not recommended)'] as $k => $l): ?><option value="<?= $k ?>" <?= setting('smtp_secure', 'tls') === $k ? 'selected' : '' ?>><?= $l ?></option><?php endforeach; ?></select></div>
     <?php if (setting('smtp_pass', '') !== ''): ?><label class="check"><input type="checkbox" name="smtp_clear" value="yes"><span>Remove the saved password</span></label><?php endif; ?>
     <div class="row"><button class="btn" name="action" value="save">Save email settings</button><button class="btn btn-outline" name="action" value="test" formnovalidate>Send me a test email</button></div>
-    <p class="hint" style="margin:8px 0 0">Brevo shows the SMTP server, port and login on its SMTP &amp; API page. The password is an SMTP key you create there, not your Brevo account password.</p>
   </form>
-  <h2>Phone app notifications (Firebase)</h2>
-  <p class="muted" style="max-width:700px">Sends new orders, messages and alerts to people's phones through the Android app. In the Firebase console open Project settings → Service accounts → Generate new private key, then paste the whole file here.</p>
-  <form method="post" action="/admin/push" class="card" style="max-width:640px" data-keep><?= csrf_field() ?>
+  <h2 id="s-phone">Phone app notifications (Firebase) <?= help('Sends new orders, messages and alerts to phones through the Android app. In the Firebase console open Project settings → Service accounts → Generate new private key, then paste the whole file here.') ?></h2>
+  <form method="post" action="/admin/push" class="card set" style="max-width:640px" data-keep><?= csrf_field() ?>
     <?php $pa = push_account(); ?>
     <?php if ($pa): ?><p class="small"><span class="pill pill-ok">Connected</span> project <strong><?= e($pa['project_id']) ?></strong></p><?php endif; ?>
     <?= f_area('fcm_service_account', $pa ? 'Replace the key (optional)' : 'Firebase service-account key', '', null, ['rows' => 5, 'placeholder' => '{ "type": "service_account", ... }', 'autocomplete' => 'off']) ?>
     <?php if ($pa): ?><label class="check"><input type="checkbox" name="push_clear" value="yes"><span>Remove the saved key</span></label><?php endif; ?>
     <div class="row"><button class="btn" name="action" value="save">Save</button><?php if ($pa): ?><button class="btn btn-outline" name="action" value="test" formnovalidate>Send me a test notification</button><?php endif; ?></div>
   </form>
-  <p style="max-width:640px"><a class="btn btn-outline" href="/admin/health">Run system check</a> <span class="muted small">Checks PHP, the database, folders, HTTPS, email and the marketplace connection.</span></p>
-  <h2>Seller levels</h2>
-  <p class="muted" style="max-width:700px">Sellers earn Bronze, Silver, Gold and Blue from the last 90 days. The badge and marketplace placement always apply. Perks are optional: leave them at 0 to start, and raise them later as a reward.</p>
+  <p><a class="btn btn-outline" href="/admin/health">Run system check</a> <?= help('Checks PHP, the database, folders, HTTPS, email and the marketplace connection.') ?></p>
+  <h2 id="s-levels">Seller levels <?= help('Sellers earn Bronze, Silver, Gold and Blue from the last 90 days. The badge and marketplace placement always apply. Perks (commission points off, payout days sooner) are optional: leave them at 0 to start and raise them later as a reward.') ?></h2>
   <?php $rules = level_rules(); ?>
   <form method="post" action="/admin/level-rules" data-keep class="card" style="max-width:900px"><?= csrf_field() ?>
     <div class="table-wrap"><table><thead><tr><th>Level</th><th>Delivered orders</th><th>Max returns %</th><th>Packed in 48h %</th><th>Min rating</th><th>Ratings needed</th><th>Commission points off</th><th>Payout days sooner</th></tr></thead><tbody>
@@ -327,28 +326,24 @@ $docLinks = function (array $docs): string {
       <?php foreach (['orders', 'returns', 'dispatch', 'rating', 'min_ratings', 'commission_off', 'hold_off'] as $k): ?><td><input name="lv[<?= e($lv) ?>][<?= e($k) ?>]" value="<?= e((string) $r[$k]) ?>" inputmode="decimal" style="width:84px" aria-label="<?= e(LEVEL_LABEL[$lv] . ' ' . $k) ?>"></td><?php endforeach; ?></tr><?php endforeach; ?>
     </tbody></table></div>
     <?php $pol = level_policy(); ?>
-    <h3>When a seller stops meeting a level</h3>
+    <h3>When a seller stops meeting a level <?= help('Levels are checked every day, and whenever an order is delivered or a rating changes. A level you pinned on the Sellers tab never changes automatically.') ?></h3>
     <div class="field"><label for="ld">Downgrading</label><select id="ld" name="level_downgrade">
       <option value="auto"<?= $pol['mode'] === 'auto' ? ' selected' : '' ?>>Automatic: the level drops at the next daily check</option>
       <option value="grace"<?= $pol['mode'] === 'grace' ? ' selected' : '' ?>>Grace period: warn the seller, drop after the days below</option>
       <option value="never"<?= $pol['mode'] === 'never' ? ' selected' : '' ?>>Never automatic: levels only go up, I lower them by hand</option></select></div>
     <div class="grid g2"><?= f_text('level_grace_days', 'Grace period (days)', (string) $pol['grace_days'], null, ['inputmode' => 'numeric']) ?>
       <div class="field"><label>&nbsp;</label><label class="check"><input type="checkbox" name="level_one_step" value="yes" <?= $pol['one_step'] ? 'checked' : '' ?>><span>Drop one level at a time</span></label></div></div>
-    <p class="muted small">Levels are checked every day, and whenever an order is delivered or a rating changes. A level you pinned on the Sellers tab never changes automatically.</p>
     <button class="btn" type="submit">Save level rules</button></form>
-  <h2>Paystack</h2>
-  <p class="muted" style="max-width:700px">Lets you pay sellers and refund customers with one click. In Paystack, open Settings → API Keys &amp; Webhooks, copy your <strong>secret key</strong>, and set the webhook address to <code><?= e(base_url()) ?>/api/paystack/webhook</code>. In Settings → Preferences turn off "Confirm transfers before sending", or transfers will wait for an OTP. Start with a <code>sk_test_</code> key and test before using <code>sk_live_</code>.</p>
-  <form method="post" action="/admin/paystack" data-keep class="card" style="max-width:640px"><?= csrf_field() ?>
+  <h2 id="s-paystack">Paystack <?= help('Lets you pay sellers and refund customers with one click. In Paystack open Settings → API Keys & Webhooks, copy your secret key and set the webhook address to ' . base_url() . '/api/paystack/webhook. In Settings → Preferences turn off "Confirm transfers before sending", or transfers wait for an OTP. Test with a sk_test_ key before using sk_live_.') ?></h2>
+  <form method="post" action="/admin/paystack" data-keep class="card set" style="max-width:640px"><?= csrf_field() ?>
     <label class="check"><input type="checkbox" name="paystack_enabled" value="yes" <?= setting('paystack_enabled', '1') === '1' ? 'checked' : '' ?>><span>Use Paystack for payouts and refunds</span></label>
     <?= f_text('paystack_secret_key', 'Secret key', '', null, ['type' => 'password', 'autocomplete' => 'off', 'placeholder' => paystack_key() !== '' ? 'Saved (' . (paystack_test_mode() ? 'test key' : 'live key') . ', ends ' . substr(paystack_key(), -4) . '). Paste a new key to replace it.' : 'sk_test_...']) ?>
     <?php if (paystack_key() !== ''): ?><label class="check"><input type="checkbox" name="paystack_clear_key" value="yes"><span>Remove the saved key</span></label><?php endif; ?>
     <p class="row"><button class="btn" type="submit">Save Paystack</button><button class="btn btn-outline" type="submit" name="action" value="test">Test connection</button></p>
   </form>
-  <h2>Backup</h2>
-  <p class="muted" style="max-width:640px">Download a copy of all sellers, products, orders and balances. Do this weekly and before any update. Uploaded photos and documents are in the <code>storage</code> folder; download that from cPanel File Manager too. Keep backups private: they contain personal data.</p>
+  <h2 id="s-backup">Backup <?= help('Downloads a copy of all sellers, products, orders and balances. Do this weekly and before any update. Uploaded photos and documents are in the storage folder: download that from cPanel File Manager too. Keep backups private, they contain personal data.') ?></h2>
   <form method="post" action="/admin/backup" class="row" data-keep><?= csrf_field() ?><input type="password" name="password" placeholder="Your password" autocomplete="current-password" required style="max-width:240px"><button class="btn btn-outline" type="submit">Download database backup</button></form>
-  <h2>Connect the marketplace</h2>
-  <p class="muted">Paste these into WordPress under WooCommerce → Vendor Hub. Treat them like passwords.</p>
+  <h2 id="s-connect">Connect the marketplace <?= help('Paste these into WordPress under WooCommerce → Vendor Hub. Treat them like passwords.') ?></h2>
   <dl class="dl">
     <dt>Vendor Hub address</dt><dd><code><?= e(base_url()) ?></code></dd>
     <dt>API key</dt><dd><code><?= e((string) setting('marketplace_api_key', '')) ?></code>

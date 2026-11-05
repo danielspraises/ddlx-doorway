@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="/assets/app.css?v=7">
+<link rel="stylesheet" href="/assets/app.css?v=8">
 </head>
 <body>
 <div class="auth-page">
@@ -32,5 +32,6 @@
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <script src="/assets/app.js?v=3" defer></script>
 <script src="/assets/pwa.js" defer></script>
+<script src="/assets/help.js?v=1" defer></script>
 </body>
 </html>

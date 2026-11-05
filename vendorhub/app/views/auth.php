@@ -10,8 +10,7 @@
     <button class="btn" type="submit">Save password</button>
   </form>
 <?php elseif ($mode === 'twofa'): ?>
-  <h1>Enter your code</h1>
-  <p class="muted">Open your authenticator app and type the 6-digit code for DDLX Vendor Hub. Lost your phone? Use one of your backup codes instead.</p>
+  <h1>Enter your code <?= help('Open your authenticator app and type the 6-digit code for DDLX Vendor Hub. Lost your phone? Use one of your backup codes instead.') ?></h1>
   <form method="post" action="/login/2fa"><?= csrf_field() ?>
     <input type="hidden" name="challenge" value="<?= e($challenge) ?>">
     <?php if (!empty($error)): ?><p class="err" role="alert"><?= e($error) ?></p><?php endif; ?>
@@ -30,8 +29,7 @@
   </form>
   <?php endif; ?>
 <?php else: $register = $mode === 'register'; ?>
-  <h1><?= $register ? 'Create your seller account' : 'Sign in' ?></h1>
-  <p class="muted"><?= $register ? 'Sell on the DDLX marketplace. You will apply, get verified, then add products.' : 'Welcome back.' ?></p>
+  <h1><?= $register ? 'Create your seller account' : 'Sign in' ?><?= $register ? ' ' . help('Sell on the DDLX marketplace. You will apply, get verified, then add products.') : '' ?></h1>
   <form method="post" action="<?= $register ? '/register' : '/login' ?>"><?= csrf_field() ?>
     <?php if (!empty($error)): ?><p class="err" role="alert"><?= e($error) ?></p><?php endif; ?>
     <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" value="<?= e($email ?? '') ?>" required></div>

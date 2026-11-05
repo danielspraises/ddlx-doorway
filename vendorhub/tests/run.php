@@ -532,7 +532,7 @@ eq(assistant_providers(), ['anthropic'], 'old installs with one saved key keep u
 set_setting('ai_key_groq', 'gsk_testtesttesttesttesttest'); set_setting('ai_key_gemini', 'AIzaTestTestTestTestTestTest');
 eq(assistant_providers(), ['gemini', 'groq', 'anthropic'], 'every service with a key is used, best first');
 eq(assistant_model_chain('gemini')[0], 'gemini-3.8-flash', 'gemini default model'); ok(count(assistant_model_chain('gemini')) > 1, 'busy model falls back to other models');
-eq(assistant_model_chain('groq')[0], 'llama-3.3-70b-versatile', 'groq default model');
+eq(assistant_model_chain('groq')[0], 'openai/gpt-oss-20b', 'groq default model');
 set_setting('ai_enabled', '0'); eq(assistant_providers(), [], 'assistant switched off uses no service'); set_setting('ai_enabled', '1');
 // Several services asked at once: the best answer wins, and a busy service never leaves the page without an answer.
 $port = 18700 + (getmypid() % 200);

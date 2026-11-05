@@ -100,7 +100,7 @@ function assistant_system_prompt(array $u): string
 // and the built-in help answers when none of them can.
 const AI_PROVIDERS = [
     'gemini'    => ['label' => 'Google Gemini', 'model' => 'gemini-3.8-flash', 'help' => 'Free key at aistudio.google.com'],
-    'groq'      => ['label' => 'Groq', 'model' => 'llama-3.3-70b-versatile', 'url' => 'https://api.groq.com/openai/v1/chat/completions', 'help' => 'Free key at console.groq.com'],
+    'groq'      => ['label' => 'Groq', 'model' => 'openai/gpt-oss-20b', 'url' => 'https://api.groq.com/openai/v1/chat/completions', 'help' => 'Free key at console.groq.com'],
     'anthropic' => ['label' => 'Anthropic Claude (paid)', 'model' => 'claude-sonnet-5-5', 'help' => 'Optional, paid'],
 ];
 

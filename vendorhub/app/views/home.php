@@ -18,7 +18,7 @@ $steps = [
       <a class="btn btn-lg" href="/apply">Start application <?= icon('arrow-up-right') ?></a>
       <a class="btn btn-lg btn-ghost" href="/auth">Continue application <?= icon('arrow-right') ?></a>
     </div>
-    <p class="hero-cats"><?= icon('check') ?> Clothing <span>/</span> Footwear <span>/</span> Accessories</p>
+    <p class="hero-cats"><?= icon('check') ?> Fashion <span>/</span> Electronics <span>/</span> Home <span>/</span> Beauty <span>/</span> Food &amp; more</p>
   </div>
   <p class="hero-caption">MADE FOR INDEPENDENT COMMERCE</p>
 </section>

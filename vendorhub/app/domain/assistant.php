@@ -127,6 +127,36 @@ function assistant_ready(): bool
     return assistant_providers() !== [];
 }
 
+// Groq retires and renames models often, so its current chat models are looked up with the saved key (cached for a day).
+function assistant_discover_groq(): array
+{
+    $cache = jdec((string) setting('ai_models_groq', ''), []);
+    if (!empty($cache['at']) && time() - (int) $cache['at'] < (empty($cache['ids']) ? 600 : 86400)) return $cache['ids'] ?? [];
+    $ids = [];
+    if (!defined('VH_TESTING') && function_exists('curl_init') && assistant_key('groq') !== '') {
+        $ch = curl_init('https://api.groq.com/openai/v1/models');
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . assistant_key('groq')]]);
+        $res = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($res !== false && $code === 200) {
+            $all = [];
+            foreach ((json_decode((string) $res, true)['data'] ?? []) as $m) {
+                $id = (string) ($m['id'] ?? '');
+                if ($id === '' || ($m['active'] ?? true) === false) continue;
+                if (preg_match('/whisper|guard|tts|speech|embed|prompt|safeguard|orpheus|distil/i', $id)) continue;
+                $all[] = $id;
+            }
+            // Prefer large, general chat models, then smaller fast ones.
+            $rank = fn (string $id): int => preg_match('/gpt-oss-120b/', $id) ? 0 : (preg_match('/llama-3\.3|llama-4|70b|120b/', $id) ? 1 : (preg_match('/gpt-oss-20b|qwen|kimi/', $id) ? 2 : (preg_match('/llama|8b/', $id) ? 3 : 4)));
+            usort($all, fn ($x, $y) => $rank($x) <=> $rank($y) ?: strcmp($x, $y));
+            $ids = array_slice($all, 0, 3);
+        }
+    }
+    set_setting('ai_models_groq', json_encode(['at' => time(), 'ids' => $ids]));
+    return $ids;
+}
+
 function assistant_model(string $p): string
 {
     $m = trim((string) setting('ai_model', ''));
@@ -134,11 +164,13 @@ function assistant_model(string $p): string
     return ($p === 'gemini' && $m !== '' && str_starts_with($m, 'gemini')) ? $m : AI_PROVIDERS[$p]['model'];
 }
 
-// Models tried in order within one service when the first is busy (free models are often overloaded for a few minutes).
+// Models tried together within one service when the first is busy (free models are often overloaded for a few minutes).
 function assistant_model_chain(string $p): array
 {
-    $more = ['gemini' => ['gemini-flash-latest', 'gemini-3.5-flash-lite', 'gemini-flash-lite-latest'], 'groq' => ['llama-3.1-8b-instant', 'openai/gpt-oss-20b'], 'anthropic' => []][$p] ?? [];
-    return array_values(array_unique(array_merge([assistant_model($p)], $more)));
+    $more = ['gemini' => ['gemini-flash-latest', 'gemini-3.5-flash-lite', 'gemini-flash-lite-latest'], 'groq' => [], 'anthropic' => []][$p] ?? [];
+    $first = [assistant_model($p)];
+    if ($p === 'groq') { $d = assistant_discover_groq(); if ($d) { $first = array_slice($d, 0, 1); $more = array_slice($d, 1, 2); } else { $more = ['llama-3.3-70b-versatile']; } }
+    return array_values(array_unique(array_merge($first, $more)));
 }
 
 // Asks every connected service at the same time (best first) and uses the best answer that arrives.

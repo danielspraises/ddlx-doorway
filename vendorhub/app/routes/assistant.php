@@ -16,7 +16,7 @@ route('POST', '/assistant', function () {
     $q = input_raw('question');
     $r = assistant_ask($u, $q);
     if (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest') {
-        json_out($r['ok'] ? ['ok' => true, 'reply' => $r['reply'], 'left' => assistant_left_today($u['id']) === PHP_INT_MAX ? null : assistant_left_today($u['id'])] : ['ok' => false, 'error' => $r['error']], $r['ok'] ? 200 : 422);
+        json_out($r['ok'] ? ['ok' => true, 'reply' => $r['reply'], 'html' => assistant_format((string) $r['reply']), 'left' => assistant_left_today($u['id']) === PHP_INT_MAX ? null : assistant_left_today($u['id'])] : ['ok' => false, 'error' => $r['error']], $r['ok'] ? 200 : 422);
     }
     if (!$r['ok']) { assistant_page($u, $r['error'], $q); return; }
     redirect('/assistant#latest');

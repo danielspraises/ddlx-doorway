@@ -41,7 +41,7 @@
     xhr.onload = function () {
       var r = {}; try { r = JSON.parse(xhr.responseText); } catch (e) {}
       if (xhr.status === 200 && r.ok) {
-        wait.querySelector('.txt').textContent = r.reply; wait.style.opacity = '';
+        var tx = wait.querySelector('.txt'); tx.style.whiteSpace = ''; tx.classList.add('rich'); if (r.html) tx.innerHTML = r.html; else tx.textContent = r.reply; wait.style.opacity = '';
         chat.scrollTop = chat.scrollHeight;
       } else {
         wait.remove(); chat.lastElementChild && chat.lastElementChild.classList.contains('mine') && chat.lastElementChild.remove();

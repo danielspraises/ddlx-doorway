@@ -272,6 +272,33 @@ function assistant_parse(string $p, string $raw): ?string
     return trim($text) !== '' ? trim($text) : null;
 }
 
+// Turns a plain or lightly marked-up answer (**bold**, lists, `code`) into safe HTML. Everything is escaped first.
+function assistant_format(string $text): string
+{
+    $inline = function (string $t): string {
+        $t = htmlspecialchars($t, ENT_QUOTES, 'UTF-8');
+        $t = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $t);
+        $t = preg_replace('/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])/s', '<em>$1</em>', $t);
+        $t = preg_replace('/`([^`]+)`/', '<code>$1</code>', $t);
+        return $t;
+    };
+    // Built-in help writes steps inline as "1) ... 2) ..."; show them as a list.
+    if (preg_match('/(?:^|\s)1\)\s/', $text) && preg_match('/\s2\)\s/', $text)) $text = preg_replace(['/\s*;?\s*(?<![\w])(\d{1,2})\)\s+/'], ["\n$1. "], $text);
+    $out = ''; $list = null; $para = [];
+    $flushPara = function () use (&$out, &$para, $inline) { if ($para) { $out .= '<p>' . implode('<br>', array_map($inline, $para)) . '</p>'; $para = []; } };
+    $flushList = function () use (&$out, &$list) { if ($list) { $out .= '<' . $list['t'] . '>' . implode('', $list['items']) . '</' . $list['t'] . '>'; $list = null; } };
+    foreach (preg_split('/\r?\n/', trim($text)) as $line) {
+        $l = trim($line);
+        if ($l === '') { $flushPara(); $flushList(); continue; }
+        if (preg_match('/^#{1,6}\s+(.*)$/', $l, $m)) { $flushPara(); $flushList(); $out .= '<p><strong>' . $inline($m[1]) . '</strong></p>'; continue; }
+        if (preg_match('/^\d+[.)]\s+(.*)$/', $l, $m)) { $flushPara(); if (!$list || $list['t'] !== 'ol') { $flushList(); $list = ['t' => 'ol', 'items' => []]; } $list['items'][] = '<li>' . $inline($m[1]) . '</li>'; continue; }
+        if (preg_match('/^[-*\x{2022}]\s+(.*)$/u', $l, $m)) { $flushPara(); if (!$list || $list['t'] !== 'ul') { $flushList(); $list = ['t' => 'ul', 'items' => []]; } $list['items'][] = '<li>' . $inline($m[1]) . '</li>'; continue; }
+        $flushList(); $para[] = $l;
+    }
+    $flushPara(); $flushList();
+    return $out;
+}
+
 function assistant_history(string $userId): array
 {
     $rows = db()->all('SELECT role, body, created_at FROM assistant_messages WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ' . AI_HISTORY, [$userId]);

@@ -565,6 +565,7 @@ set_setting('ai_daily_limit', '40');
 for ($i = 0; $i < 40; $i++) db()->insert('assistant_messages', ['id' => uuid(), 'user_id' => $sid, 'role' => 'user', 'body' => 'q', 'created_at' => now_db()]);
 ok(!assistant_ask($u, 'one more')['ok'], 'daily limit enforced when the admin sets one');
 set_setting('ai_daily_limit', '0');
+eq(assistant_format("Steps:\n1. **Create** an account\n2. Wait <b>now</b>"), '<p>Steps:</p><ol><li><strong>Create</strong> an account</li><li>Wait &lt;b&gt;now&lt;/b&gt;</li></ol>', 'answers show bold and lists, and HTML is escaped');
 ok(str_contains(assistant_fallback('When can I sell?'), 'five-step'), 'fallback answers when can I sell');
 ok(str_contains(assistant_fallback('What is the platform name?'), 'Vendor Hub'), 'fallback knows the platform name');
 ok(str_contains(assistant_fallback('What is the marketplace link?'), 'ddlx.shop'), 'fallback knows the marketplace link');

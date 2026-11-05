@@ -9,7 +9,7 @@
     <p class="row"><?php foreach ($suggestions as $s): ?><a class="chip" href="/assistant?ask=<?= e(rawurlencode($s)) ?>"><?= e($s) ?></a><?php endforeach; ?></p>
   <?php endif; ?>
   <?php foreach ($history as $i => $m): $mine = $m['role'] === 'user'; ?>
-    <div class="bubble <?= $mine ? 'mine' : 'theirs' ?>"<?= $i === count($history) - 1 ? ' id="latest"' : '' ?>><div class="who"><?= $mine ? 'You' : 'Ask DDLX' ?></div><div class="txt" style="white-space:pre-line"><?= e($m['body']) ?></div></div>
+    <div class="bubble <?= $mine ? 'mine' : 'theirs' ?>"<?= $i === count($history) - 1 ? ' id="latest"' : '' ?>><div class="who"><?= $mine ? 'You' : 'Ask DDLX' ?></div><?php if ($mine): ?><div class="txt" style="white-space:pre-line"><?= e($m['body']) ?></div><?php else: ?><div class="txt rich"><?= assistant_format((string) $m['body']) ?></div><?php endif; ?></div>
   <?php endforeach; ?>
   </div>
   <p class="err<?= empty($error) ? ' hidden' : '' ?>" role="alert" data-aerr><?= e($error ?? '') ?></p>

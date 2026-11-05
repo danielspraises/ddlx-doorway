@@ -534,6 +534,28 @@ eq(assistant_providers(), ['gemini', 'groq', 'anthropic'], 'every service with a
 eq(assistant_model_chain('gemini')[0], 'gemini-3.8-flash', 'gemini default model'); ok(count(assistant_model_chain('gemini')) > 1, 'busy model falls back to other models');
 eq(assistant_model_chain('groq')[0], 'llama-3.3-70b-versatile', 'groq default model');
 set_setting('ai_enabled', '0'); eq(assistant_providers(), [], 'assistant switched off uses no service'); set_setting('ai_enabled', '1');
+// Several services asked at once: the best answer wins, and a busy service never leaves the page without an answer.
+$port = 18700 + (getmypid() % 200);
+$srv = proc_open([PHP_BINARY, '-S', '127.0.0.1:' . $port, __DIR__ . '/fake_ai.php'], [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+usleep(600000);
+set_setting('ai_enabled', '1'); set_setting('ai_key_gemini', 'AQ.testkeyaaaaaaaaaaaaaaaaaaaa'); set_setting('ai_key_groq', 'gsk_testkeyaaaaaaaaaaaaaaaaaaaa'); set_setting('ai_api_key', ''); set_setting('ai_model', '');
+$u0 = "http://127.0.0.1:$port";
+$G = assistant_model_chain('gemini'); $Q = assistant_model_chain('groq');
+$map = function (array $m) { $GLOBALS['vh_ai_url_map'] = $m; };
+$map(['gemini|' . $G[0] => "$u0/busy", 'gemini|' . $G[1] => "$u0/ok-gemini", 'gemini|' . $G[2] => "$u0/busy", 'groq|' . $Q[0] => "$u0/ok-groq", 'groq|' . $Q[1] => "$u0/busy"]);
+eq(assistant_call('s', [['role' => 'user', 'content' => 'hi']]), 'gemini answer', 'busy first model: the next Gemini model answers (thinking text ignored)');
+$map(['gemini|' . $G[0] => "$u0/busy", 'gemini|' . $G[1] => "$u0/busy", 'gemini|' . $G[2] => "$u0/busy", 'groq|' . $Q[0] => "$u0/ok-groq", 'groq|' . $Q[1] => "$u0/busy"]);
+eq(assistant_call('s', [['role' => 'user', 'content' => 'hi']]), 'groq answer', 'all Gemini busy: Groq answers');
+ok(str_contains((string) setting('ai_last_error', ''), 'answered by groq'), 'problem line says which service answered');
+$map(['gemini|' . $G[0] => "$u0/slow-ok", 'gemini|' . $G[1] => "$u0/busy", 'gemini|' . $G[2] => "$u0/busy", 'groq|' . $Q[0] => "$u0/ok-groq", 'groq|' . $Q[1] => "$u0/busy"]);
+$t0 = microtime(true);
+eq(assistant_call('s', [['role' => 'user', 'content' => 'hi']]), 'slow gemini answer', 'a slower but better service is waited for');
+ok(microtime(true) - $t0 < 5, 'answer arrives quickly');
+$map(['gemini|' . $G[0] => "$u0/busy", 'gemini|' . $G[1] => "$u0/busy", 'gemini|' . $G[2] => "$u0/busy", 'groq|' . $Q[0] => "$u0/busy", 'groq|' . $Q[1] => "$u0/busy"]);
+eq(assistant_call('s', [['role' => 'user', 'content' => 'hi']]), null, 'every service busy: no AI answer (built-in help takes over)');
+ok(str_contains((string) setting('ai_last_error', ''), '503'), 'failure reason recorded');
+unset($GLOBALS['vh_ai_url_map']);
+proc_terminate($srv); proc_close($srv);
 foreach (['ai_api_key', 'ai_key_groq', 'ai_key_gemini', 'ai_provider'] as $k) set_setting($k, '');
 ok(!assistant_ready(), 'no key means built-in help only');
 eq(count(assistant_history($sid)), 6, 'history kept');

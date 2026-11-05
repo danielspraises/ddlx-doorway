@@ -141,60 +141,103 @@ function assistant_model_chain(string $p): array
     return array_values(array_unique(array_merge([assistant_model($p)], $more)));
 }
 
-// Asks the connected services one after another until one answers. Returns null if none could (built-in help then answers).
+// Asks every connected service at the same time (best first) and uses the best answer that arrives.
+// Running them together keeps the wait short even when one service is busy, and a total time limit guarantees
+// the page always gets an answer: the built-in help answers if no service does.
 function assistant_call(string $system, array $messages): ?string
 {
     if (!empty($GLOBALS['vh_ai_stub'])) return ($GLOBALS['vh_ai_stub'])($system, $messages);
-    if (defined('VH_TESTING') || !function_exists('curl_init')) return null;
-    $problems = [];
+    if ((defined('VH_TESTING') && empty($GLOBALS['vh_ai_url_map'])) || !function_exists('curl_init')) return null;
+    @set_time_limit(45);
+    $cands = [];
     foreach (assistant_providers() as $p) {
         $key = assistant_key($p);
-        foreach (assistant_model_chain($p) as $i => $model) {
-            [$text, $code, $err] = assistant_call_model($p, $key, $model, $system, $messages, $i === 0 ? 20 : 15);
-            if ($text !== null) { set_setting('ai_last_error', $problems ? gmdate('Y-m-d H:i') . ' UTC (answered by ' . $p . ') ' . implode(' | ', $problems) : ''); set_setting('ai_last_used', $p); return $text; }
-            log_error('Assistant call failed (' . $p . ' ' . $model . '): ' . $err);
-            $problems[] = $p . ' ' . $model . ': ' . $err;
-            if (!in_array($code, [0, 429, 500, 502, 503, 504, 404], true)) break; // a bad key or request will not improve with another model
-            if ($code === 503 && $i === 0) usleep(500000);
-        }
+        foreach (array_slice(assistant_model_chain($p), 0, $p === 'gemini' ? 3 : 2) as $model) $cands[] = ['p' => $p, 'model' => $model, 'req' => assistant_request($p, $key, $model, $system, $messages)];
     }
-    if ($problems) set_setting('ai_last_error', gmdate('Y-m-d H:i') . ' UTC, ' . implode(' | ', array_slice($problems, 0, 4)));
+    if (!$cands) return null;
+    $mh = curl_multi_init();
+    foreach ($cands as $i => &$c) {
+        $ch = curl_init($c['req']['url']);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 22, CURLOPT_CONNECTTIMEOUT => 6, CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => $c['req']['headers'], CURLOPT_POSTFIELDS => json_encode($c['req']['body'])]);
+        curl_multi_add_handle($mh, $ch);
+        $c['ch'] = $ch; $c['done'] = false; $c['text'] = null; $c['err'] = '';
+    }
+    unset($c);
+    $deadline = microtime(true) + 24;
+    $winner = null;
+    do {
+        $running = 0;
+        curl_multi_exec($mh, $running);
+        while (($info = curl_multi_info_read($mh)) !== false) {
+            foreach ($cands as $i => &$c) {
+                if ($c['ch'] !== $info['handle'] || $c['done']) continue;
+                $c['done'] = true;
+                $body = (string) curl_multi_getcontent($c['ch']);
+                $code = (int) curl_getinfo($c['ch'], CURLINFO_HTTP_CODE);
+                if ($info['result'] !== CURLE_OK || $code !== 200) $c['err'] = $info['result'] !== CURLE_OK ? 'could not reach the service' : 'HTTP ' . $code . ' ' . trim(substr((string) preg_replace('/\s+/', ' ', $body), 0, 220));
+                else { $c['text'] = assistant_parse($c['p'], $body); if ($c['text'] === null) $c['err'] = 'empty answer'; }
+            }
+            unset($c);
+        }
+        // Best-first: take the first candidate in priority order, but only once every candidate ahead of it has finished.
+        foreach ($cands as $c) {
+            if (!$c['done']) break;
+            if ($c['text'] !== null) { $winner = $c; break 2; }
+        }
+        if ($running > 0) curl_multi_select($mh, 0.3);
+    } while ($running > 0 && microtime(true) < $deadline);
+    // Time is up or all finished: any answer that did arrive is better than none.
+    if (!$winner) foreach ($cands as $c) if ($c['done'] && $c['text'] !== null) { $winner = $c; break; }
+    $problems = [];
+    foreach ($cands as $c) {
+        if (!$c['done'] && $c['text'] === null) $c['err'] = 'no answer in time';
+        if ($c['text'] === null && $c !== $winner) $problems[] = $c['p'] . ' ' . $c['model'] . ': ' . $c['err'];
+        curl_multi_remove_handle($mh, $c['ch']); curl_close($c['ch']);
+    }
+    curl_multi_close($mh);
+    foreach ($problems as $pr) log_error('Assistant call failed (' . $pr . ')');
+    if ($winner) {
+        set_setting('ai_last_error', $problems ? gmdate('Y-m-d H:i') . ' UTC (answered by ' . $winner['p'] . ' ' . $winner['model'] . ') ' . implode(' | ', array_slice($problems, 0, 4)) : '');
+        set_setting('ai_last_used', $winner['p']);
+        return $winner['text'];
+    }
+    set_setting('ai_last_error', gmdate('Y-m-d H:i') . ' UTC, ' . implode(' | ', array_slice($problems, 0, 5)));
     return null;
 }
 
-// One request. Returns [text|null, http code (0 = no connection), error text].
-function assistant_call_model(string $p, string $key, string $model, string $system, array $messages, int $timeout): array
+// What to send to one service for one model.
+function assistant_request(string $p, string $key, string $model, string $system, array $messages): array
+{
+    $r = assistant_request_real($p, $key, $model, $system, $messages);
+    if (!empty($GLOBALS['vh_ai_url_map'][$p . '|' . $model])) $r['url'] = $GLOBALS['vh_ai_url_map'][$p . '|' . $model]; // tests point services at local fakes
+    return $r;
+}
+
+function assistant_request_real(string $p, string $key, string $model, string $system, array $messages): array
 {
     if ($p === 'anthropic') {
-        $url = 'https://api.anthropic.com/v1/messages';
-        $headers = ['content-type: application/json', 'x-api-key: ' . $key, 'anthropic-version: 2023-06-01'];
-        $body = ['model' => $model, 'max_tokens' => 700, 'system' => $system, 'messages' => $messages];
-    } elseif ($p === 'gemini') { // Google's own Gemini API
-        $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent';
-        $headers = ['content-type: application/json', 'x-goog-api-key: ' . $key];
+        return ['url' => 'https://api.anthropic.com/v1/messages', 'headers' => ['content-type: application/json', 'x-api-key: ' . $key, 'anthropic-version: 2023-06-01'],
+            'body' => ['model' => $model, 'max_tokens' => 700, 'system' => $system, 'messages' => $messages]];
+    }
+    if ($p === 'gemini') { // Google's own Gemini API
         $contents = [];
         foreach ($messages as $m) $contents[] = ['role' => $m['role'] === 'assistant' ? 'model' : 'user', 'parts' => [['text' => (string) $m['content']]]];
-        $body = ['systemInstruction' => ['parts' => [['text' => $system]]], 'contents' => $contents, 'generationConfig' => ['maxOutputTokens' => 900]];
-    } else { // Groq speaks the common "chat completions" format
-        $url = AI_PROVIDERS[$p]['url'];
-        $headers = ['content-type: application/json', 'Authorization: Bearer ' . $key];
-        $body = ['model' => $model, 'max_tokens' => 700, 'messages' => array_merge([['role' => 'system', 'content' => $system]], $messages)];
+        return ['url' => 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent', 'headers' => ['content-type: application/json', 'x-goog-api-key: ' . $key],
+            'body' => ['systemInstruction' => ['parts' => [['text' => $system]]], 'contents' => $contents, 'generationConfig' => ['maxOutputTokens' => 2048]]];
     }
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 6, CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => $headers, CURLOPT_POSTFIELDS => json_encode($body)]);
-    $res = curl_exec($ch);
-    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    if ($res === false || $code !== 200) {
-        return [null, $res === false ? 0 : $code, $res === false ? 'could not reach the service' : 'HTTP ' . $code . ' ' . trim(substr((string) preg_replace('/\s+/', ' ', (string) $res), 0, 300))];
-    }
-    $d = json_decode((string) $res, true);
+    return ['url' => AI_PROVIDERS[$p]['url'], 'headers' => ['content-type: application/json', 'Authorization: Bearer ' . $key], // Groq: the common "chat completions" format
+        'body' => ['model' => $model, 'max_tokens' => 900, 'messages' => array_merge([['role' => 'system', 'content' => $system]], $messages)]];
+}
+
+function assistant_parse(string $p, string $raw): ?string
+{
+    $d = json_decode($raw, true);
     $text = '';
     if ($p === 'anthropic') { foreach ($d['content'] ?? [] as $blk) if (($blk['type'] ?? '') === 'text') $text .= $blk['text']; }
-    elseif ($p === 'gemini') { foreach ($d['candidates'][0]['content']['parts'] ?? [] as $part) $text .= (string) ($part['text'] ?? ''); }
+    elseif ($p === 'gemini') { foreach ($d['candidates'][0]['content']['parts'] ?? [] as $part) if (empty($part['thought'])) $text .= (string) ($part['text'] ?? ''); }
     else $text = (string) ($d['choices'][0]['message']['content'] ?? '');
-    return trim($text) !== '' ? [trim($text), 200, ''] : [null, 200, 'empty answer'];
+    return trim($text) !== '' ? trim($text) : null;
 }
 
 function assistant_history(string $userId): array
@@ -224,9 +267,19 @@ function assistant_ask(array $u, string $question): array
     while ($msgs && $msgs[0]['role'] !== 'user') array_shift($msgs);
     $clean = [];
     foreach ($msgs as $m) { if ($clean && $clean[count($clean) - 1]['role'] === $m['role']) $clean[count($clean) - 1]['content'] .= "\n" . $m['content']; else $clean[] = $m; }
-    $reply = assistant_ready() ? assistant_call(assistant_system_prompt($u), $clean) : null;
+    try {
+        $reply = assistant_ready() ? assistant_call(assistant_system_prompt($u), $clean) : null;
+    } catch (Throwable $e) {
+        log_error('Assistant error: ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
+        set_setting('ai_last_error', gmdate('Y-m-d H:i') . ' UTC, ' . get_class($e) . ': ' . $e->getMessage());
+        $reply = null;
+    }
     $ai = $reply !== null;
-    if (!$ai) $reply = assistant_fallback($question);
+    if (!$ai) {
+        $reply = assistant_fallback($question);
+        // Admins are told why the AI did not answer, so it can be fixed.
+        if (!empty($u['isAdmin']) && assistant_ready() && (string) setting('ai_last_error', '') !== '') $reply .= "\n\n(Admin note: the AI services did not answer. " . str_limit((string) setting('ai_last_error', ''), 420) . ')';
+    }
     $now = now_db();
     db()->insert('assistant_messages', ['id' => uuid(), 'user_id' => $u['id'], 'role' => 'user', 'body' => $question, 'created_at' => $now]);
     db()->insert('assistant_messages', ['id' => uuid(), 'user_id' => $u['id'], 'role' => 'assistant', 'body' => str_limit($reply, 4000), 'created_at' => db_plus('+0 seconds')]);

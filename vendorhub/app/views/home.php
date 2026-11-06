@@ -16,7 +16,7 @@ $steps = [
       <div class="orbit o1"><span class="coin" style="--a:0deg"><i><?= icon('package') ?></i></span><span class="coin" style="--a:120deg"><i><?= icon('wallet') ?></i></span><span class="coin" style="--a:240deg"><i><?= icon('truck') ?></i></span></div>
       <div class="orbit o2"><span class="coin" style="--a:60deg"><i><?= icon('chart') ?></i></span><span class="coin" style="--a:180deg"><i><?= icon('bell') ?></i></span><span class="coin" style="--a:300deg"><i><?= icon('store') ?></i></span></div>
       <span class="ring r3"></span>
-      <span class="chip ch1"><b></b>New order · ₦45,000</span>
+      <span class="chip ch1"><b></b>New order · ₦450,000</span>
       <span class="chip ch2"><b></b>Payout sent</span>
       <span class="chip ch3"><b></b>Product approved</span>
       <span class="spark s1"></span><span class="spark s2"></span><span class="spark s3"></span><span class="spark s4"></span>

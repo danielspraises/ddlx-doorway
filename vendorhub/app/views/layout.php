@@ -11,7 +11,7 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
 <title><?= e($pageTitle) ?> — Vendor Hub</title>
 <meta name="robots" content="noindex">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#0c0d12">
+<meta name="theme-color" content="#0f1b2d">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Vendor Hub"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
@@ -19,7 +19,7 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="/assets/app.css?v=8">
+<link rel="stylesheet" href="/assets/app.css?v=9">
 </head>
 <body data-csrf="<?= e(csrf_token()) ?>" <?= $user ? 'data-live="1"' : '' ?> <?= !empty($live_refresh) ? 'data-refresh="1"' : '' ?>>
 <header class="site-header">
@@ -57,7 +57,7 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
 <?php if (!empty($footer)): ?><footer class="site-footer"><div class="wrap"><strong>DDLX</strong><a href="https://ddlxapparel.com">Marketplace <?= icon('arrow-up-right') ?></a></div></footer><?php endif; ?>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <dialog id="preview-dialog"><div class="dlg-head"><strong data-dlg-title>Document</strong><button class="btn btn-sm btn-outline" type="button" data-dlg-close>Close</button></div><div class="dlg-body"></div></dialog>
-<script src="/assets/app.js?v=3" defer></script>
+<script src="/assets/app.js?v=4" defer></script>
 <script src="/assets/pwa.js" defer></script>
 <script src="/assets/help.js?v=1" defer></script>
 <?php if ($user): ?><script src="/assets/native.js?v=1" defer></script><?php endif; ?>

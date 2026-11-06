@@ -11,9 +11,9 @@ $steps = [
   <div class="hero-grid" aria-hidden="true"></div>
   <div class="scene" aria-hidden="true"><?= tote_svg() ?></div>
   <div class="wrap hero-copy">
-    <p class="eyebrow">Vendor Hub · Seller platform</p>
-    <h1>Build your brand. Run your store<em>.</em></h1>
-    <p class="lead">Apply to sell, then manage products, inventory, orders and growth from one focused workspace.</p>
+    <p class="eyebrow">DDLX · Vendor Hub</p>
+    <h1>Run your store. Build your brand.</h1>
+    <p class="lead">Apply to sell, then manage products, inventory, orders, and growth in one workspace.</p>
     <div class="hero-actions">
       <a class="btn btn-lg" href="/apply">Start application <?= icon('arrow-up-right') ?></a>
       <a class="btn btn-lg btn-ghost" href="/auth">Continue application <?= icon('arrow-right') ?></a>
@@ -23,14 +23,15 @@ $steps = [
   <p class="hero-caption">MADE FOR INDEPENDENT COMMERCE</p>
 </section>
 
+<div class="marquee" aria-hidden="true"><div class="marquee-track"><?php for ($k = 0; $k < 2; $k++) foreach (['Fashion', 'Electronics', 'Home & living', 'Beauty', 'Food & drink', 'Health', 'Kids', 'Sports', 'Art & crafts', 'Auto & tools'] as $c): ?><span><?= e($c) ?></span><?php endforeach; ?></div></div>
 <section class="band"><div class="wrap">
   <p class="eyebrow" style="text-transform:uppercase">From application to everyday operations</p>
   <ul><li><?= icon('store') ?> Store</li><li><?= icon('package') ?> Inventory</li><li><?= icon('chart') ?> Insights</li><li><?= icon('wallet') ?> Payouts</li></ul>
 </div></section>
 
 <section class="section" id="how"><div class="wrap">
-  <div class="section-head"><div><p class="eyebrow">Your application</p><h2>Five clear steps to your DDLX store.</h2></div><span class="muted small">Progress saves as you go.</span></div>
-  <ol class="stepcards">
+  <div class="section-head" data-reveal><div><p class="eyebrow">Your application</p><h2>Five clear steps to your DDLX store.</h2></div><span class="muted small">Progress saves as you go.</span></div>
+  <ol class="stepcards" data-reveal>
     <?php foreach ($steps as $i => [$ic, $title]): ?>
     <li><button class="stepcard" type="button" data-step="<?= $i ?>" aria-pressed="<?= $i === 0 ? 'true' : 'false' ?>"><span class="top">0<?= $i + 1 ?><?= icon('arrow-right') ?></span><span class="t"><?= e($title) ?></span></button></li>
     <?php endforeach; ?>
@@ -44,17 +45,17 @@ $steps = [
 </div></section>
 
 <section class="section"><div class="wrap">
-  <div class="section-head"><div><p class="eyebrow">Once you are approved</p><h2>Everything you need to sell on DDLX.</h2></div></div>
+  <div class="section-head" data-reveal><div><p class="eyebrow">Once you are approved</p><h2>Everything you need to sell on DDLX.</h2></div></div>
   <div class="features">
-    <div class="feature"><?= icon('package') ?><h3>Products and inventory</h3><p>Simple and variable products, photo galleries, clear categories and live stock. Every product is reviewed before it goes on the marketplace.</p></div>
-    <div class="feature"><?= icon('truck') ?><h3>Orders in step with the marketplace</h3><p>Mark orders processing and ready for shipping. DDLX collects and delivers, and every status updates on both sides.</p></div>
-    <div class="feature"><?= icon('wallet') ?><h3>Clear payouts</h3><p>See pending and available earnings, add your bank account and withdraw once an order has been delivered.</p></div>
-    <div class="feature"><?= icon('chart') ?><h3>Insights</h3><p>Daily earnings, best sellers and spreadsheet downloads of your sales and products.</p></div>
-    <div class="feature"><?= icon('bell') ?><h3>Notifications</h3><p>New orders, low stock, decisions on your products and payouts, in the app and by email.</p></div>
-    <div class="feature"><?= icon('shield') ?><h3>Verified sellers only</h3><p>Identity and business checks keep the marketplace trusted for buyers and for you.</p></div>
+    <div class="feature" data-reveal style="--d:<?= (($fi = ($fi ?? -1) + 1) % 3) * .1 ?>s"><?= icon('package') ?><h3>Products and inventory</h3><p>Simple and variable products, photo galleries, clear categories and live stock. Every product is reviewed before it goes on the marketplace.</p></div>
+    <div class="feature" data-reveal style="--d:<?= (($fi = ($fi ?? -1) + 1) % 3) * .1 ?>s"><?= icon('truck') ?><h3>Orders in step with the marketplace</h3><p>Mark orders processing and ready for shipping. DDLX collects and delivers, and every status updates on both sides.</p></div>
+    <div class="feature" data-reveal style="--d:<?= (($fi = ($fi ?? -1) + 1) % 3) * .1 ?>s"><?= icon('wallet') ?><h3>Clear payouts</h3><p>See pending and available earnings, add your bank account and withdraw once an order has been delivered.</p></div>
+    <div class="feature" data-reveal style="--d:<?= (($fi = ($fi ?? -1) + 1) % 3) * .1 ?>s"><?= icon('chart') ?><h3>Insights</h3><p>Daily earnings, best sellers and spreadsheet downloads of your sales and products.</p></div>
+    <div class="feature" data-reveal style="--d:<?= (($fi = ($fi ?? -1) + 1) % 3) * .1 ?>s"><?= icon('bell') ?><h3>Notifications</h3><p>New orders, low stock, decisions on your products and payouts, in the app and by email.</p></div>
+    <div class="feature" data-reveal style="--d:<?= (($fi = ($fi ?? -1) + 1) % 3) * .1 ?>s"><?= icon('shield') ?><h3>Verified sellers only</h3><p>Identity and business checks keep the marketplace trusted for buyers and for you.</p></div>
   </div>
 </div></section>
 
 <section class="section" style="border-bottom:0"><div class="wrap">
-  <div class="cta"><h2>Ready to open your DDLX store<em>?</em></h2><a class="btn btn-lg" href="/apply">Start application <?= icon('arrow-up-right') ?></a></div>
+  <div class="cta" data-reveal><h2>Ready to launch your DDLX store?</h2><a class="btn btn-lg" href="/apply">Start application <?= icon('arrow-up-right') ?></a></div>
 </div></section>

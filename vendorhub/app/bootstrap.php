@@ -24,9 +24,9 @@ function nav_items(array $u): array
     if ($u['isAdmin']) return [['Admin', '/admin', 0]];
     if ($u['canReview'] || $u['canOrders'] || $u['canMessages']) return [['Staff desk', '/admin', 0]];
     $s = $u['stage'];
+    if ($s === 'verified') return [['Seller Center', '/seller?tab=overview', 0]];
     $items = [['Application', '/apply', 0]];
-    if (str_starts_with($s, 'verification_') || $s === 'verified') $items[] = ['Verification', '/verification', 0];
-    if ($s === 'verified') $items[] = ['Seller Center', '/seller?tab=overview', 0];
+    if (str_starts_with($s, 'verification_')) $items[] = ['Verification', '/verification', 0];
     return $items;
 }
 

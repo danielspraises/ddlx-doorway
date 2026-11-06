@@ -253,3 +253,18 @@ function level_badge(string $level): string
 {
     return '<span class="lvl lvl-' . e($level) . '" title="' . e(LEVEL_NOTE[$level] ?? '') . '">' . icon('shield') . e(LEVEL_LABEL[$level] ?? $level) . '</span>';
 }
+
+/** The blue tick shown next to a verified seller's store name, wherever the name appears. Empty for anyone else. */
+function verified_tick(?string $sellerId): string
+{
+    static $verified = null;
+    if (!$sellerId) return '';
+    if ($verified === null) {
+        $verified = [];
+        foreach (db()->all("SELECT v.user_id, COALESCE(NULLIF(l.override_level, ''), l.auto_level) AS lv FROM seller_verifications v LEFT JOIN seller_levels l ON l.seller_id = v.user_id WHERE v.status = 'approved'") as $r) $verified[$r['user_id']] = (string) ($r['lv'] ?: 'starter');
+    }
+    if (!isset($verified[$sellerId])) return '';
+    $lv = $verified[$sellerId];
+    $title = 'Verified seller' . ($lv !== 'starter' && isset(LEVEL_LABEL[$lv]) ? ' · ' . LEVEL_LABEL[$lv] . ' level' : '');
+    return '<span class="vtick" role="img" aria-label="' . e($title) . '" title="' . e($title) . '"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="seal" d="M12 1.6l2.5 1.9 3.1-.2 1.2 2.9 2.7 1.6-.6 3.1 1.3 2.8-2 2.4-.1 3.1-3 .9-1.9 2.5-2.9-1.1-2.9 1.1-1.9-2.5-3-.9-.1-3.1-2-2.4 1.3-2.8-.6-3.1 2.7-1.6 1.2-2.9 3.1.2z"/><path class="chk" d="M7.6 12.4l3 3 5.9-6.2"/></svg></span>';
+}

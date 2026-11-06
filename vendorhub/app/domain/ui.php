@@ -169,6 +169,6 @@ function tote_svg(): string
   <path d="M66 126h188c8 0 14 6 15 14l3 28H48l3-28c1-8 7-14 15-14z" fill="#4a7bff"/>
   <rect x="86" y="226" width="148" height="76" rx="6" fill="#fff"/>
   <text x="160" y="277" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-size="46" letter-spacing="2" fill="#111525">DDLX</text>
-  <g transform="rotate(14 250 150)"><rect x="238" y="140" width="34" height="62" rx="5" fill="#ff5938"/><circle cx="255" cy="152" r="4" fill="#fff"/></g>
+  <g transform="rotate(14 250 150)"><rect x="238" y="140" width="34" height="62" rx="5" fill="#2f6db5"/><circle cx="255" cy="152" r="4" fill="#fff"/></g>
 </svg></div>';
 }

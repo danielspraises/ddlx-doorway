@@ -16,7 +16,7 @@ $activeId = $thread['id'] ?? '';
   <aside class="inbox-list" aria-label="Conversations">
     <?php foreach ($threads as $t): $unread = $team ? (int) $t['team_unread'] : (int) $t['seller_unread']; ?>
       <a class="inbox-item<?= $t['id'] === $activeId ? ' active' : '' ?><?= $unread ? ' unread' : '' ?>" href="/messages?id=<?= e($t['id']) ?>&amp;filter=<?= e($filter) ?>">
-        <span class="row between" style="gap:8px"><strong><?= e($team ? $t['store'] : $t['subject']) ?></strong><span class="muted small"><?= e(human_date($t['last_message_at'], false)) ?></span></span>
+        <span class="row between" style="gap:8px"><strong><?= e($team ? $t['store'] : $t['subject']) ?></strong><?= $team ? verified_tick($t['seller_id'] ?? '') : '' ?><span class="muted small"><?= e(human_date($t['last_message_at'], false)) ?></span></span>
         <?php if ($team): ?><span class="small"><?= e($t['subject']) ?></span><?php endif; ?>
         <span class="muted small clip"><?= e(str_limit(preg_replace('/\s+/', ' ', (string) $t['preview']) ?? '', 90)) ?></span>
         <?php if ($t['broadcast_id']): ?><span class="pill small">Announcement</span><?php endif; ?>
@@ -26,7 +26,7 @@ $activeId = $thread['id'] ?? '';
   <section class="inbox-pane">
   <?php if ($thread): ?>
     <div class="row between"><div><h2 style="margin:0"><?= e($thread['subject']) ?></h2>
-      <p class="muted small" style="margin:4px 0 0"><?= $team ? e($thread['store']) . ' · ' . e($thread['seller_email']) : 'Conversation with the DDLX team' ?><?= $thread['status'] === 'closed' ? ' · closed' : '' ?></p></div>
+      <p class="muted small" style="margin:4px 0 0"><?= $team ? e($thread['store']) . verified_tick($thread['seller_id'] ?? '') . ' · ' . e($thread['seller_email']) : 'Conversation with the DDLX team' ?><?= $thread['status'] === 'closed' ? ' · closed' : '' ?></p></div>
       <?php if ($team): ?><form method="post" action="/messages/status" data-keep><?= csrf_field() ?><input type="hidden" name="thread" value="<?= e($thread['id']) ?>"><input type="hidden" name="status" value="<?= $thread['status'] === 'closed' ? 'open' : 'closed' ?>"><button class="btn btn-outline btn-sm" type="submit"><?= $thread['status'] === 'closed' ? 'Reopen' : 'Close' ?></button></form><?php endif; ?></div>
     <div class="chat" role="log" aria-label="Messages">
     <?php foreach ($thread['messages'] as $m): $mine = $team ? $m['side'] === 'team' : $m['side'] === 'seller'; ?>

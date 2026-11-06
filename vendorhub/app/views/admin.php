@@ -104,7 +104,7 @@ $docLinks = function (array $docs): string {
   <?php if ($selected): $p = $selected; $problems = readiness_problems($p); ?>
     <p><a href="/admin?tab=products">← Products</a></p>
     <h2 style="margin-top:0"><?= e($p['name']) ?> <?= pill($p['status'], PRODUCT_STATUS_LABEL) ?> <?= $p['live'] ? pill('live') : '' ?></h2>
-    <p class="muted"><?= e($p['store_name']) ?> · <?= e($p['seller_email']) ?></p>
+    <p class="muted"><?= e($p['store_name']) ?><?= verified_tick($p['seller_id'] ?? '') ?> · <?= e($p['seller_email']) ?></p>
     <div class="imgs"><?php foreach (array_filter(array_merge([$p['featured_image']], $p['gallery'])) as $path): ?><a href="<?= e(product_image_url($path)) ?>" data-preview="<?= e(product_image_url($path)) ?>" data-title="<?= e($p['name']) ?>"><img class="thumb" style="width:90px;height:90px" src="<?= e(product_image_url($path)) ?>" alt=""></a><?php endforeach; ?></div>
     <dl class="dl"><dt>SKU</dt><dd><?= e($p['sku']) ?></dd><dt>Category</dt><dd><?= e(category_label($p)) ?></dd><dt>Brand</dt><dd><?= e($p['brand'] ?: '—') ?></dd><dt>Price</dt><dd><?= e(price_label($p)) ?><?= $p['sale_price'] !== null && $p['product_type'] === 'simple' ? ' (regular ' . e($m($p['regular_price'], $p['currency'])) . ')' : '' ?></dd>
       <dt>Stock</dt><dd><?= $p['product_type'] === 'variable' ? array_sum(array_column($p['variations'], 'stock')) : (int) $p['stock'] ?></dd>
@@ -121,7 +121,7 @@ $docLinks = function (array $docs): string {
   <?php else: ?>
     <div class="row" style="margin:16px 0"><?php foreach (['pending' => 'Waiting', 'live' => 'Live', 'all' => 'All'] as $k => $l): ?><a class="btn btn-sm <?= $f === $k ? '' : 'btn-outline' ?>" href="/admin?tab=products&filter=<?= $k ?>"><?= $l ?></a><?php endforeach; ?></div>
     <ul class="list"><?php foreach ($list as $p): ?><li class="row between"><div class="row" style="flex-wrap:nowrap"><?php if ($p['featured_image']): ?><img class="thumb" src="<?= e(product_image_url($p['featured_image'])) ?>" alt=""><?php else: ?><span class="thumb"></span><?php endif; ?>
-      <div><a href="/admin?tab=products&id=<?= e($p['id']) ?>"><strong><?= e($p['name']) ?></strong></a><div class="muted small"><?= e($p['store_name']) ?> · <?= e(category_label($p)) ?> · <?= e(price_label($p)) ?></div></div></div><span><?= pill($p['status'], PRODUCT_STATUS_LABEL) ?> <?= $p['live'] ? pill('live') : '' ?></span></li><?php endforeach; ?>
+      <div><a href="/admin?tab=products&id=<?= e($p['id']) ?>"><strong><?= e($p['name']) ?></strong></a><div class="muted small"><?= e($p['store_name']) ?><?= verified_tick($p['seller_id'] ?? '') ?> · <?= e(category_label($p)) ?> · <?= e(price_label($p)) ?></div></div></div><span><?= pill($p['status'], PRODUCT_STATUS_LABEL) ?> <?= $p['live'] ? pill('live') : '' ?></span></li><?php endforeach; ?>
       <?php if (!$list): ?><li class="muted">Nothing here.</li><?php endif; ?></ul>
   <?php endif; ?>
 <?php endif; ?>
@@ -186,7 +186,7 @@ $docLinks = function (array $docs): string {
 <?php if ($tab === 'payouts'): ?>
   <p class="small"><a href="/admin/export?kind=payouts">Download all withdrawals (CSV)</a></p>
   <ul class="list"><?php foreach ($items as $w): ?><li>
-    <div class="row between"><div><strong><?= e($w['store_name']) ?></strong> <span class="muted">· <?= e($w['seller_email']) ?></span>
+    <div class="row between"><div><strong><?= e($w['store_name']) ?></strong><?= verified_tick($w['seller_id'] ?? '') ?> <span class="muted">· <?= e($w['seller_email']) ?></span>
       <div>Pay <strong><?= e($m((float) $w['amount'] - (float) $w['fee'], $w['currency'])) ?></strong><?= (float) $w['fee'] > 0 ? ' <span class="muted small">(' . e($m($w['amount'], $w['currency'])) . ' less ' . e($m($w['fee'], $w['currency'])) . ' fee)</span>' : '' ?></div>
       <div class="muted small"><?= e($w['bank_name']) ?> · <?= e($w['account_number']) ?> · <?= e($w['account_name']) ?></div>
       <div class="muted small">Requested <?= e(human_date($w['requested_at'], true)) ?><?= $w['reference'] ? ' · Ref ' . e($w['reference']) : '' ?><?= $w['admin_note'] ? ' · ' . e($w['admin_note']) : '' ?></div></div>
@@ -235,7 +235,7 @@ $docLinks = function (array $docs): string {
 <?php if ($tab === 'codes'): ?>
   <p class="muted">Codes created by sellers. The seller funds each discount. Switch a code off if it is being misused.</p>
   <div class="table-wrap"><table><thead><tr><th>Code</th><th>Seller</th><th>Discount</th><th>Status</th><th class="t-right">Used</th><th class="t-right">Given away</th><th></th></tr></thead><tbody>
-  <?php foreach ($items as $c): ?><tr><td><strong><?= e($c['code']) ?></strong></td><td><?= e($c['store']) ?></td>
+  <?php foreach ($items as $c): ?><tr><td><strong><?= e($c['code']) ?></strong></td><td><?= e($c['store']) ?><?= verified_tick($c['seller_id'] ?? '') ?></td>
     <td><?= $c['kind'] === 'percent' ? e((string) $c['amount']) . '%' : e($c['currency'] . ' ' . number_format($c['amount'], 2)) . ' each' ?></td>
     <td><?= e(COUPON_STATE_LABEL[$c['state']] ?? $c['state']) ?></td><td class="t-right"><?= (int) $c['used_count'] ?></td><td class="t-right"><?= e(number_format($c['discount_total'], 2)) ?></td>
     <td><form method="post" action="/admin/code" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>"><button class="btn btn-sm btn-outline" name="action" value="<?= $c['admin_disabled'] ? 'allow' : 'block' ?>"><?= $c['admin_disabled'] ? 'Switch on' : 'Switch off' ?></button></form></td></tr>
@@ -249,7 +249,7 @@ $docLinks = function (array $docs): string {
   <form method="post" action="/admin/marketplace-sync" data-keep class="row" style="margin-bottom:12px"><?= csrf_field() ?><label class="row small" style="gap:6px"><input type="checkbox" name="create" value="1"> Create Vendor Hub accounts for marketplace sellers that have none</label><button class="btn btn-sm" type="submit">Sync with marketplace</button> <?= help('Links marketplace (Dokan) sellers to Vendor Hub sellers with the same email. With the box ticked, sellers that only exist on the marketplace also get a Vendor Hub account and an email to set a password. Products and orders are imported per seller from the Link page. Verified Vendor Hub sellers reach the marketplace automatically on its next sync.') ?></form>
   <div class="table-wrap"><table><thead><tr><th>Seller</th><th>Level</th><th class="t-right">Delivered (90d)</th><th class="t-right">Returns</th><th class="t-right">Packed in 48h</th><th class="t-right">Rating</th><th>Pin a level</th><th>Marketplace</th></tr></thead><tbody>
   <?php foreach ($items as $s): $m = $s['m']; ?>
-    <tr><td><strong><?= e($s['store']) ?></strong><br><span class="muted small"><?= e($s['email']) ?></span></td>
+    <tr><td><strong><?= e($s['store']) ?></strong><?= verified_tick($s['id']) ?><br><span class="muted small"><?= e($s['email']) ?></span></td>
       <td><?= level_badge($s['level']) ?><?= $s['override_level'] ? '<br><span class="muted small">pinned' . ($s['override_note'] ? ': ' . e($s['override_note']) : '') . '</span>' : '' ?><?= !empty($s['below_since']) && !$s['override_level'] ? '<br><span class="muted small" style="color:#b45309">at risk since ' . e(human_date($s['below_since'], false)) . '</span>' : '' ?></td>
       <td class="t-right"><?= (int) ($m['delivered'] ?? 0) ?></td><td class="t-right"><?= isset($m['return_pct']) ? e((string) $m['return_pct']) . '%' : '–' ?></td>
       <td class="t-right"><?= isset($m['dispatch_pct']) && $m['dispatch_pct'] !== null ? e((string) $m['dispatch_pct']) . '%' : '–' ?></td><td class="t-right"><?= !empty($m['rating']) ? e((string) $m['rating']) . ' (' . (int) $m['ratings'] . ')' : '–' ?></td>

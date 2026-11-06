@@ -32,24 +32,10 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
     $low = array_filter($products, fn ($p) => in_array(stock_state($p), ['low', 'out'], true));
     $changes = array_filter($products, fn ($p) => in_array($p['status'], ['changes_requested', 'rejected'], true));
     $attention = array_slice(array_unique(array_merge(array_values($changes), array_values($low)), SORT_REGULAR), 0, 6); ?>
-<?php
-    $curLv = $level['override_level'] ?: $level['auto_level'];
-    $nextLv = LEVELS[level_rank($curLv) + 1] ?? null;
-    $nextChecks = $nextLv ? level_checks($nextLv, $lm) : [];
-?>
-  <div class="card level-card" style="margin-top:24px">
-    <div class="level-big lvl-<?= e($curLv) ?>"><?= icon('shield') ?></div>
-    <div>
-      <p class="muted small" style="margin:0">Your seller level <?= help('Based on the last ' . LEVEL_WINDOW_DAYS . ' days. Higher levels get a badge and better placement on the marketplace' . (function () use ($curLv) { $pk = level_perks($curLv); return $pk['commission_off'] > 0 || $pk['hold_off'] > 0 ? ', plus ' . ($pk['commission_off'] > 0 ? $pk['commission_off'] . ' points off commission' : '') . ($pk['commission_off'] > 0 && $pk['hold_off'] > 0 ? ' and ' : '') . ($pk['hold_off'] > 0 ? 'payouts ' . $pk['hold_off'] . ' days sooner' : '') : ''; })() . '.') ?></p>
-      <p style="margin:2px 0 4px"><?= level_badge($curLv) ?> <?php if ($level['override_level']): ?><span class="muted small">set by the DDLX team</span><?php endif; ?></p>
-      <p class="muted" style="margin:0"><?= e(LEVEL_NOTE[$curLv]) ?><?= $rating['count'] ? ' Rating ' . number_format((float) $rating['average'], 1) . ' from ' . (int) $rating['count'] . ' customer ratings.' : '' ?></p>
-      <?php if (!empty($level['below_since']) && !$level['override_level']): $pol = level_policy(); ?><p class="notice" style="margin:12px 0 0"><strong>Your <?= e(LEVEL_LABEL[$curLv]) ?> level is at risk.</strong> You no longer meet its requirements<?= $pol['mode'] === 'grace' ? '. Meet them again by ' . e(human_date(db_plus('+' . $pol['grace_days'] . ' days', $level['below_since']), false)) . ' to keep it' : '' ?>.</p>
-        <ul class="need"><?php foreach (level_checks($curLv, $lm) as $c): ?><li class="<?= $c['ok'] ? 'ok' : '' ?>"><?= icon($c['ok'] ? 'check' : 'arrow-right') ?><span><?= e($c['label']) ?>: <strong><?= e($c['have']) ?></strong> <span class="muted">(<?= e($c['need']) ?>)</span></span></li><?php endforeach; ?></ul><?php endif; ?>
-      <?php if ($nextLv): ?><p style="margin:12px 0 0"><strong>To reach <?= e(LEVEL_LABEL[$nextLv]) ?>:</strong></p>
-      <ul class="need"><?php foreach ($nextChecks as $c): ?><li class="<?= $c['ok'] ? 'ok' : '' ?>"><?= icon($c['ok'] ? 'check' : 'arrow-right') ?><span><?= e($c['label']) ?>: <strong><?= e($c['have']) ?></strong> <span class="muted">(<?= e($c['need']) ?>)</span></span></li><?php endforeach; ?></ul>
-      <?php else: ?><p style="margin:12px 0 0"><strong>You are at the top level.</strong> Keep returns low and orders moving to stay here.</p><?php endif; ?>
-    </div>
-  </div>
+<?php $curLv = $level['override_level'] ?: $level['auto_level'];
+    if (!empty($level['below_since']) && !$level['override_level']): $pol = level_policy(); ?>
+  <p class="notice" style="margin-top:24px"><strong>Your <?= e(LEVEL_LABEL[$curLv]) ?> level is at risk.</strong> <?= $pol['mode'] === 'grace' ? 'Meet its requirements again by ' . e(human_date(db_plus('+' . $pol['grace_days'] . ' days', $level['below_since']), false)) . ' to keep it.' : 'You no longer meet its requirements.' ?></p>
+<?php endif; ?>
   <div class="grid g4" style="margin-top:24px">
     <div class="stat"><p class="muted small">Products</p><p class="n"><?= count($products) ?></p></div>
     <div class="stat"><p class="muted small">Live on marketplace</p><p class="n"><?= $live ?></p></div>
@@ -219,7 +205,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
     <div class="cover"><?php if ($store['banner']): ?><img src="/files/store?p=<?= e(rawurlencode($store['banner'])) ?>" alt="Banner"><?php else: ?><span>Banner · 1600×400 works best</span><?php endif; ?></div>
     <div class="storeid">
       <div class="logo-ring"><?php if ($store['logo']): ?><img src="/files/store?p=<?= e(rawurlencode($store['logo'])) ?>" alt="Logo"><?php else: ?><span>Logo</span><?php endif; ?></div>
-      <div class="grow"><strong class="store-title"><?= e($store['tagline'] !== '' ? $store['tagline'] : 'Your store') ?></strong><span class="muted small">Preview of your marketplace store <?= help('This is how customers see your store on the marketplace.') ?></span></div>
+      <div class="grow"><strong class="store-title"><?= e(inbox_store_name($user['id']) ?: 'Your store') ?><?= verified_tick($user['id']) ?></strong><span class="muted small"><?= e($store['tagline'] !== '' ? $store['tagline'] : 'Preview of your marketplace store') ?> <?= help('This is how customers see your store on the marketplace.') ?></span></div>
       <?php if ($store['vacation']): ?><span class="pill pill-warn">On vacation</span><?php endif; ?>
     </div>
     <div class="uploads">
@@ -244,4 +230,6 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
       <?= f_text('vacation_message', 'Message to customers', $store['vacation_message'], null, ['maxlength' => 300]) ?></div>
     <p style="margin-top:12px"><button class="btn" type="submit">Save store</button></p>
   </form>
+  <div class="card" style="margin-top:24px"><h3 style="margin-top:0">Application and verification <?= verified_tick($user['id']) ?> <?= help('The details you submitted when you applied and were verified. You can read them here; contact the DDLX team to change them.') ?></h3>
+    <p class="row" style="gap:12px"><a class="btn btn-outline btn-sm" href="/apply">View application</a><a class="btn btn-outline btn-sm" href="/verification">View verification</a></p></div>
 <?php endif; ?>

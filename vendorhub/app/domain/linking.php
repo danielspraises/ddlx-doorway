@@ -49,6 +49,7 @@ function marketplace_vendors(string $search = '', int $page = 1): ?array
         $v['name'] = (string) ($v['name'] ?? '');
         $v['linked_here'] = $linked[$v['id']] ?? null;
     }
+    $GLOBALS['vh_market_info'] = ['version' => (string) ($d['version'] ?? ''), 'total' => $d['total'] ?? null];
     return array_values(array_filter($d['vendors'], fn ($v) => $v['id'] > 0));
 }
 

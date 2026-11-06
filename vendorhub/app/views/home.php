@@ -9,7 +9,19 @@ $steps = [
 ?>
 <section class="hero">
   <div class="hero-grid" aria-hidden="true"></div>
-  <div class="scene" aria-hidden="true"><?= tote_svg() ?></div>
+  <div class="scene" aria-hidden="true">
+    <div class="orbits" data-parallax>
+      <span class="blob b1"></span><span class="blob b2"></span>
+      <?= tote_svg() ?>
+      <div class="orbit o1"><span class="coin" style="--a:0deg"><i><?= icon('package') ?></i></span><span class="coin" style="--a:120deg"><i><?= icon('wallet') ?></i></span><span class="coin" style="--a:240deg"><i><?= icon('truck') ?></i></span></div>
+      <div class="orbit o2"><span class="coin" style="--a:60deg"><i><?= icon('chart') ?></i></span><span class="coin" style="--a:180deg"><i><?= icon('bell') ?></i></span><span class="coin" style="--a:300deg"><i><?= icon('store') ?></i></span></div>
+      <span class="ring r3"></span>
+      <span class="chip ch1"><b></b>New order · ₦45,000</span>
+      <span class="chip ch2"><b></b>Payout sent</span>
+      <span class="chip ch3"><b></b>Product approved</span>
+      <span class="spark s1"></span><span class="spark s2"></span><span class="spark s3"></span><span class="spark s4"></span>
+    </div>
+  </div>
   <div class="wrap hero-copy">
     <p class="eyebrow">DDLX · Vendor Hub</p>
     <h1>Run your store. Build your brand.</h1>
@@ -20,10 +32,9 @@ $steps = [
     </div>
     <p class="hero-cats"><?= icon('check') ?> Fashion <span>/</span> Electronics <span>/</span> Home <span>/</span> Beauty <span>/</span> Food &amp; more</p>
   </div>
-  <p class="hero-caption">MADE FOR INDEPENDENT COMMERCE</p>
 </section>
 
-<div class="marquee" aria-hidden="true"><div class="marquee-track"><?php for ($k = 0; $k < 2; $k++) foreach (['Fashion', 'Electronics', 'Home & living', 'Beauty', 'Food & drink', 'Health', 'Kids', 'Sports', 'Art & crafts', 'Auto & tools'] as $c): ?><span><?= e($c) ?></span><?php endforeach; ?></div></div>
+<div class="marquee" aria-hidden="true"><div class="marquee-track"><?php for ($k = 0; $k < 2; $k++): ?><div class="marquee-set"><?php foreach (['Fashion', 'Electronics', 'Home & living', 'Beauty', 'Food & drink', 'Health', 'Kids', 'Sports', 'Art & crafts', 'Auto & tools'] as $c): ?><span><?= e($c) ?></span><?php endforeach; ?></div><?php endfor; ?></div></div>
 <section class="band"><div class="wrap">
   <p class="eyebrow" style="text-transform:uppercase">From application to everyday operations</p>
   <ul><li><?= icon('store') ?> Store</li><li><?= icon('package') ?> Inventory</li><li><?= icon('chart') ?> Insights</li><li><?= icon('wallet') ?> Payouts</li></ul>

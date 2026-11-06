@@ -1,7 +1,7 @@
 /* Vendor Hub service worker: makes the app installable and shows a friendly page when offline.
    It never stores pages, accounts or API data: only the look of the app (CSS, JS, icons). */
-var VERSION = 'vh-v5';
-var SHELL = ['/offline.html', '/assets/app.css?v=9', '/assets/app.js?v=4', '/assets/pwa.js', '/icons/icon-192.png'];
+var VERSION = 'vh-v6';
+var SHELL = ['/offline.html', '/assets/app.css', '/assets/app.js', '/assets/pwa.js', '/icons/icon-192.png'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(VERSION).then(function (c) {

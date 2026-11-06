@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.5.0
+ * Version: 1.5.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -414,17 +414,23 @@ final class Verola_Connector {
 	public static function rest_vendors($request) {
 		$search = trim((string) $request->get_param('search'));
 		$page = max(1, (int) $request->get_param('page'));
+		global $wpdb;
 		$roles = array_values(array_unique([self::settings()['role'], 'seller']));
-		$ids = [];
-		$base = ['role__in' => $roles, 'fields' => 'ID', 'number' => 20, 'paged' => $page, 'orderby' => 'display_name'];
-		if ($search !== '') {
-			$by_user = get_users($base + ['search' => '*' . $search . '*', 'search_columns' => ['user_login', 'user_email', 'display_name', 'user_nicename']]);
-			$by_store = get_users($base + ['meta_query' => [['key' => 'store_name', 'value' => $search, 'compare' => 'LIKE']]]);
-			$by_dokan = get_users($base + ['meta_query' => [['key' => 'dokan_profile_settings', 'value' => $search, 'compare' => 'LIKE']]]);
-			$ids = array_values(array_unique(array_merge($by_user, $by_store, $by_dokan)));
-		} else {
-			$ids = get_users($base);
+		// A vendor is anyone with a seller role OR Dokan store data, so stores are found even when the role differs.
+		$conds = [$wpdb->prepare('(m.meta_key = %s AND m.meta_value LIKE %s)', $wpdb->get_blog_prefix() . 'capabilities', '%' . $wpdb->esc_like('"seller"') . '%')];
+		foreach ($roles as $r) {
+			$conds[] = $wpdb->prepare('(m.meta_key = %s AND m.meta_value LIKE %s)', $wpdb->get_blog_prefix() . 'capabilities', '%' . $wpdb->esc_like('"' . $r . '"') . '%');
 		}
+		$conds[] = "m.meta_key = 'dokan_enable_selling' AND m.meta_value = 'yes'";
+		$conds[] = "m.meta_key = 'dokan_profile_settings'";
+		$where = '(' . implode(' OR ', $conds) . ')';
+		if ($search !== '') {
+			$like = '%' . $wpdb->esc_like($search) . '%';
+			$where .= $wpdb->prepare(' AND (u.user_login LIKE %s OR u.user_email LIKE %s OR u.display_name LIKE %s OR u.user_nicename LIKE %s OR u.ID IN (SELECT user_id FROM ' . $wpdb->usermeta . " WHERE meta_key = 'dokan_profile_settings' AND meta_value LIKE %s))", $like, $like, $like, $like, $like);
+		}
+		$base = 'FROM ' . $wpdb->users . ' u JOIN ' . $wpdb->usermeta . ' m ON m.user_id = u.ID WHERE ' . $where;
+		$total = (int) $wpdb->get_var('SELECT COUNT(DISTINCT u.ID) ' . $base);
+		$ids = array_map('intval', $wpdb->get_col('SELECT DISTINCT u.ID ' . $base . ' ORDER BY u.display_name, u.ID LIMIT 20 OFFSET ' . (($page - 1) * 20)));
 		$out = [];
 		foreach ($ids as $id) {
 			$u = get_userdata($id);
@@ -442,7 +448,7 @@ final class Verola_Connector {
 				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
 			];
 		}
-		return ['vendors' => $out, 'has_more' => count($ids) === 20 && $search === ''];
+		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.5.1'];
 	}
 
 	public static function rest_link($request) {

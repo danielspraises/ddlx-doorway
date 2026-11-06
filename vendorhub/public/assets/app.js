@@ -193,3 +193,15 @@
   var io = new IntersectionObserver(function (en) { en.forEach(function (x) { if (x.isIntersecting) { x.target.classList.add('in'); io.unobserve(x.target); } }); }, { threshold: 0.12 });
   els.forEach(function (e) { io.observe(e); });
 })();
+
+// Gentle mouse parallax on the landing hero.
+(function () {
+  var el = document.querySelector('[data-parallax]');
+  if (!el || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+  var hero = el.closest('.hero') || document.body;
+  hero.addEventListener('mousemove', function (e) {
+    var r = hero.getBoundingClientRect();
+    el.style.setProperty('--px', ((e.clientX - r.left) / r.width - 0.5) * -26 + 'px');
+    el.style.setProperty('--py', ((e.clientY - r.top) / r.height - 0.5) * -20 + 'px');
+  });
+})();

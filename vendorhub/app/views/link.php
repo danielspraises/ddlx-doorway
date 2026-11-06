@@ -8,9 +8,9 @@
 <?php elseif (!$link): ?>
   <form method="get" action="/admin/link" class="row" style="margin:12px 0" data-keep><input type="hidden" name="seller" value="<?= e($sid) ?>"><input type="search" name="q" value="<?= e($q) ?>" placeholder="Search by name or email" style="max-width:280px"><button class="btn btn-sm btn-outline">Search</button><?php if ($q !== ''): ?><a class="btn btn-sm btn-ghost" href="/admin/link?seller=<?= e($sid) ?>">Clear</a><?php endif; ?></form>
   <?php if ($vendors === null): ?>
-    <p class="notice error">The marketplace did not answer. Check that the plugin is active (version 1.4.0 or newer) and try again.</p>
+    <p class="notice error">The marketplace did not answer. Check that the plugin is active (version 1.5.1 or newer) and try again.</p>
   <?php elseif (!$vendors): ?>
-    <p class="muted">No marketplace sellers found<?= $q !== '' ? ' for "' . e($q) . '"' : '' ?>.</p>
+    <p class="muted">No marketplace sellers found<?= $q !== '' ? ' for "' . e($q) . '"' : '' ?>.</p><?php $mi = $GLOBALS['vh_market_info'] ?? []; if (($mi['version'] ?? '') === ''): ?><p class="notice error">The marketplace plugin looks out of date. Upload verola-connector 1.5.1 on ddlx.shop, then reload this page.</p><?php else: ?><p class="muted small">Marketplace plugin <?= e($mi['version']) ?> reports <?= (int) ($mi['total'] ?? 0) ?> seller<?= (int) ($mi['total'] ?? 0) === 1 ? '' : 's' ?> in total.</p><?php endif; ?>
   <?php else: ?>
   <div class="table-wrap"><table><thead><tr><th>Marketplace seller</th><th>Email</th><th class="t-right">Products</th><th></th></tr></thead><tbody>
   <?php foreach ($vendors as $v): ?>

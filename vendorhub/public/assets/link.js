@@ -33,7 +33,7 @@
           if (cp && c.products !== undefined) cp.textContent = c.products + ' imported so far';
           if (co && c.orders !== undefined) co.textContent = c.orders + ' orders imported so far';
           if (d.next) { status.textContent = 'Working… ' + done + ' done' + (d.remaining ? ', about ' + d.remaining + ' to go' : ''); step(d.next); return; }
-          status.textContent = 'Finished. ' + done + ' ' + kind + ' imported' + (skipped ? ', ' + skipped + ' skipped' : '') + '.';
+          status.textContent = 'Finished. ' + done + ' ' + kind + ' imported' + (skipped ? ', ' + skipped + ' skipped (reasons listed below)' : '') + '.';
           buttons.forEach(function (x) { x.disabled = false; });
         }).catch(function () { status.textContent = 'Connection problem. Press the button again to continue; nothing is duplicated.'; buttons.forEach(function (x) { x.disabled = false; }); });
       })(0);

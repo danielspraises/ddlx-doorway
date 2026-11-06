@@ -256,7 +256,7 @@ $docLinks = function (array $docs): string {
       <td><form method="post" action="/admin/level" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="seller" value="<?= e($s['id']) ?>">
         <select name="level" aria-label="Level"><option value="">Automatic</option><?php foreach (LEVEL_LABEL as $k => $l): ?><option value="<?= e($k) ?>"<?= $s['override_level'] === $k ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select>
         <input name="note" placeholder="Reason (optional)" value="<?= e($s['override_note']) ?>" maxlength="250" style="max-width:170px"><button class="btn btn-sm" type="submit">Save</button></form></td>
-      <td><?php $lk = $links[$s['id']] ?? null; ?><?= $lk ? '<span class="pill pill-ok">Linked</span><br><span class="muted small">' . e($lk['name']) . ' #' . (int) $lk['uid'] . '</span><br>' : '' ?><a class="btn btn-sm btn-outline" href="/admin/link?seller=<?= e($s['id']) ?>"><?= $lk ? 'Manage' : 'Link to marketplace' ?></a></td></tr>
+      <td><?php $lk = $links[$s['id']] ?? null; ?><?= $lk ? '<span class="pill pill-ok">Linked</span><br><span class="muted small">' . e($lk['name']) . ' #' . (int) $lk['uid'] . '</span><br>' : '' ?><a class="btn btn-sm btn-outline" href="/admin/link?seller=<?= e($s['id']) ?>"><?= $lk ? 'Manage' : 'Link to marketplace' ?></a> <a class="btn btn-sm" href="/admin/seller?id=<?= e($s['id']) ?>">Edit details</a></td></tr>
   <?php endforeach; if (!$items): ?><tr><td colspan="8" class="muted">No verified sellers yet.</td></tr><?php endif; ?></tbody></table></div>
 <?php endif; ?>
 

@@ -178,6 +178,7 @@ function abort(int $status, string $message = ''): never
 function render(string $view, array $vars = [], string $layout = 'layout'): void
 {
     extract($vars, EXTR_SKIP);
+    $pageTitle = $title ?? 'Vendor Hub'; // read before the view runs: views reuse loop variables like $title
     ob_start();
     require APP_ROOT . '/app/views/' . $view . '.php';
     $content = (string) ob_get_clean();
@@ -185,7 +186,6 @@ function render(string $view, array $vars = [], string $layout = 'layout'): void
         echo $content;
         return;
     }
-    $pageTitle = $title ?? 'Vendor Hub';
     require APP_ROOT . '/app/views/' . $layout . '.php';
 }
 

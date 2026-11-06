@@ -32,5 +32,10 @@
     <p class="row"><button class="btn" type="button" data-run="orders"<?= $counts['products'] ? '' : ' disabled' ?>>Import past orders</button><span class="muted small" data-count="orders"><?= (int) $counts['orders'] ?> orders imported so far</span></p>
     <p class="muted small" data-status role="status"></p>
     <ul class="list hidden" data-notes style="margin-top:8px"></ul>
+    <?php $rep = jdec((string) setting('import_report_' . $sid, ''), []); if ($rep): ?>
+      <div class="card" style="margin-top:12px"><h3 style="margin-top:0">Last product import <?= help('Why products may not have come across: unsupported product types, a product with no variations, or a problem copying it. Fix the cause on the marketplace and run the import again; nothing is duplicated.') ?></h3>
+        <p class="small"><?= (int) ($rep['created'] ?? 0) ?> imported, <?= (int) ($rep['skipped'] ?? 0) ?> skipped<?= !empty($rep['at']) ? ' · ' . e(human_date($rep['at'])) : '' ?></p>
+        <?php if (!empty($rep['notes'])): ?><ul class="list"><?php foreach ($rep['notes'] as $n): ?><li class="small"><?= e((string) $n) ?></li><?php endforeach; ?></ul><?php endif; ?></div>
+    <?php endif; ?>
   </div>
 <?php endif; ?>

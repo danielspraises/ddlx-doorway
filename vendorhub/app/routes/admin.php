@@ -178,6 +178,24 @@ route('POST', '/admin/link', function () {
     redirect('/admin/link?seller=' . $id, $err ?? (input('action') === 'unlink' ? 'Link removed.' : 'Linked. Now import their products, then their past orders.'), $err ? 'error' : 'ok');
 });
 
+route('GET', '/admin/seller', function () {
+    require_admin();
+    $id = input('id');
+    if (!is_uuid($id)) abort(404);
+    $row = db()->one('SELECT email FROM users WHERE id = ?', [$id]);
+    $app = load_application($id);
+    if (!$row || !$app) abort(404);
+    render('seller_edit', ['title' => 'Edit seller', 'user' => current_user(), 'sid' => $id, 'account' => $row['email'], 'app' => $app, 'link' => seller_link($id)]);
+});
+
+route('POST', '/admin/seller', function () {
+    $u = require_admin();
+    $id = input('id');
+    if (!is_uuid($id)) abort(404);
+    $err = admin_update_seller($u, $id, $_POST);
+    redirect('/admin/seller?id=' . $id, $err ?? 'Seller details saved. The marketplace picks up a new store name or profile on its next sync.', $err ? 'error' : 'ok');
+});
+
 route('POST', '/admin/marketplace-sync', function () {
     $u = require_admin();
     @set_time_limit(240);

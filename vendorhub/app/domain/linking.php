@@ -148,6 +148,13 @@ function import_unique_slug(string $name): string
     return $slug;
 }
 
+function import_free_sku(string $sku, int $wcId, array $also = []): string
+{
+    $try = substr($sku, 0, 90) . '-' . $wcId;
+    for ($i = 2; import_sku_taken($try) || in_array($try, $also, true); $i++) $try = substr($sku, 0, 85) . '-' . $wcId . '-' . $i;
+    return $try;
+}
+
 function import_sku_taken(string $sku): bool
 {
     return (bool) (db()->val('SELECT 1 FROM products WHERE LOWER(sku) = LOWER(?)', [$sku]) ?: db()->val('SELECT 1 FROM product_variations WHERE LOWER(sku) = LOWER(?)', [$sku]));
@@ -171,7 +178,10 @@ function import_one_product(string $sellerId, array $m): array
 
     $variable = $m['type'] === 'variable';
     $sku = trim((string) ($m['sku'] ?? '')) ?: 'WC-' . $wcId;
-    if (import_sku_taken($sku)) return [null, $name . ': the SKU "' . $sku . '" is already used in Vendor Hub. Change one of them and import again.', []];
+    if (import_sku_taken($sku)) { // another product already uses it here: keep the product, make the SKU unique
+        $old = $sku; $sku = import_free_sku($sku, $wcId);
+        $GLOBALS['vh_import_info'][] = $name . ': SKU "' . $old . '" was already in use in Vendor Hub, so it was imported as "' . $sku . '".';
+    }
     $currency = in_array($m['currency'] ?? '', CURRENCIES, true) ? $m['currency'] : 'NGN';
     $price = isset($m['regular_price']) && is_numeric($m['regular_price']) ? round((float) $m['regular_price'], 2) : null;
     $sale = isset($m['sale_price']) && is_numeric($m['sale_price']) && (float) $m['sale_price'] > 0 && $price && (float) $m['sale_price'] < $price ? round((float) $m['sale_price'], 2) : null;
@@ -186,7 +196,10 @@ function import_one_product(string $sellerId, array $m): array
         foreach ((array) ($m['variations'] ?? []) as $v) {
             $n++;
             $vsku = trim((string) ($v['sku'] ?? '')) ?: $sku . '-' . $n;
-            if (import_sku_taken($vsku) || $vsku === $sku) return [null, $name . ': the variation SKU "' . $vsku . '" is already used in Vendor Hub.', []];
+            if (import_sku_taken($vsku) || $vsku === $sku || in_array($vsku, array_column($vars, 'sku'), true)) {
+                $old = $vsku; $vsku = import_free_sku($vsku, (int) ($v['id'] ?? $n), array_column($vars, 'sku') + [$sku]);
+                $GLOBALS['vh_import_info'][] = $name . ': variation SKU "' . $old . '" was already in use, so it was imported as "' . $vsku . '".';
+            }
             $opts = [];
             foreach ((array) ($v['options'] ?? []) as $k => $val) $opts[trim((string) $k)] = trim((string) $val);
             $vp = isset($v['regular_price']) && is_numeric($v['regular_price']) ? round((float) $v['regular_price'], 2) : null;
@@ -237,16 +250,17 @@ function import_products_batch(array $admin, string $sellerId, int $after = 0): 
     if (!$link) return ['error' => 'Link the seller first.'];
     $d = marketplace_call('/vendor/products?user_id=' . $link['uid'] . '&after=' . $after . '&limit=' . IMPORT_PRODUCT_BATCH, 'GET', null, 60);
     if (!$d || !isset($d['products'])) return ['error' => 'The marketplace did not answer. Try again in a moment.'];
-    $created = 0; $notes = []; $adopt = [];
+    $created = 0; $notes = []; $adopt = []; $skipped = 0; $GLOBALS['vh_import_info'] = [];
     foreach ($d['products'] as $m) {
         try {
             [$vh, $note, $vars] = import_one_product($sellerId, (array) $m);
         } catch (Throwable $e) {
             log_error('import product: ' . $e->getMessage());
             $notes[] = (string) ($m['name'] ?? 'A product') . ': could not be imported (' . $e->getMessage() . ').';
+            $skipped++;
             continue;
         }
-        if ($note) { $notes[] = $note; continue; }
+        if ($note) { $notes[] = $note; $skipped++; continue; }
         $created++;
         $adopt[] = ['wc_id' => (int) $m['id'], 'vh_id' => $vh, 'variations' => $vars];
     }
@@ -257,7 +271,13 @@ function import_products_batch(array $admin, string $sellerId, int $after = 0): 
     }
     $next = isset($d['next']) && $d['next'] ? (int) $d['next'] : null;
     if ($next === null && $created > 0) audit($admin, 'seller.import_products', 'Imported products for seller ' . $sellerId, $sellerId);
-    return ['created' => $created, 'notes' => $notes, 'next' => $next, 'remaining' => (int) ($d['remaining'] ?? 0)];
+    $notes = array_merge($notes, $GLOBALS['vh_import_info']);
+    // Keep a report on the Link page, so the reasons are still there after a reload.
+    $key = 'import_report_' . $sellerId;
+    $rep = $after === 0 ? ['created' => 0, 'skipped' => 0, 'notes' => []] : (jdec((string) setting($key, ''), []) + ['created' => 0, 'skipped' => 0, 'notes' => []]);
+    $rep['created'] += $created; $rep['skipped'] += $skipped; $rep['notes'] = array_slice(array_merge($rep['notes'], $notes), 0, 150); $rep['at'] = now_db();
+    set_setting($key, jenc($rep));
+    return ['created' => $created, 'skipped' => $skipped, 'notes' => $notes, 'next' => $next, 'remaining' => (int) ($d['remaining'] ?? 0)];
 }
 
 // ---------------------------------------------------------------- orders
@@ -389,4 +409,51 @@ function marketplace_sync_run(array $admin, bool $create): array
         if (empty($d['has_more'])) break;
     }
     return $res;
+}
+
+// ---------------------------------------------------------------- admin: edit a seller's details
+
+const SELLER_EDIT_FIELDS = [
+    1 => ['Personal information', ['first_name' => 'First name', 'last_name' => 'Last name', 'other_names' => 'Other name(s)', 'email' => 'Personal email', 'phone' => 'Phone', 'address' => 'Residential address', 'city' => 'City', 'state' => 'State', 'country' => 'Country', 'role' => 'Role', 'id_type' => 'ID type', 'id_number' => 'ID number']],
+    2 => ['Business information', ['name' => 'Business name', 'type' => 'Business type', 'type_other' => 'Business type (other)', 'category' => 'Category', 'category_other' => 'Category (other)', 'phone' => 'Business phone', 'email' => 'Business email', 'address' => 'Business address', 'city' => 'City', 'state' => 'State', 'country' => 'Country', 'website' => 'Website', 'years' => 'Years in business', 'employees' => 'Employees', 'description' => 'Description']],
+    3 => ['Brand & store', ['store_name' => 'Store name', 'owns_brand' => 'Owns a brand (yes/no)', 'brand_name' => 'Brand name', 'brand_category' => 'Brand category', 'brand_category_other' => 'Brand category (other)', 'brand_description' => 'Brand description', 'instagram' => 'Instagram', 'facebook' => 'Facebook', 'tiktok' => 'TikTok', 'x' => 'X / Twitter', 'whatsapp' => 'WhatsApp Business', 'snapchat' => 'Snapchat', 'other' => 'Other social media']],
+    4 => ['Business registration', ['registered' => 'Registered (yes/no)', 'reg_number' => 'Registration number', 'reg_name' => 'Registered business name']],
+];
+
+/** Admin changes any of a seller's application details. Returns an error message, or null when saved. */
+function admin_update_seller(array $admin, string $sid, array $post): ?string
+{
+    $db = db();
+    $user = $db->one('SELECT id, email FROM users WHERE id = ?', [$sid]);
+    $app = load_application($sid);
+    if (!$user || !$app) return 'Seller not found.';
+    $account = strtolower(trim((string) ($post['account_email'] ?? '')));
+    if (!filter_var($account, FILTER_VALIDATE_EMAIL)) return 'Enter a valid sign-in email.';
+    if ($account !== strtolower((string) $user['email']) && $db->val('SELECT 1 FROM users WHERE email = ? AND id <> ?', [$account, $sid])) return 'That email already belongs to another account.';
+    $new = []; $changed = [];
+    foreach (SELLER_EDIT_FIELDS as $step => [$title, $fields]) {
+        $key = APP_STEPS[$step][0];
+        $data = $app[$key];
+        foreach ($fields as $k => $label) {
+            $v = trim(str_replace("\r", '', (string) ($post['s' . $step . '_' . $k] ?? ($data[$k] ?? ''))));
+            $v = str_limit($v, in_array($k, ['description', 'brand_description'], true) ? 2000 : 500);
+            if (in_array($k, ['email'], true) && $v !== '' && !filter_var($v, FILTER_VALIDATE_EMAIL)) return $label . ' (' . $title . ') is not a valid email.';
+            if ($k === 'website' && $v !== '' && !preg_match('#^https?://[^\s.]+\.[^\s]+$#i', $v)) return 'Website must start with http:// or https://';
+            if (in_array($k, ['years', 'employees'], true) && $v !== '' && !ctype_digit($v)) return $label . ' must be a whole number.';
+            if (in_array($k, ['owns_brand', 'registered'], true) && !in_array($v, ['', 'yes', 'no'], true)) return $label . ' must be yes or no.';
+            if ($k === 'store_name' && $v === '') return 'The store name cannot be empty.';
+            if (($data[$k] ?? '') !== $v) $changed[] = $label;
+            $data[$k] = $v;
+        }
+        $new[$key] = $data;
+    }
+    if ($account !== strtolower((string) $user['email'])) $changed[] = 'Sign-in email';
+    if (!$changed) return 'Nothing was changed.';
+    $db->tx(function () use ($db, $sid, $app, $new, $account) {
+        $db->exec('UPDATE seller_applications SET personal = ?, business = ?, brand = ?, registration = ?, applicant_email = ?, updated_at = ? WHERE id = ?',
+            [jenc($new['personal']), jenc($new['business']), jenc($new['brand']), jenc($new['registration']), $account, now_db(), $app['id']]);
+        $db->exec('UPDATE users SET email = ? WHERE id = ?', [$account, $sid]);
+    });
+    audit($admin, 'seller.edit', 'Edited seller details (' . implode(', ', array_slice($changed, 0, 12)) . ')', $sid);
+    return null;
 }

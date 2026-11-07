@@ -329,7 +329,7 @@ function add_bank_account(string $sellerId, string $bank, string $number, string
     $bank = bank_options()[$code];
     if (paystack_on()) { // the bank tells us the real account name; we never trust a typed one
         $real = paystack_resolve_account($number, $code);
-        if ($real === null) return 'We could not verify this account with the bank. Check the bank and account number.';
+        if ($real === null) return 'Couldn’t fetch the account name. Check the bank and account number.';
         $name = $real;
     }
     if (mb_strlen($name) < 2 || mb_strlen($name) > 120) return 'Enter the account name.';

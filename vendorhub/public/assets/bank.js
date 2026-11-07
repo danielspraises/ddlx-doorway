@@ -22,9 +22,9 @@
       .then(function (d) {
         if (mine !== seq) return;
         if (d.name) { name.value = d.name; say(''); if (save) save.disabled = false; }
-        else say(d.error || 'We could not verify this account.', 'is-err');
+        else say(d.error || 'Couldn’t fetch the account name. Try again.', 'is-err');
       })
-      .catch(function () { if (mine === seq) say('Could not reach the bank check. Try again.', 'is-err'); });
+      .catch(function () { if (mine === seq) say('Couldn’t fetch the account name. Try again.', 'is-err'); });
   }
   bank.addEventListener('change', check);
   num.addEventListener('input', check);

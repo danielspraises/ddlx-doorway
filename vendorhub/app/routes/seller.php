@@ -60,7 +60,7 @@ route('GET', '/payouts/resolve', function () {
     if ((int) $w['n'] >= 25) json_out(['error' => 'Too many checks. Wait a few minutes and try again.'], 429);
     set_setting($key, jenc(['at' => $w['at'], 'n' => (int) $w['n'] + 1]));
     $name = paystack_resolve_account($num, $bank);
-    $name === null ? json_out(['error' => 'We could not find that account. Check the bank and number.'], 404) : json_out(['name' => $name]);
+    $name === null ? json_out(['error' => 'Couldn’t fetch the account name. Check the bank and account number.'], 404) : json_out(['name' => $name]);
 });
 
 route('POST', '/payouts/bank', function () {

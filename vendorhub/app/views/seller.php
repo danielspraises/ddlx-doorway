@@ -194,7 +194,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
         <div class="field"><label for="f-bank_name">Bank <?= help('Pick your bank. Once you enter your 10-digit account number we fetch the account name from the bank, so there is nothing to type.') ?></label>
           <select id="f-bank_name" name="bank_name" required><option value="">Choose your bank…</option><?php foreach ($banks as $code => $bn): ?><option value="<?= e((string) $code) ?>"><?= e($bn) ?></option><?php endforeach; ?></select></div>
         <?= f_text('account_number', 'Account number', '', null, ['required' => 1, 'inputmode' => 'numeric', 'maxlength' => 10, 'autocomplete' => 'off', 'placeholder' => '10 digits']) ?>
-        <div class="field"><label for="f-account_name">Account name</label><input id="f-account_name" name="account_name" maxlength="120" <?= $verify ? 'readonly placeholder="Fetched from your bank"' : 'placeholder="Name on the account" required' ?>><p class="small bk-status" data-bkstatus role="status"><?= $verify ? '' : 'Automatic name check is not switched on yet, so type the name exactly as the bank has it.' ?></p></div>
+        <div class="field"><label for="f-account_name">Account name</label><input id="f-account_name" name="account_name" maxlength="120" <?= $verify ? 'readonly placeholder="Fetched from your bank"' : 'placeholder="Name on the account" required' ?>><p class="small bk-status" data-bkstatus role="status"><?= $verify ? '' : 'Enter the name exactly as it appears on the account.' ?></p></div>
         <button class="btn" type="submit" data-bksave<?= $verify ? ' disabled' : '' ?>>Save account</button></form><?php endif; ?>
     </section>
   </div>

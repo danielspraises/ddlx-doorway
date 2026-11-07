@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.6.0
+ * Version: 1.6.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -52,6 +52,7 @@ final class Verola_Connector {
 		add_action('admin_init', [__CLASS__, 'register_settings']);
 		add_action('admin_post_verola_sync_now', [__CLASS__, 'sync_now']);
 		add_action('admin_post_verola_test', [__CLASS__, 'test_connection']);
+		add_action('admin_post_verola_repair_stock', [__CLASS__, 'repair_stock']);
 		add_action('rest_api_init', [__CLASS__, 'register_rest']);
 		add_filter('plugin_action_links_' . plugin_basename(__FILE__), function ($links) {
 			array_unshift($links, '<a href="' . esc_url(admin_url('admin.php?page=verola-connector')) . '">Settings</a>');
@@ -197,6 +198,13 @@ final class Verola_Connector {
 				<input type="hidden" name="action" value="verola_test">
 				<?php wp_nonce_field('verola_test'); ?>
 				<?php submit_button('Test connection', 'secondary', 'submit', false, self::configured() ? [] : ['disabled' => 'disabled']); ?>
+			</form>
+			<?php if (isset($_GET['verola_repaired'])) : ?><div class="notice notice-success inline"><p><?php echo esc_html((int) $_GET['verola_repaired']); ?> product(s) or variation(s) with no stock count are available again.</p></div><?php endif; ?>
+			<form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-top:.5em">
+				<input type="hidden" name="action" value="verola_repair_stock">
+				<?php wp_nonce_field('verola_repair_stock'); ?>
+				<?php submit_button('Make products with no stock count available', 'secondary', 'submit', false); ?>
+				<p class="description" style="max-width:640px">Vendor Hub products that track stock with a count of 0 are switched to "not tracked, in stock". Run this once after updating if products show as out of stock at checkout though no stock was ever listed. Products you really sold out are also reopened, so set their count again in WooCommerce afterwards.</p>
 			</form>
 			<h2>Give these to Vendor Hub</h2>
 			<p>Nothing to enter on the Vendor Hub side except the two secrets in its <code>.env</code> file (<code>MARKETPLACE_API_KEY</code> and <code>MARKETPLACE_WEBHOOK_SECRET</code>), which must match the values above. Sales are sent from this store to <code><?php echo esc_html($s['url'] !== '' ? $s['url'] : 'your-vendor-hub-address'); ?>/api/marketplace/orders</code>.</p>
@@ -443,7 +451,7 @@ final class Verola_Connector {
 				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
 			];
 		}
-		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.6.0'];
+		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.6.1'];
 	}
 
 	public static function rest_link($request) {
@@ -715,6 +723,46 @@ final class Verola_Connector {
 		exit;
 	}
 
+	// Products and variations that were forced to "track stock" with a count of zero (no count was ever listed) become available again.
+	public static function repair_stock() {
+		if (!current_user_can('manage_woocommerce') && !current_user_can('manage_options')) {
+			wp_die('Not allowed.');
+		}
+		check_admin_referer('verola_repair_stock');
+		global $wpdb;
+		$ids = $wpdb->get_col("SELECT DISTINCT p.ID FROM {$wpdb->posts} p JOIN {$wpdb->postmeta} m ON m.post_id = p.ID AND m.meta_key = '_verola_product_id' WHERE p.post_type = 'product' AND p.post_status IN ('publish','draft','pending','private')");
+		$fixed = 0;
+		foreach ($ids as $pid) {
+			$product = wc_get_product($pid);
+			if (!$product) {
+				continue;
+			}
+			$targets = [$product];
+			if ($product->is_type('variable')) {
+				foreach ($product->get_children() as $cid) {
+					$c = wc_get_product($cid);
+					if ($c) {
+						$targets[] = $c;
+					}
+				}
+			}
+			foreach ($targets as $t) {
+				if ($t->get_manage_stock() === true && (int) $t->get_stock_quantity() <= 0) {
+					$t->set_manage_stock(false);
+					$t->set_stock_quantity(null);
+					$t->set_stock_status('instock');
+					$t->save();
+					$fixed++;
+				}
+			}
+			if ($product->is_type('variable')) {
+				WC_Product_Variable::sync($pid);
+			}
+		}
+		wp_safe_redirect(add_query_arg(['page' => 'verola-connector', 'verola_repaired' => $fixed], admin_url('admin.php')));
+		exit;
+	}
+
 	public static function sync_now() {
 		if (!current_user_can('manage_woocommerce')) {
 			wp_die('Not allowed.');
@@ -907,7 +955,7 @@ final class Verola_Connector {
 		}
 		$json = wp_json_encode($map);
 		?>
-<style>.vh-tick{display:inline-block;width:1.05em;height:1.05em;min-width:14px;min-height:14px;margin-left:.3em;vertical-align:-.15em;line-height:0}.vh-tick svg{width:100%;height:100%;display:block}</style>
+<style>.vh-name{display:inline-flex;align-items:center;white-space:nowrap;max-width:100%}.vh-tick{display:inline-block;width:1.05em;height:1.05em;min-width:14px;min-height:14px;margin-left:.3em;vertical-align:-.15em;line-height:0}.vh-tick svg{width:100%;height:100%;display:block}</style>
 <script>
 (function () {
   var stores = <?php echo $json; ?>;
@@ -917,7 +965,13 @@ final class Verola_Connector {
     if (el.getAttribute('data-vh-tick')) return;
     el.setAttribute('data-vh-tick', '1');
     var s = document.createElement('span'); s.className = 'vh-tick'; s.title = 'Verified seller'; s.setAttribute('role', 'img'); s.setAttribute('aria-label', 'Verified seller'); s.innerHTML = svg;
-    el.appendChild(s);
+    // Put the tick on the same line as the name, like an extra letter: wrap the name's text together with the tick.
+    var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), n, target = null;
+    while ((n = w.nextNode())) { if (norm(n.nodeValue) !== '') { target = n; break; } }
+    if (target) {
+      var wrap = document.createElement('span'); wrap.className = 'vh-name';
+      target.parentNode.insertBefore(wrap, target); wrap.appendChild(target); wrap.appendChild(s);
+    } else { el.appendChild(s); }
   }
   function slugOf(href) { var m = /\/store\/([^\/?#]+)/.exec(href || ''); return m ? decodeURIComponent(m[1]) : null; }
   function run() {
@@ -1182,13 +1236,17 @@ final class Verola_Connector {
 		$product->set_attributes($attributes);
 
 		if ($variable) {
-			$product->set_manage_stock(false);
+			if (!$id) {
+				$product->set_manage_stock(false);
+			}
 		} else {
 			self::set_prices($product, $item);
-			$product->set_manage_stock(!empty($item['manage_stock']));
-			if (!empty($item['manage_stock'])) {
+			// WooCommerce owns stock: only push a real count (more than zero). No count never means out of stock.
+			if (!empty($item['manage_stock']) && (int) $item['stock'] > 0) {
+				$product->set_manage_stock(true);
 				$product->set_stock_quantity((int) $item['stock']);
-			} else {
+			} elseif (!$id) {
+				$product->set_manage_stock(false);
 				$product->set_stock_status('instock');
 			}
 		}
@@ -1248,15 +1306,11 @@ final class Verola_Connector {
 			$variation->set_attributes($attrs);
 			$variation->set_sku(self::free_sku($v['sku'], $vid, $seller));
 			self::set_prices($variation, $v);
-			// Only track variation stock when the seller tracks stock for this product. Otherwise leave it always available,
-			// so a variation that was never counted is not turned into "out of stock" at checkout.
-			if (!empty($item['manage_stock'])) {
+			// WooCommerce owns stock. A count is only pushed when Vendor Hub has a real one (more than zero);
+			// "no count" never turns a variation into out of stock.
+			if (!empty($item['manage_stock']) && (int) $v['stock'] > 0) {
 				$variation->set_manage_stock(true);
 				$variation->set_stock_quantity((int) $v['stock']);
-			} else {
-				$variation->set_manage_stock(false);
-				$variation->set_stock_quantity(null);
-				$variation->set_stock_status('instock');
 			}
 			$variation->set_backorders(!empty($item['allow_backorders']) ? 'yes' : 'no');
 			$variation->set_menu_order($position);

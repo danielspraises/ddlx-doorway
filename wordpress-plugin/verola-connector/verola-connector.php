@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.6.1
+ * Version: 1.6.2
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -451,7 +451,7 @@ final class Verola_Connector {
 				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
 			];
 		}
-		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.6.1'];
+		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.6.2'];
 	}
 
 	public static function rest_link($request) {
@@ -747,7 +747,10 @@ final class Verola_Connector {
 				}
 			}
 			foreach ($targets as $t) {
-				if ($t->get_manage_stock() === true && (int) $t->get_stock_quantity() <= 0) {
+				// Stuck either way: tracking a count of 0, or not tracking at all yet still flagged "out of stock" (an older sync left that flag behind).
+				$stuck = ($t->get_manage_stock() === true && (int) $t->get_stock_quantity() <= 0)
+					|| ($t->get_manage_stock() === false && $t->get_stock_status() === 'outofstock');
+				if ($stuck) {
 					$t->set_manage_stock(false);
 					$t->set_stock_quantity(null);
 					$t->set_stock_status('instock');
@@ -1312,6 +1315,10 @@ final class Verola_Connector {
 				$variation->set_manage_stock(true);
 				$variation->set_stock_quantity((int) $v['stock']);
 			}
+			elseif ($vid && !get_post_meta($vid, '_verola_stock_v2', true) && !$variation->managing_stock()) {
+				// One-time clean-up of the "out of stock" flag older versions left on variations that have no count.
+				$variation->set_stock_status('instock');
+			}
 			$variation->set_backorders(!empty($item['allow_backorders']) ? 'yes' : 'no');
 			$variation->set_menu_order($position);
 			$variation->set_status('publish');
@@ -1321,6 +1328,7 @@ final class Verola_Connector {
 			}
 			$saved = $variation->save();
 			update_post_meta($saved, '_verola_variation_id', $v['id']);
+			update_post_meta($saved, '_verola_stock_v2', '1');
 			$keep[] = (int) $saved;
 		}
 		foreach ($parent->get_children() as $child) {

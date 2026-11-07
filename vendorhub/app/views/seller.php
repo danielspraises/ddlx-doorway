@@ -53,9 +53,13 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 <?php if ($tab === 'products'): ?>
   <div class="row between" style="margin:18px 0"><span class="muted"><?= count($products) ?> product<?= count($products) === 1 ? '' : 's' ?> · <a href="/seller/export?kind=products">Download CSV</a></span><span class="row"><a class="btn btn-outline" href="/products/import">Import CSV</a><a class="btn" href="/products/edit">Add product</a></span></div>
   <?php if (!$products): ?><p class="notice">You have no products yet. Add one, then submit it for review. Approved products appear on the DDLX marketplace.</p><?php endif; ?>
-  <ul class="list">
-  <?php foreach ($products as $p): [$k, $l] = product_visibility($p); ?>
-    <li><div class="row between">
+  <?php if ($products): ?><div class="filterbar" data-fbar="products">
+    <input type="search" data-fq placeholder="Search by name, SKU or category" aria-label="Search products">
+    <select data-fs aria-label="Filter products"><option value="">All products</option><option value="live">Live</option><option value="hidden">Off the marketplace</option><option value="draft">Drafts</option><option value="pending_review">In review</option><option value="attention">Needs changes</option><option value="low">Low stock</option><option value="out">Out of stock</option></select>
+    <span class="muted small" data-fcount></span></div><?php endif; ?>
+  <ul class="list" data-fbox="products">
+  <?php foreach ($products as $p): [$k, $l] = product_visibility($p); $tags = [$k, $p['status'], stock_state($p)]; if (in_array($p['status'], ['changes_requested', 'rejected'], true)) $tags[] = 'attention'; ?>
+    <li data-fitem data-tags="<?= e(implode(' ', array_unique($tags))) ?>" data-text="<?= e(mb_strtolower($p['name'] . ' ' . $p['sku'] . ' ' . category_label($p) . ' ' . $p['brand'])) ?>"><div class="row between">
       <div class="row" style="flex-wrap:nowrap"><?php if ($p['featured_image']): ?><img class="thumb" src="<?= e(product_image_url($p['featured_image'])) ?>" alt=""><?php else: ?><span class="thumb"></span><?php endif; ?>
         <div><a href="/products/edit?id=<?= e($p['id']) ?>"><strong><?= e($p['name'] ?: 'Untitled') ?></strong></a>
           <div class="muted small"><?= e($p['sku']) ?> · <?= e(category_label($p)) ?> · <?= e(price_label($p)) ?><?= $p['product_type'] === 'variable' ? ' · ' . count($p['variations']) . ' variations' : '' ?></div>
@@ -66,18 +70,22 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
         <?php if (!$p['live'] && $p['status'] === 'approved' && !empty($p['has_snapshot'])): ?><form method="post" action="/products/action"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><button class="btn btn-sm" name="action" value="live">Put back live</button></form><?php endif; ?>
         <?php if ($p['status'] === 'pending_review'): ?><form method="post" action="/products/action"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><button class="btn btn-outline btn-sm" name="action" value="withdraw">Withdraw</button></form><?php endif; ?>
       </div></div></li>
-  <?php endforeach; ?></ul>
+  <?php endforeach; ?><li class="muted" data-fempty hidden>No products match your search.</li></ul>
 <?php endif; ?>
 
 <?php if ($tab === 'inventory'): ?>
   <?php if ($products): ?><details class="card" style="margin:12px 0"><summary><strong>Update many at once (CSV)</strong></summary>
     <form method="post" action="/inventory/import" enctype="multipart/form-data" class="row" data-keep><?= csrf_field() ?><a class="btn btn-outline btn-sm" href="/inventory/export">Download stock list</a><input type="file" name="file" accept=".csv,text/csv" required style="max-width:240px"><button class="btn btn-sm" type="submit">Upload</button></form></details><?php endif; ?>
   <?php if (!$products): ?><p class="notice">Add a product first.</p><?php endif; ?>
-  <div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th class="t-right">In stock</th><th>Change</th></tr></thead><tbody>
+  <?php if ($products): ?><div class="filterbar" data-fbar="stock">
+    <input type="search" data-fq placeholder="Search by product, option or SKU" aria-label="Search stock">
+    <select data-fs aria-label="Filter stock"><option value="">All stock</option><option value="low">Low stock</option><option value="out">Out of stock</option><option value="ok">In stock</option></select>
+    <span class="muted small" data-fcount></span></div><?php endif; ?>
+  <div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th class="t-right">In stock</th><th>Change</th></tr></thead><tbody data-fbox="stock">
   <?php foreach ($products as $p):
       $rows = $p['product_type'] === 'variable' ? $p['variations'] : [['id' => null, 'sku' => $p['sku'], 'options' => [], 'stock' => $p['stock']]];
       foreach ($rows as $r): $state = $p['product_type'] === 'variable' ? ($r['stock'] <= 0 ? 'out' : ($r['stock'] <= $p['low_stock_threshold'] ? 'low' : 'ok')) : stock_state($p); ?>
-    <tr><td><a href="/products/edit?id=<?= e($p['id']) ?>"><strong><?= e($p['name']) ?></strong></a><?= $r['options'] ? '<br><span class="muted small">' . e(implode(' / ', $r['options'])) . '</span>' : '' ?></td>
+    <tr data-fitem data-tags="<?= e($state) ?>" data-text="<?= e(mb_strtolower($p['name'] . ' ' . $r['sku'] . ' ' . implode(' ', $r['options']))) ?>"><td><a href="/products/edit?id=<?= e($p['id']) ?>"><strong><?= e($p['name']) ?></strong></a><?= $r['options'] ? '<br><span class="muted small">' . e(implode(' / ', $r['options'])) . '</span>' : '' ?></td>
       <td><?= e($r['sku']) ?></td>
       <td class="t-right"><?= !$p['manage_stock'] && $p['product_type'] === 'simple' ? '<span class="muted">Not tracked</span>' : (int) $r['stock'] . ' ' . ($state !== 'ok' ? pill($state) : '') ?></td>
       <td><form method="post" action="/inventory/adjust" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><input type="hidden" name="variation_id" value="<?= e((string) $r['id']) ?>">
@@ -85,7 +93,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
         <button class="btn btn-outline btn-sm" name="op" value="add" type="submit">Add</button>
         <button class="btn btn-outline btn-sm" name="op" value="remove" type="submit">Remove</button>
         <button class="btn btn-sm" name="op" value="set" type="submit">Set to</button></form></td></tr>
-  <?php endforeach; endforeach; ?></tbody></table></div>
+  <?php endforeach; endforeach; ?><tr data-fempty hidden><td colspan="4" class="muted">No stock matches your search.</td></tr></tbody></table></div>
 <?php endif; ?>
 
 <?php if ($tab === 'promotions'):
@@ -208,19 +216,31 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 
 <?php if ($tab === 'store'): ?>
   <section class="storehead" style="margin-top:14px">
-    <div class="cover"><?php if ($store['banner']): ?><img src="/files/store?p=<?= e(rawurlencode($store['banner'])) ?>" alt="Banner"><?php else: ?><span>Banner · 1600×400 works best</span><?php endif; ?></div>
-    <div class="storeid">
-      <div class="logo-ring"><?php if ($store['logo']): ?><img src="/files/store?p=<?= e(rawurlencode($store['logo'])) ?>" alt="Logo"><?php else: ?><span>Logo</span><?php endif; ?></div>
-      <div class="grow"><strong class="store-title"><?= e(inbox_store_name($user['id']) ?: 'Your store') ?><?= verified_tick($user['id']) ?></strong><span class="muted small"><?= e($store['tagline'] !== '' ? $store['tagline'] : 'Preview of your marketplace store') ?> <?= help('This is how customers see your store on the marketplace.') ?></span></div>
-      <?php if ($store['vacation']): ?><span class="pill pill-warn">On vacation</span><?php endif; ?>
-    </div>
-    <div class="uploads">
-    <?php foreach (['logo' => ['Logo', 'Square, at least 400 px. JPG, PNG or WebP.'], 'banner' => ['Banner', 'Wide, 1600 × 400 works best. JPG, PNG or WebP.']] as $kind => [$label, $tip]): ?>
-      <form method="post" action="/store/image" enctype="multipart/form-data" class="upcard" data-keep data-autosubmit><?= csrf_field() ?><input type="hidden" name="kind" value="<?= $kind ?>">
-        <div class="up-info"><strong><?= $label ?></strong><span class="muted small"><?= e($tip) ?></span><span class="up-status small" data-upnote role="status"></span></div>
-        <div class="up-btns"><label class="btn btn-outline btn-sm filebtn"><?= $store[$kind] ? 'Replace' : 'Choose image' ?><input class="sr" type="file" name="file" accept="image/jpeg,image/png,image/webp"></label><?php if ($store[$kind]): ?><button class="btn btn-ghost btn-sm" name="action" value="remove" formnovalidate>Remove</button><?php endif; ?></div>
+    <div class="cover"><?php if ($store['banner']): ?><img src="/files/store?p=<?= e(rawurlencode($store['banner'])) ?>" alt="Banner"><?php else: ?><span>Banner · 1600×400 works best</span><?php endif; ?>
+      <form method="post" action="/store/image" enctype="multipart/form-data" class="imgform" data-keep data-autosubmit><?= csrf_field() ?><input type="hidden" name="kind" value="banner">
+        <button type="button" class="imgtrigger" data-imgbtn aria-haspopup="menu" aria-expanded="false" aria-label="Banner options"><span class="imgcue"><?= icon(\'image\') ?><span class="cuetxt"><?= $store['banner'] ? 'Edit' : 'Add' ?> banner</span></span></button>
+        <div class="imgpop" role="menu" hidden>
+          <?php if ($store['banner']): ?><a role="menuitem" href="/files/store?p=<?= e(rawurlencode($store['banner'])) ?>" data-preview="/files/store?p=<?= e(rawurlencode($store['banner'])) ?>" data-title="Banner">View</a><?php endif; ?>
+          <label role="menuitem" class="imgitem">Upload new<input class="sr" type="file" name="file" accept="image/jpeg,image/png,image/webp"></label>
+          <?php if ($store['banner']): ?><button type="submit" role="menuitem" name="action" value="remove" formnovalidate class="imgdel">Remove</button><?php endif; ?>
+          <span class="up-status small" data-upnote role="status"></span>
+        </div>
       </form>
-    <?php endforeach; ?>
+    </div>
+    <div class="storeid">
+      <div class="logo-wrap"><div class="logo-ring"><?php if ($store['logo']): ?><img src="/files/store?p=<?= e(rawurlencode($store['logo'])) ?>" alt="Logo"><?php else: ?><span>Logo</span><?php endif; ?></div>
+        <form method="post" action="/store/image" enctype="multipart/form-data" class="imgform" data-keep data-autosubmit><?= csrf_field() ?><input type="hidden" name="kind" value="logo">
+        <button type="button" class="imgtrigger" data-imgbtn aria-haspopup="menu" aria-expanded="false" aria-label="Logo options"><span class="imgcue"><?= icon(\'image\') ?><span class="cuetxt"><?= $store['logo'] ? 'Edit' : 'Add' ?> logo</span></span></button>
+        <div class="imgpop" role="menu" hidden>
+          <?php if ($store['logo']): ?><a role="menuitem" href="/files/store?p=<?= e(rawurlencode($store['logo'])) ?>" data-preview="/files/store?p=<?= e(rawurlencode($store['logo'])) ?>" data-title="Logo">View</a><?php endif; ?>
+          <label role="menuitem" class="imgitem">Upload new<input class="sr" type="file" name="file" accept="image/jpeg,image/png,image/webp"></label>
+          <?php if ($store['logo']): ?><button type="submit" role="menuitem" name="action" value="remove" formnovalidate class="imgdel">Remove</button><?php endif; ?>
+          <span class="up-status small" data-upnote role="status"></span>
+        </div>
+      </form>
+      </div>
+      <div class="grow"><strong class="store-title"><?= e(inbox_store_name($user['id']) ?: 'Your store') ?><?= verified_tick($user['id']) ?></strong><span class="muted small"><?= e($store['tagline'] !== '' ? $store['tagline'] : 'Preview of your marketplace store') ?> <?= help('This is how customers see your store on the marketplace. Click the banner or logo to view, replace or remove it.') ?></span></div>
+      <?php if ($store['vacation']): ?><span class="pill pill-warn">On vacation</span><?php endif; ?>
     </div>
   </section>
   <form method="post" action="/store/save" data-keep><?= csrf_field() ?>

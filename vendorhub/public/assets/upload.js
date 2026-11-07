@@ -60,3 +60,20 @@
     });
   });
 })();
+
+// Click the banner or logo for View / Upload / Remove.
+(function () {
+  var open = null;
+  function close() { if (!open) return; open.pop.hidden = true; open.btn.setAttribute('aria-expanded', 'false'); open = null; }
+  document.querySelectorAll('[data-imgbtn]').forEach(function (btn) {
+    var form = btn.closest('form'), pop = form.querySelector('.imgpop');
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var was = open && open.btn === btn; close();
+      if (!was) { pop.hidden = false; btn.setAttribute('aria-expanded', 'true'); open = { btn: btn, pop: pop }; var f = pop.querySelector('a,label,button'); if (f && f.focus) f.focus(); }
+    });
+    pop.addEventListener('click', function (e) { e.stopPropagation(); if (e.target.closest('a[data-preview]')) close(); });
+  });
+  document.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+})();

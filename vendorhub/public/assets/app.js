@@ -205,3 +205,31 @@
     el.style.setProperty('--py', ((e.clientY - r.top) / r.height - 0.5) * -20 + 'px');
   });
 })();
+
+// Live search and filters: a bar [data-fbar=x] controls the items inside [data-fbox=x].
+(function () {
+  document.querySelectorAll('[data-fbar]').forEach(function (bar) {
+    var box = document.querySelector('[data-fbox="' + bar.getAttribute('data-fbar') + '"]');
+    if (!box) return;
+    var q = bar.querySelector('[data-fq]'), sel = bar.querySelector('[data-fs]'), count = bar.querySelector('[data-fcount]');
+    var chips = bar.querySelectorAll('[data-fchip]');
+    var chip = bar.getAttribute('data-fdefault') || (chips.length ? 'all' : '');
+    function apply() {
+      var text = q ? q.value.trim().toLowerCase() : '';
+      var tag = sel ? sel.value : (chip && chip !== 'all' ? chip : '');
+      var shown = 0, total = 0;
+      box.querySelectorAll('[data-fitem]').forEach(function (it) {
+        total++;
+        var ok = (!tag || (' ' + it.getAttribute('data-tags') + ' ').indexOf(' ' + tag + ' ') !== -1) && (!text || (it.getAttribute('data-text') || it.textContent.toLowerCase()).indexOf(text) !== -1);
+        it.hidden = !ok; if (ok) shown++;
+      });
+      var empty = box.querySelector('[data-fempty]'); if (empty) empty.hidden = shown !== 0;
+      if (count) count.textContent = total ? (shown === total ? total + ' total' : shown + ' of ' + total) : '';
+      chips.forEach(function (c) { c.classList.toggle('btn-outline', c.getAttribute('data-fchip') !== chip); });
+    }
+    if (q) q.addEventListener('input', apply);
+    if (sel) sel.addEventListener('change', apply);
+    chips.forEach(function (c) { c.addEventListener('click', function () { chip = c.getAttribute('data-fchip'); apply(); }); });
+    apply();
+  });
+})();

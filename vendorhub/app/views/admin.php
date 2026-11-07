@@ -123,10 +123,13 @@ $docLinks = function (array $docs): string {
       <?= $decision('/admin/product', $p['id'], $p['updated_raw'], [['decision', 'relist', 'Put back on marketplace', '']]) ?>
     <?php endif; ?>
   <?php else: ?>
-    <div class="row" style="margin:16px 0"><?php foreach (['pending' => 'Waiting', 'live' => 'Live', 'all' => 'All'] as $k => $l): ?><a class="btn btn-sm <?= $f === $k ? '' : 'btn-outline' ?>" href="/admin?tab=products&filter=<?= $k ?>"><?= $l ?></a><?php endforeach; ?></div>
-    <ul class="list"><?php foreach ($list as $p): ?><li class="row between"><div class="row" style="flex-wrap:nowrap"><?php if ($p['featured_image']): ?><img class="thumb" src="<?= e(product_image_url($p['featured_image'])) ?>" alt=""><?php else: ?><span class="thumb"></span><?php endif; ?>
+    <div class="filterbar" data-fbar="adminproducts" data-fdefault="<?= e($f) ?>">
+      <input type="search" data-fq placeholder="Search by product, store, SKU or category" aria-label="Search products">
+      <span class="chips-row"><?php foreach (['pending' => 'Waiting', 'live' => 'Live', 'hidden' => 'Off marketplace', 'all' => 'All'] as $k => $l): ?><button type="button" class="btn btn-sm <?= $f === $k ? '' : 'btn-outline' ?>" data-fchip="<?= $k ?>"><?= $l ?></button><?php endforeach; ?></span>
+      <span class="muted small" data-fcount></span></div>
+    <ul class="list" data-fbox="adminproducts"><?php foreach ($items as $p): $tags = []; if ($p['status'] === 'pending_review') $tags[] = 'pending'; if ($p['live']) $tags[] = 'live'; elseif ($p['status'] === 'approved') $tags[] = 'hidden'; ?><li class="row between" data-fitem data-tags="<?= e(implode(' ', $tags)) ?>" data-text="<?= e(mb_strtolower($p['name'] . ' ' . $p['store_name'] . ' ' . $p['sku'] . ' ' . category_label($p))) ?>"<?= $f !== 'all' && !in_array($f, $tags, true) ? ' hidden' : '' ?>><div class="row" style="flex-wrap:nowrap"><?php if ($p['featured_image']): ?><img class="thumb" src="<?= e(product_image_url($p['featured_image'])) ?>" alt=""><?php else: ?><span class="thumb"></span><?php endif; ?>
       <div><a href="/admin?tab=products&id=<?= e($p['id']) ?>"><strong><?= e($p['name']) ?></strong></a><div class="muted small"><?= e($p['store_name']) ?><?= verified_tick($p['seller_id'] ?? '') ?> · <?= e(category_label($p)) ?> · <?= e(price_label($p)) ?></div></div></div><span><?= pill($p['status'], PRODUCT_STATUS_LABEL) ?> <?= $p['live'] ? pill('live') : '' ?></span></li><?php endforeach; ?>
-      <?php if (!$list): ?><li class="muted">Nothing here.</li><?php endif; ?></ul>
+      <li class="muted" data-fempty<?= $items ? ' hidden' : '' ?>>Nothing here.</li></ul>
   <?php endif; ?>
 <?php endif; ?>
 

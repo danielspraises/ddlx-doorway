@@ -21,7 +21,7 @@
       .then(function (r) { return r.json().catch(function () { return {}; }); })
       .then(function (d) {
         if (mine !== seq) return;
-        if (d.name) { name.value = d.name; say('Verified: this account belongs to ' + d.name + '.', 'is-ok'); if (save) save.disabled = false; }
+        if (d.name) { name.value = d.name; say(''); if (save) save.disabled = false; }
         else say(d.error || 'We could not verify this account.', 'is-err');
       })
       .catch(function () { if (mine === seq) say('Could not reach the bank check. Try again.', 'is-err'); });

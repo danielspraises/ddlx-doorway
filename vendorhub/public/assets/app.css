@@ -531,3 +531,5 @@ input[readonly]{background:var(--soft)}
 .viewas .wrap{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;padding-top:8px;padding-bottom:8px;font-size:.88rem}
 .viewas svg{width:16px;height:16px;vertical-align:-3px;margin-right:4px}
 .viewas form{margin:0}
+.orbits .tote-wrap{width:46%;display:grid;place-items:center;position:relative;z-index:2;justify-self:center;align-self:center}
+.orbits .tote-wrap .tote{width:100%}

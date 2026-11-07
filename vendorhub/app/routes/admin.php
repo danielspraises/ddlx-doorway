@@ -97,10 +97,10 @@ route('POST', '/admin/verification', function () use ($adminBack) {
 route('POST', '/admin/product', function () use ($adminBack) {
     $u = require_reviewer();
     $decision = input('decision');
-    if (!in_array($decision, ['approve', 'request_changes', 'reject', 'take_down'], true)) $adminBack('products', 'Unknown decision.', '');
+    if (!in_array($decision, ['approve', 'request_changes', 'reject', 'take_down', 'relist'], true)) $adminBack('products', 'Unknown decision.', '');
     $err = review_product($u, input('id'), $decision, input_raw('comment'), input('expected'));
     if (!$err) audit($u, 'product', ucfirst(str_replace('_', ' ', $decision)) . ': ' . (string) db()->val('SELECT name FROM products WHERE id = ?', [input('id')]), input('id'));
-    $adminBack('products', $err, ['approve' => 'Approved and live on the marketplace.', 'request_changes' => 'Changes requested.', 'reject' => 'Product rejected.', 'take_down' => 'Taken off the marketplace.'][$decision], $err ? '&id=' . rawurlencode(input('id')) : '');
+    $adminBack('products', $err, ['approve' => 'Approved and live on the marketplace.', 'request_changes' => 'Changes requested.', 'reject' => 'Product rejected.', 'take_down' => 'Taken off the marketplace.', 'relist' => 'Back on the marketplace.'][$decision], $err ? '&id=' . rawurlencode(input('id')) : '');
 });
 
 route('POST', '/admin/payout', function () use ($adminBack) {

@@ -63,6 +63,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
       <div class="row">
         <a class="btn btn-outline btn-sm" href="/products/edit?id=<?= e($p['id']) ?>">Edit</a>
         <?php if (in_array($p['status'], ['draft', 'changes_requested', 'rejected'], true)): ?><form method="post" action="/products/action"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><button class="btn btn-sm" name="action" value="submit">Submit</button></form><?php endif; ?>
+        <?php if (!$p['live'] && $p['status'] === 'approved' && !empty($p['has_snapshot'])): ?><form method="post" action="/products/action"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><button class="btn btn-sm" name="action" value="live">Put back live</button></form><?php endif; ?>
         <?php if ($p['status'] === 'pending_review'): ?><form method="post" action="/products/action"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><button class="btn btn-outline btn-sm" name="action" value="withdraw">Withdraw</button></form><?php endif; ?>
       </div></div></li>
   <?php endforeach; ?></ul>
@@ -169,29 +170,34 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 
 <?php if ($tab === 'payouts'): $cur = $balances[0]['currency'] ?? 'NGN'; ?>
   <p class="small"><a href="/seller/export?kind=payouts">Download my wallet history (CSV)</a></p>
-  <h2>Withdraw money</h2>
-  <?php if (!$accounts): ?><p class="muted">Add a bank account below, then request a withdrawal.</p><?php else: ?>
-  <form method="post" action="/payouts/request" class="card" style="max-width:520px" data-keep><?= csrf_field() ?>
-    <p class="muted small" style="margin-top:0">Smallest withdrawal <?= e($m(min_withdrawal(), $cur)) ?><?= withdrawal_fee() > 0 ? ' · fee ' . e($m(withdrawal_fee(), $cur)) . ' per withdrawal' : '' ?>.</p>
-    <div class="grid g2">
-      <div class="field"><label for="wd-cur">Currency</label><select id="wd-cur" name="currency"><?php foreach (($balances ?: [['currency' => 'NGN', 'available' => 0]]) as $b): ?><option value="<?= e($b['currency']) ?>"><?= e($b['currency']) ?> — <?= e($m($b['available'], $b['currency'])) ?> available</option><?php endforeach; ?></select></div>
-      <?= f_text('amount', 'Amount', '', null, ['inputmode' => 'decimal', 'required' => 1]) ?>
-    </div>
-    <div class="field"><label for="wd-bank">Pay to</label><select id="wd-bank" name="account_id"><?php foreach ($accounts as $a): ?><option value="<?= e($a['id']) ?>"><?= e($a['bank_name'] . ' · ' . $a['account_number'] . ' · ' . $a['account_name']) ?></option><?php endforeach; ?></select></div>
-    <button class="btn" type="submit">Request withdrawal</button>
-  </form><?php endif; ?>
-
-  <h2>Bank accounts</h2>
-  <ul class="list"><?php foreach ($accounts as $a): ?><li class="row between"><div><strong><?= e($a['bank_name']) ?> · <?= e($a['account_number']) ?></strong><div class="muted small"><?= e($a['account_name']) ?></div></div>
-    <form method="post" action="/payouts/bank" data-confirm="Remove this bank account?"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($a['id']) ?>"><button class="btn btn-ghost btn-sm" name="action" value="remove">Remove</button></form></li><?php endforeach; ?>
-    <?php if (!$accounts): ?><li class="muted">No bank accounts yet.</li><?php endif; ?></ul>
-  <?php if (count($accounts) < MAX_BANK_ACCOUNTS): ?>
-  <form method="post" action="/payouts/bank" class="card" style="max-width:520px;margin-top:16px" data-keep><?= csrf_field() ?><h3 style="margin-top:0">Add a bank account</h3>
-    <?= f_text('bank_name', 'Bank', '', null, ['required' => 1, 'placeholder' => 'e.g. GTBank', 'list' => 'banklist', 'autocomplete' => 'off', 'hint' => 'Pick your bank from the list. We check the account number with the bank and use the name it gives.']) ?>
-    <?php $bl = paystack_on() ? paystack_banks() : []; if ($bl): ?><datalist id="banklist"><?php foreach ($bl as $bn): ?><option value="<?= e($bn) ?>"></option><?php endforeach; ?></datalist><?php endif; ?>
-    <?= f_text('account_number', 'Account number', '', null, ['required' => 1, 'inputmode' => 'numeric', 'maxlength' => 10]) ?>
-    <?= f_text('account_name', 'Account name', '', null, ['required' => 1]) ?>
-    <button class="btn" type="submit">Save account</button></form><?php endif; ?>
+  <div class="pay-grid">
+    <section>
+      <h2>Withdraw money</h2>
+      <?php if (!$accounts): ?><div class="card"><p class="muted" style="margin:0">Add a bank account first, then you can request a withdrawal.</p></div><?php else: ?>
+      <form method="post" action="/payouts/request" class="card pay-card" data-keep><?= csrf_field() ?>
+        <p class="muted small" style="margin-top:0">Smallest withdrawal <?= e($m(min_withdrawal(), $cur)) ?><?= withdrawal_fee() > 0 ? ' · fee ' . e($m(withdrawal_fee(), $cur)) . ' per withdrawal' : '' ?>.</p>
+        <div class="grid g2">
+          <div class="field"><label for="wd-cur">Currency</label><select id="wd-cur" name="currency"><?php foreach (($balances ?: [['currency' => 'NGN', 'available' => 0]]) as $b): ?><option value="<?= e($b['currency']) ?>"><?= e($b['currency']) ?> — <?= e($m($b['available'], $b['currency'])) ?> available</option><?php endforeach; ?></select></div>
+          <?= f_text('amount', 'Amount', '', null, ['inputmode' => 'decimal', 'required' => 1]) ?>
+        </div>
+        <div class="field"><label for="wd-bank">Pay to</label><select id="wd-bank" name="account_id"><?php foreach ($accounts as $a): ?><option value="<?= e($a['id']) ?>"><?= e($a['bank_name'] . ' · ' . $a['account_number'] . ' · ' . $a['account_name']) ?></option><?php endforeach; ?></select></div>
+        <button class="btn" type="submit">Request withdrawal</button>
+      </form><?php endif; ?>
+    </section>
+    <section>
+      <h2>Bank accounts</h2>
+      <ul class="bankcards"><?php foreach ($accounts as $a): ?><li><span class="bk-ic"><?= icon('wallet') ?></span><div class="grow"><strong><?= e($a['bank_name']) ?></strong><span class="muted small"><?= e($a['account_number']) ?> · <?= e($a['account_name']) ?></span></div>
+        <form method="post" action="/payouts/bank" data-confirm="Remove this bank account?"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($a['id']) ?>"><button class="btn btn-ghost btn-sm" name="action" value="remove">Remove</button></form></li><?php endforeach; ?>
+        <?php if (!$accounts): ?><li class="muted">No bank accounts yet.</li><?php endif; ?></ul>
+      <?php if (count($accounts) < MAX_BANK_ACCOUNTS): ?>
+      <form method="post" action="/payouts/bank" class="card pay-card" style="margin-top:14px" data-keep data-bank-form data-verify="<?= $verify ? '1' : '0' ?>"><?= csrf_field() ?><h3 style="margin-top:0">Add a bank account</h3>
+        <div class="field"><label for="f-bank_name">Bank <?= help('Pick your bank. Once you enter your 10-digit account number we fetch the account name from the bank, so there is nothing to type.') ?></label>
+          <select id="f-bank_name" name="bank_name" required><option value="">Choose your bank…</option><?php foreach ($banks as $code => $bn): ?><option value="<?= e((string) $code) ?>"><?= e($bn) ?></option><?php endforeach; ?></select></div>
+        <?= f_text('account_number', 'Account number', '', null, ['required' => 1, 'inputmode' => 'numeric', 'maxlength' => 10, 'autocomplete' => 'off', 'placeholder' => '10 digits']) ?>
+        <div class="field"><label for="f-account_name">Account name</label><input id="f-account_name" name="account_name" maxlength="120" <?= $verify ? 'readonly placeholder="Fetched from your bank"' : 'placeholder="Name on the account" required' ?>><p class="small bk-status" data-bkstatus role="status"><?= $verify ? '' : 'Automatic name check is not switched on yet, so type the name exactly as the bank has it.' ?></p></div>
+        <button class="btn" type="submit" data-bksave<?= $verify ? ' disabled' : '' ?>>Save account</button></form><?php endif; ?>
+    </section>
+  </div>
 
   <h2>Withdrawal history</h2>
   <ul class="list"><?php foreach ($withdrawals as $w): ?><li class="row between"><div><strong><?= e($m($w['amount'], $w['currency'])) ?></strong><?= (float) $w['fee'] > 0 ? ' <span class="muted small">(you receive ' . e($m((float) $w['amount'] - (float) $w['fee'], $w['currency'])) . ')</span>' : '' ?>
@@ -209,8 +215,11 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
       <?php if ($store['vacation']): ?><span class="pill pill-warn">On vacation</span><?php endif; ?>
     </div>
     <div class="uploads">
-    <?php foreach (['logo' => 'Logo', 'banner' => 'Banner'] as $kind => $label): ?>
-      <form method="post" action="/store/image" enctype="multipart/form-data" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="kind" value="<?= $kind ?>"><span class="label small" style="min-width:48px"><?= $label ?></span><input type="file" name="file" accept="image/jpeg,image/png,image/webp" required><button class="btn btn-outline btn-sm" name="action" value="upload">Upload</button><?php if ($store[$kind]): ?><button class="btn btn-ghost btn-sm" name="action" value="remove" formnovalidate>Remove</button><?php endif; ?></form>
+    <?php foreach (['logo' => ['Logo', 'Square, at least 400 px. JPG, PNG or WebP.'], 'banner' => ['Banner', 'Wide, 1600 × 400 works best. JPG, PNG or WebP.']] as $kind => [$label, $tip]): ?>
+      <form method="post" action="/store/image" enctype="multipart/form-data" class="upcard" data-keep data-autosubmit><?= csrf_field() ?><input type="hidden" name="kind" value="<?= $kind ?>">
+        <div class="up-info"><strong><?= $label ?></strong><span class="muted small"><?= e($tip) ?></span><span class="up-status small" data-upnote role="status"></span></div>
+        <div class="up-btns"><label class="btn btn-outline btn-sm filebtn"><?= $store[$kind] ? 'Replace' : 'Choose image' ?><input class="sr" type="file" name="file" accept="image/jpeg,image/png,image/webp"></label><?php if ($store[$kind]): ?><button class="btn btn-ghost btn-sm" name="action" value="remove" formnovalidate>Remove</button><?php endif; ?></div>
+      </form>
     <?php endforeach; ?>
     </div>
   </section>

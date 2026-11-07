@@ -109,7 +109,8 @@ $docLinks = function (array $docs): string {
     <dl class="dl"><dt>SKU</dt><dd><?= e($p['sku']) ?></dd><dt>Category</dt><dd><?= e(category_label($p)) ?></dd><dt>Brand</dt><dd><?= e($p['brand'] ?: '—') ?></dd><dt>Price</dt><dd><?= e(price_label($p)) ?><?= $p['sale_price'] !== null && $p['product_type'] === 'simple' ? ' (regular ' . e($m($p['regular_price'], $p['currency'])) . ')' : '' ?></dd>
       <dt>Stock</dt><dd><?= $p['product_type'] === 'variable' ? array_sum(array_column($p['variations'], 'stock')) : (int) $p['stock'] ?></dd>
       <dt>Shipping</dt><dd><?= e((string) $p['weight_kg']) ?> kg · <?= e((string) $p['length_cm']) ?> × <?= e((string) $p['width_cm']) ?> × <?= e((string) $p['height_cm']) ?> cm</dd>
-      <dt>Description</dt><dd><?= nl2br(e($p['short_description'] . ($p['short_description'] && $p['description'] ? "\n\n" : '') . $p['description'])) ?></dd></dl>
+      </dl>
+    <?php if ($p['short_description'] !== '' || $p['description'] !== ''): ?><div class="card pdesc"><h3 style="margin-top:0">Description</h3><?= $p['short_description'] !== '' ? '<p class="lead-sm">' . e($p['short_description']) . '</p>' : '' ?><?= rich_text((string) $p['description']) ?></div><?php endif; ?>
     <?php if ($p['variations']): ?><h3>Variations</h3><div class="table-wrap"><table><thead><tr><th>Options</th><th>SKU</th><th class="t-right">Price</th><th class="t-right">Stock</th></tr></thead><tbody><?php foreach ($p['variations'] as $v): ?><tr><td><?= e(implode(' / ', $v['options'])) ?><?= $v['enabled'] ? '' : ' (off)' ?></td><td><?= e($v['sku']) ?></td><td class="t-right"><?= e($m($v['sale_price'] ?? $v['regular_price'] ?? 0, $p['currency'])) ?></td><td class="t-right"><?= (int) $v['stock'] ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
     <?php if ($p['admin_comment']): ?><div class="notice"><h3>Previous note</h3><p><?= nl2br(e($p['admin_comment'])) ?></p></div><?php endif; ?>
     <?php if ($p['status'] === 'pending_review'): ?>
@@ -117,6 +118,9 @@ $docLinks = function (array $docs): string {
       <?= $decision('/admin/product', $p['id'], $p['updated_raw'], array_merge($problems ? [] : [['decision', 'approve', 'Approve and publish', '']], [['decision', 'request_changes', 'Request changes', 'btn-outline'], ['decision', 'reject', 'Reject', 'btn-danger']])) ?>
     <?php elseif ($p['live']): ?>
       <?= $decision('/admin/product', $p['id'], $p['updated_raw'], [['decision', 'take_down', 'Take off marketplace', 'btn-danger']]) ?>
+    <?php elseif ($p['status'] === 'approved' && !empty($p['has_snapshot'])): ?>
+      <div class="notice"><p>This product is approved but currently off the marketplace.</p></div>
+      <?= $decision('/admin/product', $p['id'], $p['updated_raw'], [['decision', 'relist', 'Put back on marketplace', '']]) ?>
     <?php endif; ?>
   <?php else: ?>
     <div class="row" style="margin:16px 0"><?php foreach (['pending' => 'Waiting', 'live' => 'Live', 'all' => 'All'] as $k => $l): ?><a class="btn btn-sm <?= $f === $k ? '' : 'btn-outline' ?>" href="/admin?tab=products&filter=<?= $k ?>"><?= $l ?></a><?php endforeach; ?></div>

@@ -172,3 +172,43 @@ function tote_svg(): string
   <g transform="rotate(14 250 150)"><rect x="238" y="140" width="34" height="62" rx="5" fill="#2f6db5"/><circle cx="255" cy="152" r="4" fill="#fff"/></g>
 </svg></div>';
 }
+
+/** Product text from the marketplace can contain HTML. This keeps simple formatting and drops everything else, so it reads as text and is safe. */
+function rich_text(string $text): string
+{
+    $text = trim($text);
+    if ($text === '') return '';
+    if ($text === strip_tags($text)) return '<p>' . nl2br(e($text)) . '</p>';
+    $doc = new DOMDocument();
+    $prev = libxml_use_internal_errors(true);
+    $doc->loadHTML('<?xml encoding="utf-8"?><body>' . $text . '</body>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+    libxml_clear_errors(); libxml_use_internal_errors($prev);
+    $allowed = ['p', 'br', 'ul', 'ol', 'li', 'strong', 'b', 'em', 'i', 'u', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'blockquote', 'img'];
+    $heading = ['h2' => 'h4', 'h3' => 'h4', 'h4' => 'h4', 'h5' => 'h5', 'h6' => 'h5'];
+    $walk = function (DOMNode $node) use (&$walk, $allowed, $heading) {
+        foreach (iterator_to_array($node->childNodes) as $c) {
+            if ($c->nodeType !== XML_ELEMENT_NODE) { if ($c->nodeType !== XML_TEXT_NODE) $node->removeChild($c); continue; }
+            $tag = strtolower($c->nodeName);
+            if (in_array($tag, ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'svg', 'noscript'], true)) { $node->removeChild($c); continue; }
+            $walk($c);
+            if (!in_array($tag, $allowed, true)) { // unwrap: keep the text, drop the tag
+                while ($c->firstChild) $node->insertBefore($c->firstChild, $c);
+                $node->removeChild($c);
+                continue;
+            }
+            $keep = [];
+            if ($tag === 'a') { $h = trim($c->getAttribute('href')); if (preg_match('#^(https?://|mailto:)#i', $h)) $keep['href'] = $h; $keep['rel'] = 'noopener nofollow'; $keep['target'] = '_blank'; }
+            if ($tag === 'img') { $s = trim($c->getAttribute('src')); if (!preg_match('#^https://#i', $s)) { $node->removeChild($c); continue; } $keep = ['src' => $s, 'alt' => $c->getAttribute('alt'), 'loading' => 'lazy']; }
+            foreach (iterator_to_array($c->attributes) as $a) $c->removeAttribute($a->nodeName);
+            foreach ($keep as $k => $v) $c->setAttribute($k, $v);
+            if (isset($heading[$tag])) { $n = $c->ownerDocument->createElement($heading[$tag]); while ($c->firstChild) $n->appendChild($c->firstChild); $node->replaceChild($n, $c); }
+        }
+    };
+    $body = $doc->getElementsByTagName('body')->item(0);
+    if (!$body) return '<p>' . nl2br(e(strip_tags($text))) . '</p>';
+    $walk($body);
+    $out = '';
+    foreach ($body->childNodes as $c) $out .= $doc->saveHTML($c);
+    $out = trim(str_replace("\xC2\xA0", ' ', $out));
+    return '<div class="rich">' . $out . '</div>';
+}

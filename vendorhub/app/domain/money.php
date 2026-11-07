@@ -321,18 +321,18 @@ function add_bank_account(string $sellerId, string $bank, string $number, string
     $bank = trim($bank);
     $name = trim($name);
     $number = trim($number);
-    if (mb_strlen($bank) < 2 || mb_strlen($bank) > 100) return 'Enter the bank name.';
+    if ($bank === '') return 'Choose your bank.';
     if (!preg_match('/^[0-9]{10}$/', $number)) return 'The account number must be 10 digits.';
-    if (mb_strlen($name) < 2 || mb_strlen($name) > 120) return 'Enter the account name.';
-    // With Paystack on, the bank must be one it knows, and the bank tells us the real account name.
-    $code = null;
-    if (paystack_on() && paystack_banks()) {
-        $code = bank_code_for($bank);
-        if (!$code) return 'Choose your bank from the list.';
-        $bank = paystack_banks()[$code];
+    // $bank is the bank's code from the list (a bank name is also understood).
+    $code = bank_code_for($bank);
+    if (!$code) return 'Choose your bank from the list.';
+    $bank = bank_options()[$code];
+    if (paystack_on()) { // the bank tells us the real account name; we never trust a typed one
         $real = paystack_resolve_account($number, $code);
-        if ($real !== null) $name = $real;
+        if ($real === null) return 'We could not verify this account with the bank. Check the bank and account number.';
+        $name = $real;
     }
+    if (mb_strlen($name) < 2 || mb_strlen($name) > 120) return 'Enter the account name.';
     $db = db();
     return $db->tx(function () use ($db, $sellerId, $bank, $number, $name, $code) {
         $db->val('SELECT id FROM users WHERE id = ?' . $db->lock(), [$sellerId]);

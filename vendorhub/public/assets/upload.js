@@ -43,3 +43,20 @@
     });
   });
 })();
+
+// Store images: upload as soon as a picture is chosen.
+(function () {
+  document.querySelectorAll('form[data-autosubmit]').forEach(function (form) {
+    var input = form.querySelector('input[type=file]');
+    var note = form.querySelector('[data-upnote]');
+    if (!input) return;
+    input.addEventListener('change', function () {
+      if (!input.files || !input.files[0]) return;
+      if (input.files[0].size > 10 * 1024 * 1024) { if (note) note.textContent = 'That file is over 10 MB. Choose a smaller one.'; input.value = ''; return; }
+      if (note) note.textContent = 'Uploading…';
+      form.querySelectorAll('button,label.btn').forEach(function (b) { b.setAttribute('aria-disabled', 'true'); b.style.pointerEvents = 'none'; b.style.opacity = '.6'; });
+      var hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = 'action'; hidden.value = 'upload'; form.appendChild(hidden);
+      form.submit();
+    });
+  });
+})();

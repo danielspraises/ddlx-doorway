@@ -11,7 +11,8 @@ route('GET', '/seller', function () {
     if ($tab === 'overview') { $vars['level'] = level_refresh($u['id']); $vars['lm'] = jdec((string) $vars['level']['metrics'], []); $vars['rating'] = seller_rating_summary($u['id']); $vars['chart'] = seller_daily_earnings($u['id']); $vars['to_process'] = seller_to_process($u['id']); }
     if (in_array($tab, ['overview', 'sales', 'payouts'], true)) { $vars['balances'] = wallet_balances($u['id']); $vars['month'] = sales_last_30d($u['id']); }
     if ($tab === 'sales') { $vars['sales'] = seller_sales($u['id']); $vars['history'] = item_history(array_column($vars['sales'], 'id')); }
-    if ($tab === 'payouts') { $vars['accounts'] = bank_accounts($u['id']); $vars['withdrawals'] = seller_withdrawals($u['id']); }
+    if ($tab === 'store') $vars['scripts'] = ['upload.js'];
+    if ($tab === 'payouts') { $vars['scripts'] = ['bank.js']; $vars['banks'] = bank_options(); $vars['verify'] = paystack_on(); $vars['accounts'] = bank_accounts($u['id']); $vars['withdrawals'] = seller_withdrawals($u['id']); }
     if ($tab === 'returns') $vars['cases'] = seller_returns($u['id']);
     if ($tab === 'promotions') { $vars['coupons'] = coupons_for_seller($u['id']); $vars['all_products'] = array_values(array_filter(seller_products($u['id']), fn ($p) => $p['status'] !== 'draft' || $p['live'])); $vars['edit'] = null; foreach ($vars['coupons'] as $c) if ($c['id'] === input('edit')) $vars['edit'] = $c; $vars['err'] = null; }
     if ($tab === 'store') $vars['store'] = store_profile($u['id']);
@@ -47,6 +48,20 @@ route('POST', '/orders/fulfil', function () {
 });
 
 // ---------------------------------------------------------------- payouts
+
+// Looks up the account holder's name while the seller fills in the form.
+route('GET', '/payouts/resolve', function () {
+    $u = require_seller();
+    $bank = input('bank'); $num = preg_replace('/\D/', '', input('number')) ?? '';
+    if (!isset(bank_options()[$bank]) || strlen($num) !== 10) json_out(['error' => 'Choose a bank and enter all 10 digits.'], 422);
+    if (!paystack_on()) json_out(['manual' => true]);
+    $key = 'resolve_' . $u['id']; $w = jdec((string) setting($key, ''), ['at' => 0, 'n' => 0]);
+    if (time() - (int) $w['at'] > 600) $w = ['at' => time(), 'n' => 0];
+    if ((int) $w['n'] >= 25) json_out(['error' => 'Too many checks. Wait a few minutes and try again.'], 429);
+    set_setting($key, jenc(['at' => $w['at'], 'n' => (int) $w['n'] + 1]));
+    $name = paystack_resolve_account($num, $bank);
+    $name === null ? json_out(['error' => 'We could not find that account. Check the bank and number.'], 404) : json_out(['name' => $name]);
+});
 
 route('POST', '/payouts/bank', function () {
     $u = require_seller();

@@ -654,13 +654,17 @@ function review_queue(): array
 function review_product(array $reviewer, string $id, string $decision, string $comment, string $expectedRaw): ?string
 {
     $comment = trim($comment);
-    if ($decision !== 'approve' && $comment === '') return 'Add a note so the seller knows why.';
+    if (!in_array($decision, ['approve', 'relist'], true) && $comment === '') return 'Add a note so the seller knows why.';
     $p = load_product($id);
     if (!$p) return 'Product not found.';
     if ($p['updated_raw'] !== $expectedRaw) return 'This product changed while you were reviewing it. Reopen it and review again.';
     $now = now_db();
     $oldPaths = [];
-    if ($decision === 'take_down') {
+    if ($decision === 'relist') {
+        if ($p['live'] || $p['status'] !== 'approved' || empty($p['has_snapshot'])) return 'Only an approved product that is off the marketplace can be put back.';
+        db()->exec('UPDATE products SET live = 1, reviewed_by = ?, reviewed_at = ?, updated_at = ? WHERE id = ?', [$reviewer['id'], $now, $now, $id]);
+        $message = $p['name'] . ' is back on the marketplace';
+    } elseif ($decision === 'take_down') {
         if (!$p['live']) return 'This product is not live.';
         db()->exec('UPDATE products SET live = 0, admin_comment = ?, reviewed_by = ?, reviewed_at = ?, updated_at = ? WHERE id = ?', [$comment, $reviewer['id'], $now, $now, $id]);
         $message = $p['name'] . ' was taken off the marketplace';
@@ -680,7 +684,7 @@ function review_product(array $reviewer, string $id, string $decision, string $c
     }
     if ($oldPaths) remove_unreferenced($id, $oldPaths);
     announce('seller', 'product', $message, $p['seller_id']);
-    notify($p['seller_id'], 'product', $message, $decision === 'approve' ? '' : trim($comment), '/products/edit?id=' . $id);
+    notify($p['seller_id'], 'product', $message, in_array($decision, ['approve', 'relist'], true) ? '' : trim($comment), '/products/edit?id=' . $id);
     announce('reviewers', 'review_queue');
     return null;
 }

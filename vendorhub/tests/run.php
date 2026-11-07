@@ -74,6 +74,13 @@ eq(review_product($admin, $pid, 'approve', '', $prod['updated_raw']), null, 'app
 $prod = load_product($pid);
 ok($prod['live'] && $prod['status'] === 'approved' && $prod['has_snapshot'], 'live after approval');
 eq(review_product($admin, $pid, 'reject', 'no', $prod['updated_raw']), 'This product is not waiting for review.', 'decided review locked');
+eq(review_product($admin, $pid, 'relist', '', $prod['updated_raw']), 'Only an approved product that is off the marketplace can be put back.', 'cannot relist a live product');
+eq(review_product($admin, $pid, 'take_down', 'policy', $prod['updated_raw']), null, 'admin takes product down');
+$prod = load_product($pid); ok(!$prod['live'], 'product is off the marketplace');
+eq(review_product($admin, $pid, 'relist', '', $prod['updated_raw']), null, 'admin puts it back');
+ok((bool) load_product($pid)['live'], 'live again after relist');
+$rt = rich_text('<p onclick="x()">Hi <b>there</b></p><script>alert(1)</script><ul><li>One</li></ul><a href="javascript:x">bad</a><img src="http://x/y.png"><img src="https://x/y.png" onerror="z">');
+ok(!str_contains($rt, 'script') && !str_contains($rt, 'onclick') && !str_contains($rt, 'javascript:') && !str_contains($rt, 'http://x') && str_contains($rt, '<li>One</li>') && str_contains($rt, 'https://x/y.png') && !str_contains($rt, 'onerror'), 'rich_text keeps formatting and drops anything unsafe: ' . $rt);
 // editing an approved product -> draft, still live
 $r = save_product($sid, ['id' => $pid, 'name' => 'Ankara Shirt v2'] + $base);
 ok($r['ok'], 'edit approved');
@@ -249,9 +256,9 @@ eq(count(admin_returns('done')), 1, 'one closed case');
 ok(count(seller_returns($sid)) === 1 && count(seller_returns($other)) === 0, 'sellers see only their cases');
 
 // ---- withdrawals
-eq(add_bank_account($sid, 'GTBank', '0123456789', 'A B'), null, 'bank added');
-ok(add_bank_account($sid, 'GTBank', '0123456789', 'A B') !== null, 'duplicate bank rejected');
-ok(add_bank_account($sid, 'GTBank', '12345', 'A B') !== null, 'bad account number rejected');
+eq(add_bank_account($sid, '058', '0123456789', 'A B'), null, 'bank added');
+ok(add_bank_account($sid, '058', '0123456789', 'A B') !== null, 'duplicate bank rejected');
+ok(add_bank_account($sid, '058', '12345', 'A B') !== null, 'bad account number rejected');
 $acct = bank_accounts($sid)[0]['id'];
 ok(request_withdrawal($sid, $acct, 'NGN', 500) !== null, 'below minimum');
 ok(request_withdrawal($sid, $acct, 'NGN', 99999) !== null, 'above balance');

@@ -88,6 +88,21 @@ function paystack_banks(): array
     return $banks;
 }
 
+/** Banks to pick from: Paystack's live list when connected, otherwise the main Nigerian banks (code => name). */
+function bank_options(): array
+{
+    $b = paystack_banks();
+    if (!$b) $b = [
+        '044' => 'Access Bank', '063' => 'Access Bank (Diamond)', '035A' => 'ALAT by WEMA', '023' => 'Citibank Nigeria', '050' => 'Ecobank Nigeria', '070' => 'Fidelity Bank', '011' => 'First Bank of Nigeria',
+        '214' => 'First City Monument Bank', '058' => 'Guaranty Trust Bank', '030' => 'Heritage Bank', '301' => 'Jaiz Bank', '082' => 'Keystone Bank', '50211' => 'Kuda Microfinance Bank',
+        '50515' => 'Moniepoint MFB', '999992' => 'OPay', '999991' => 'PalmPay', '076' => 'Polaris Bank', '101' => 'Providus Bank', '221' => 'Stanbic IBTC Bank', '068' => 'Standard Chartered Bank',
+        '232' => 'Sterling Bank', '100' => 'Suntrust Bank', '000026' => 'Taj Bank', '000025' => 'Titan Trust Bank', '032' => 'Union Bank of Nigeria', '033' => 'United Bank for Africa',
+        '215' => 'Unity Bank', '035' => 'Wema Bank', '057' => 'Zenith Bank',
+    ];
+    asort($b, SORT_NATURAL | SORT_FLAG_CASE);
+    return $b;
+}
+
 function bank_norm(string $s): string
 {
     return preg_replace('/\b(plc|bank|limited|ltd|microfinance|mfb|nigeria|of)\b|[^a-z0-9]/', '', strtolower($s)) ?? '';
@@ -96,7 +111,8 @@ function bank_norm(string $s): string
 // The bank's Paystack code for a name the seller typed or picked, or null.
 function bank_code_for(string $name): ?string
 {
-    $banks = paystack_banks();
+    $banks = bank_options();
+    if (isset($banks[trim($name)])) return (string) trim($name);
     $n = bank_norm($name);
     if ($n === '') return null;
     foreach ($banks as $code => $bn) if (strcasecmp($bn, trim($name)) === 0) return (string) $code;

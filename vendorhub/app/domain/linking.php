@@ -166,8 +166,13 @@ function import_one_product(string $sellerId, array $m): array
     $db = db();
     $wcId = (int) ($m['id'] ?? 0);
     $name = trim((string) ($m['name'] ?? ''));
-    if ($wcId < 1 || $name === '') return [null, 'Skipped: no name.', []];
-    if (!in_array($m['type'] ?? '', ['simple', 'variable'], true)) return [null, $name . ': product type "' . ($m['type'] ?? '?') . '" is not supported, left on the marketplace.', []];
+    if ($wcId < 1) return [null, 'A product without an id was skipped.', []];
+    $forceDraft = false;
+    if ($name === '') { $name = 'Untitled product #' . $wcId; $forceDraft = true; $GLOBALS['vh_import_info'][] = $name . ': it had no name on the marketplace, so it was imported as a draft to fill in.'; }
+    if (!in_array($m['type'] ?? '', ['simple', 'variable'], true)) { // grouped, external, bundles...: still brought across, as a simple product to review
+        $GLOBALS['vh_import_info'][] = $name . ': marketplace type "' . ($m['type'] ?? '?') . '" imported as a simple product (saved as a draft to check).';
+        $m['type'] = 'simple'; $forceDraft = true;
+    }
 
     $existing = $db->one('SELECT id FROM products WHERE marketplace_product_id = ?', [$wcId]);
     if ($existing) { // imported earlier but the marketplace was not told yet: just tell it again
@@ -206,12 +211,15 @@ function import_one_product(string $sellerId, array $m): array
             $vars[] = ['wc' => (int) ($v['id'] ?? 0), 'sku' => $vsku, 'options' => $opts, 'regular_price' => $vp, 'sale_price' => isset($v['sale_price']) && is_numeric($v['sale_price']) && (float) $v['sale_price'] > 0 && $vp && (float) $v['sale_price'] < $vp ? round((float) $v['sale_price'], 2) : null,
                 'stock' => max(0, (int) ($v['stock'] ?? 0)), 'image' => $v['image'] ?? null, 'enabled' => ($v['enabled'] ?? true) ? 1 : 0, 'position' => $n];
         }
-        if (!$vars) return [null, $name . ': a variable product with no variations, left on the marketplace.', []];
+        if (!$vars) { // nothing to sell as variations: keep it as a draft simple product
+            $GLOBALS['vh_import_info'][] = $name . ': it had no usable variations on the marketplace, so it was imported as a draft simple product.';
+            $variable = false; $forceDraft = true;
+        }
     }
 
     [$catId, $catName] = import_category((array) ($m['category_path'] ?? []));
     $id = uuid();
-    $live = ($m['status'] ?? '') === 'publish' && ($variable || ($price !== null && $price > 0));
+    $live = !$forceDraft && ($m['status'] ?? '') === 'publish' && ($variable || ($price !== null && $price > 0));
     $images = array_slice(array_values(array_filter((array) ($m['images'] ?? []), 'is_string')), 0, IMPORT_MAX_IMAGES);
     $paths = [];
     foreach ($images as $u) { $p = import_fetch_image($u, $sellerId, $id); if ($p) $paths[] = $p; }
@@ -256,7 +264,7 @@ function import_products_batch(array $admin, string $sellerId, int $after = 0): 
             [$vh, $note, $vars] = import_one_product($sellerId, (array) $m);
         } catch (Throwable $e) {
             log_error('import product: ' . $e->getMessage());
-            $notes[] = (string) ($m['name'] ?? 'A product') . ': could not be imported (' . $e->getMessage() . ').';
+            $notes[] = (string) ($m['name'] ?? 'A product') . ' (#' . (int) ($m['id'] ?? 0) . '): could not be imported. ' . $e->getMessage();
             $skipped++;
             continue;
         }

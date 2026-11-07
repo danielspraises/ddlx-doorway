@@ -61,7 +61,7 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
 <script src="/assets/pwa.js" defer></script>
 <script src="/assets/help.js?v=1" defer></script>
 <?php if ($user): ?><script src="/assets/native.js?v=1" defer></script><?php endif; ?>
-<?php foreach (($scripts ?? []) as $src): ?><script src="/assets/<?= e($src) ?>?v=1" defer></script>
+<?php foreach (($scripts ?? []) as $src): ?><script src="/assets/<?= e($src) ?>?v=<?= (int) @filemtime(__DIR__ . "/../../public/assets/" . basename($src)) ?>" defer></script>
 <?php endforeach; ?>
 </body>
 </html>

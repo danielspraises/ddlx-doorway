@@ -243,21 +243,39 @@ $docLinks = function (array $docs): string {
 <?php endif; ?>
 
 <?php if ($tab === 'sellers'): ?>
-  <form method="get" action="/admin" class="row" style="margin:12px 0" data-keep><input type="hidden" name="tab" value="sellers"><input type="search" name="q" value="<?= e($q) ?>" placeholder="Search sellers" style="max-width:260px"><button class="btn btn-sm btn-outline">Search</button>
-    </form>
-  <form method="post" action="/admin/level" data-keep style="margin-bottom:12px"><?= csrf_field() ?><input type="hidden" name="action" value="recalculate"><button class="btn btn-sm btn-outline" type="submit">Recalculate all levels</button> <?= help('Levels also update when orders are delivered and ratings change.') ?></form>
-  <form method="post" action="/admin/marketplace-sync" data-keep class="row" style="margin-bottom:12px"><?= csrf_field() ?><label class="row small" style="gap:6px"><input type="checkbox" name="create" value="1"> Create Vendor Hub accounts for marketplace sellers that have none</label><button class="btn btn-sm" type="submit">Sync with marketplace</button> <?= help('Links marketplace (Dokan) sellers to Vendor Hub sellers with the same email. With the box ticked, sellers that only exist on the marketplace also get a Vendor Hub account and an email to set a password. Products and orders are imported per seller from the Link page. Verified Vendor Hub sellers reach the marketplace automatically on its next sync.') ?></form>
-  <div class="table-wrap"><table><thead><tr><th>Seller</th><th>Level</th><th class="t-right">Delivered (90d)</th><th class="t-right">Returns</th><th class="t-right">Packed in 48h</th><th class="t-right">Rating</th><th>Pin a level</th><th>Marketplace</th></tr></thead><tbody>
-  <?php foreach ($items as $s): $m = $s['m']; ?>
-    <tr><td><strong><?= e($s['store']) ?></strong><?= verified_tick($s['id']) ?><br><span class="muted small"><?= e($s['email']) ?></span></td>
-      <td><?= level_badge($s['level']) ?><?= $s['override_level'] ? '<br><span class="muted small">pinned' . ($s['override_note'] ? ': ' . e($s['override_note']) : '') . '</span>' : '' ?><?= !empty($s['below_since']) && !$s['override_level'] ? '<br><span class="muted small" style="color:#b45309">at risk since ' . e(human_date($s['below_since'], false)) . '</span>' : '' ?></td>
-      <td class="t-right"><?= (int) ($m['delivered'] ?? 0) ?></td><td class="t-right"><?= isset($m['return_pct']) ? e((string) $m['return_pct']) . '%' : '–' ?></td>
-      <td class="t-right"><?= isset($m['dispatch_pct']) && $m['dispatch_pct'] !== null ? e((string) $m['dispatch_pct']) . '%' : '–' ?></td><td class="t-right"><?= !empty($m['rating']) ? e((string) $m['rating']) . ' (' . (int) $m['ratings'] . ')' : '–' ?></td>
-      <td><form method="post" action="/admin/level" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="seller" value="<?= e($s['id']) ?>">
-        <select name="level" aria-label="Level"><option value="">Automatic</option><?php foreach (LEVEL_LABEL as $k => $l): ?><option value="<?= e($k) ?>"<?= $s['override_level'] === $k ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select>
-        <input name="note" placeholder="Reason (optional)" value="<?= e($s['override_note']) ?>" maxlength="250" style="max-width:170px"><button class="btn btn-sm" type="submit">Save</button></form></td>
-      <td><?php $lk = $links[$s['id']] ?? null; ?><?= $lk ? '<span class="pill pill-ok">Linked</span><br><span class="muted small">' . e($lk['name']) . ' #' . (int) $lk['uid'] . '</span><br>' : '' ?><a class="btn btn-sm btn-outline" href="/admin/link?seller=<?= e($s['id']) ?>"><?= $lk ? 'Manage' : 'Link to marketplace' ?></a> <a class="btn btn-sm" href="/admin/seller?id=<?= e($s['id']) ?>">Edit details</a></td></tr>
-  <?php endforeach; if (!$items): ?><tr><td colspan="8" class="muted">No verified sellers yet.</td></tr><?php endif; ?></tbody></table></div>
+  <div class="toolbar">
+    <form method="get" action="/admin" class="tb-search" data-keep><input type="hidden" name="tab" value="sellers"><input type="search" name="q" value="<?= e($q) ?>" placeholder="Search sellers" aria-label="Search sellers"><button class="btn btn-sm btn-outline">Search</button></form>
+    <div class="tb-actions">
+      <form method="post" action="/admin/level" data-keep><?= csrf_field() ?><input type="hidden" name="action" value="recalculate"><button class="btn btn-sm btn-outline" type="submit">Recalculate levels</button></form>
+      <form method="post" action="/admin/marketplace-sync" data-keep class="tb-sync"><?= csrf_field() ?>
+        <label class="check-inline"><input type="checkbox" name="create" value="1"> Also create accounts for marketplace-only sellers</label>
+        <button class="btn btn-sm" type="submit">Sync with marketplace</button><?= help('Links marketplace (Dokan) sellers to Vendor Hub sellers with the same email. With the box ticked, sellers that only exist on the marketplace also get a Vendor Hub account and an email to set a password. Products and orders are imported per seller from the Manage page. Verified Vendor Hub sellers reach the marketplace automatically on its next sync. Levels also update when orders are delivered and ratings change.') ?>
+      </form>
+    </div>
+  </div>
+  <div class="sellers">
+  <?php foreach ($items as $s): $m = $s['m']; $lk = $links[$s['id']] ?? null; ?>
+    <article class="seller-card">
+      <header class="sc-head">
+        <div class="sc-id"><span class="sc-name"><strong><?= e($s['store']) ?></strong><?= verified_tick($s['id']) ?></span><span class="muted small"><?= e($s['email']) ?></span></div>
+        <div class="sc-level"><?= level_badge($s['level']) ?><?= $s['override_level'] ? '<span class="muted small">pinned' . ($s['override_note'] ? ': ' . e($s['override_note']) : '') . '</span>' : '' ?><?= !empty($s['below_since']) && !$s['override_level'] ? '<span class="small" style="color:#b45309">at risk since ' . e(human_date($s['below_since'], false)) . '</span>' : '' ?></div>
+      </header>
+      <dl class="sc-metrics">
+        <div><dt>Delivered (90d)</dt><dd><?= (int) ($m['delivered'] ?? 0) ?></dd></div>
+        <div><dt>Returns</dt><dd><?= isset($m['return_pct']) ? e((string) $m['return_pct']) . '%' : '–' ?></dd></div>
+        <div><dt>Packed in 48h</dt><dd><?= isset($m['dispatch_pct']) && $m['dispatch_pct'] !== null ? e((string) $m['dispatch_pct']) . '%' : '–' ?></dd></div>
+        <div><dt>Rating</dt><dd><?= !empty($m['rating']) ? e((string) $m['rating']) . ' <span class="muted small">(' . (int) $m['ratings'] . ')</span>' : '–' ?></dd></div>
+        <div><dt>Marketplace</dt><dd><?= $lk ? '<span class="pill pill-ok">Linked</span> <span class="muted small">#' . (int) $lk['uid'] . '</span>' : '<span class="muted small">Not linked</span>' ?></dd></div>
+      </dl>
+      <footer class="sc-foot">
+        <form method="post" action="/admin/level" class="sc-pin" data-keep><?= csrf_field() ?><input type="hidden" name="seller" value="<?= e($s['id']) ?>">
+          <select name="level" aria-label="Pin a level"><option value="">Automatic level</option><?php foreach (LEVEL_LABEL as $k => $l): ?><option value="<?= e($k) ?>"<?= $s['override_level'] === $k ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select>
+          <input name="note" placeholder="Reason (optional)" value="<?= e($s['override_note']) ?>" maxlength="250"><button class="btn btn-sm btn-outline" type="submit">Save level</button></form>
+        <div class="sc-btns"><a class="btn btn-sm btn-outline" href="/admin/link?seller=<?= e($s['id']) ?>"><?= $lk ? 'Manage marketplace' : 'Link to marketplace' ?></a><a class="btn btn-sm" href="/admin/seller?id=<?= e($s['id']) ?>">Edit details</a></div>
+      </footer>
+    </article>
+  <?php endforeach; if (!$items): ?><p class="muted">No verified sellers yet.</p><?php endif; ?>
+  </div>
 <?php endif; ?>
 
 <?php if ($tab === 'staff'): ?>

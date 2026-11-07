@@ -750,7 +750,7 @@ ok(admin_update_seller($admin, $nu['id'], ['account_email' => 'bad'] + $_p) !== 
 eq(admin_update_seller($admin, $nu['id'], ['s3_store_name' => ''] + $_p), 'The store name cannot be empty.', 'store name guarded');
 ok(admin_update_seller($admin, $nu['id'], ['account_email' => 'old@shop.test'] + $_p) !== null, 'email already used by another account refused');
 $r = import_products_batch($admin, $lk, 0);
-eq($r['created'], 3, 'three products imported (SKU clash is renamed, not skipped)'); eq($r['skipped'], 1, 'grouped product skipped');
+eq($r['created'], 4, 'every product imported (SKU clash renamed, grouped kept as draft)'); eq($r['skipped'], 0, 'nothing skipped');
 ok(count($r['notes']) === 2, 'grouped skip and SKU rename reported: ' . implode(' | ', $r['notes']));
 $shirt = db()->one('SELECT * FROM products WHERE marketplace_product_id = 501');
 eq($shirt['status'], 'approved', 'published product is live'); eq((int) $shirt['live'], 1, 'live flag'); eq((int) $shirt['stock'], 12, 'stock copied');
@@ -761,9 +761,9 @@ eq($dress['product_type'], 'variable', 'variable imported'); eq($dress['category
 eq((int) db()->val('SELECT COUNT(*) FROM product_variations WHERE product_id = ?', [$dress['id']]), 2, 'variations imported');
 ok((bool) db()->val("SELECT 1 FROM product_variations WHERE sku = 'OLD-2-2'"), 'blank variation SKU generated');
 $adopt = array_values(array_filter($calls, fn ($c) => $c[0] === '/adopt'))[0][2];
-eq(count($adopt['items']), 3, 'marketplace told about every imported product'); eq(count($adopt['items'][1]['variations']), 2, 'variation ids sent');
+eq(count($adopt['items']), 4, 'marketplace told about every imported product'); eq(count($adopt['items'][1]['variations']), 2, 'variation ids sent');
 $again = import_products_batch($admin, $lk, 0);
-eq((int) db()->val('SELECT COUNT(*) FROM products WHERE seller_id = ?', [$lk]), 3, 'importing again creates no duplicates');
+eq((int) db()->val('SELECT COUNT(*) FROM products WHERE seller_id = ?', [$lk]), 4, 'importing again creates no duplicates');
 eq(import_orders_batch($admin, $lk, 0)['imported'], 2, 'two orders imported (third has no matching products)');
 $hist = db()->one("SELECT * FROM orders WHERE marketplace_order_id = '9001'"); eq((int) $hist['history'], 1, 'finished order is history');
 eq((float) db()->val("SELECT COALESCE(SUM(amount),0) FROM wallet_entries WHERE seller_id = ?", [$lk]), 10800.0, 'only the open order pays the wallet (12000 less 10%)');

@@ -24,12 +24,12 @@
   <div class="card" style="max-width:720px" data-link-box data-seller="<?= e($sid) ?>">
     <div class="row between"><div><span class="pill pill-ok">Linked</span> <strong><?= e($link['name']) ?></strong> <span class="muted small">marketplace seller #<?= (int) $link['uid'] ?></span></div>
       <?php if (!$counts['products'] && !$counts['orders']): ?><form method="post" action="/admin/link" data-keep><?= csrf_field() ?><input type="hidden" name="seller" value="<?= e($sid) ?>"><input type="hidden" name="action" value="unlink"><button class="btn btn-sm btn-ghost" type="submit">Remove link</button></form><?php endif; ?></div>
-    <hr class="sep">
+    <div class="link-step">
     <h3 style="margin-top:0">1. Products <?= help('Copies their existing products (with photos, prices, stock and variations) into Vendor Hub and ties each to the same product on the store, so nothing is duplicated. Safe to run again.') ?></h3>
-    <p class="row"><button class="btn" type="button" data-run="products">Import products</button><span class="muted small" data-count="products"><?= (int) $counts['products'] ?> imported so far</span></p>
-    <hr class="sep">
+    <p class="ls-act"><span class="muted small" data-count="products"><?= (int) $counts['products'] ?> imported so far</span><button class="btn" type="button" data-run="products">Import products</button></p></div>
+    <div class="link-step">
     <h3 style="margin-top:0">2. Past orders <?= help('Brings in their sales history so charts and levels are complete. Finished orders are shown for history only and add nothing to the wallet. Orders still on their way are paid out normally once delivered. Import products first.') ?></h3>
-    <p class="row"><button class="btn" type="button" data-run="orders"<?= $counts['products'] ? '' : ' disabled' ?>>Import past orders</button><span class="muted small" data-count="orders"><?= (int) $counts['orders'] ?> orders imported so far</span></p>
+    <p class="ls-act"><span class="muted small" data-count="orders"><?= (int) $counts['orders'] ?> orders imported so far</span><button class="btn" type="button" data-run="orders"<?= $counts['products'] ? '' : ' disabled' ?>>Import past orders</button></p></div>
     <p class="muted small" data-status role="status"></p>
     <ul class="list hidden" data-notes style="margin-top:8px"></ul>
     <?php $rep = jdec((string) setting('import_report_' . $sid, ''), []); if ($rep): ?>

@@ -218,7 +218,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
   <section class="storehead" style="margin-top:14px">
     <div class="cover"><?php if ($store['banner']): ?><img src="/files/store?p=<?= e(rawurlencode($store['banner'])) ?>" alt="Banner"><?php else: ?><span>Banner · 1600×400 works best</span><?php endif; ?>
       <form method="post" action="/store/image" enctype="multipart/form-data" class="imgform" data-keep data-autosubmit><?= csrf_field() ?><input type="hidden" name="kind" value="banner">
-        <button type="button" class="imgtrigger" data-imgbtn aria-haspopup="menu" aria-expanded="false" aria-label="Banner options"><span class="imgcue"><?= icon(\'image\') ?><span class="cuetxt"><?= $store['banner'] ? 'Edit' : 'Add' ?> banner</span></span></button>
+        <button type="button" class="imgtrigger" data-imgbtn aria-haspopup="menu" aria-expanded="false" aria-label="Banner options"><span class="imgcue"><?= icon('image') ?><span class="cuetxt"><?= $store['banner'] ? 'Edit' : 'Add' ?> banner</span></span></button>
         <div class="imgpop" role="menu" hidden>
           <?php if ($store['banner']): ?><a role="menuitem" href="/files/store?p=<?= e(rawurlencode($store['banner'])) ?>" data-preview="/files/store?p=<?= e(rawurlencode($store['banner'])) ?>" data-title="Banner">View</a><?php endif; ?>
           <label role="menuitem" class="imgitem">Upload new<input class="sr" type="file" name="file" accept="image/jpeg,image/png,image/webp"></label>
@@ -230,7 +230,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
     <div class="storeid">
       <div class="logo-wrap"><div class="logo-ring"><?php if ($store['logo']): ?><img src="/files/store?p=<?= e(rawurlencode($store['logo'])) ?>" alt="Logo"><?php else: ?><span>Logo</span><?php endif; ?></div>
         <form method="post" action="/store/image" enctype="multipart/form-data" class="imgform" data-keep data-autosubmit><?= csrf_field() ?><input type="hidden" name="kind" value="logo">
-        <button type="button" class="imgtrigger" data-imgbtn aria-haspopup="menu" aria-expanded="false" aria-label="Logo options"><span class="imgcue"><?= icon(\'image\') ?><span class="cuetxt"><?= $store['logo'] ? 'Edit' : 'Add' ?> logo</span></span></button>
+        <button type="button" class="imgtrigger" data-imgbtn aria-haspopup="menu" aria-expanded="false" aria-label="Logo options"><span class="imgcue"><?= icon('image') ?><span class="cuetxt"><?= $store['logo'] ? 'Edit' : 'Add' ?> logo</span></span></button>
         <div class="imgpop" role="menu" hidden>
           <?php if ($store['logo']): ?><a role="menuitem" href="/files/store?p=<?= e(rawurlencode($store['logo'])) ?>" data-preview="/files/store?p=<?= e(rawurlencode($store['logo'])) ?>" data-title="Logo">View</a><?php endif; ?>
           <label role="menuitem" class="imgitem">Upload new<input class="sr" type="file" name="file" accept="image/jpeg,image/png,image/webp"></label>

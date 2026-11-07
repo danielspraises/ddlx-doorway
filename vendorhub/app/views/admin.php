@@ -278,7 +278,7 @@ $docLinks = function (array $docs): string {
         <form method="post" action="/admin/level" class="sc-pin" data-keep><?= csrf_field() ?><input type="hidden" name="seller" value="<?= e($s['id']) ?>">
           <select name="level" aria-label="Pin a level"><option value="">Automatic level</option><?php foreach (LEVEL_LABEL as $k => $l): ?><option value="<?= e($k) ?>"<?= $s['override_level'] === $k ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select>
           <input name="note" placeholder="Reason (optional)" value="<?= e($s['override_note']) ?>" maxlength="250"><button class="btn btn-sm btn-outline" type="submit">Save level</button></form>
-        <div class="sc-btns"><a class="btn btn-sm btn-outline" href="/admin/link?seller=<?= e($s['id']) ?>"><?= $lk ? 'Manage marketplace' : 'Link to marketplace' ?></a><a class="btn btn-sm" href="/admin/seller?id=<?= e($s['id']) ?>">Edit details</a></div>
+        <div class="sc-btns"><a class="btn btn-sm btn-outline" href="/admin/link?seller=<?= e($s['id']) ?>"><?= $lk ? 'Manage marketplace' : 'Link to marketplace' ?></a><a class="btn btn-sm" href="/admin/seller?id=<?= e($s['id']) ?>">Edit details</a><form method="post" action="/admin/view-as" data-keep style="display:inline"><?= csrf_field() ?><input type="hidden" name="seller" value="<?= e($s['id']) ?>"><button class="btn btn-sm btn-outline" type="submit">View as seller</button></form></div>
       </footer>
     </article>
   <?php endforeach; if (!$items): ?><p class="muted">No verified sellers yet.</p><?php endif; ?>

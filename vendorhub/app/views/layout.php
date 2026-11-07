@@ -51,6 +51,10 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
     <?php endif; ?>
   </div>
 </header>
+<?php if (!empty($user['viewAs'])): ?>
+<div class="viewas" role="status"><div class="wrap"><span><?= icon('eye') ?> Viewing <strong><?= e(inbox_store_name($user['id']) ?: $user['email']) ?></strong> as the seller sees it. Read-only.</span>
+  <form method="post" action="/view-as/exit"><?= csrf_field() ?><button class="btn btn-sm" type="submit">Exit view</button></form></div></div>
+<?php endif; ?>
 <?php if ($flashMsg): ?><div class="wrap"><p class="flash <?= e($flashMsg['k'] === 'error' ? 'flash-error' : 'flash-ok') ?>" role="status"><?= e($flashMsg['m']) ?></p></div><?php endif; ?>
 <?php if (!empty($user) && empty($user['twofa']) && ($user['isAdmin'] || $user['canReview'] || $user['canOrders'] || $user['canMessages']) && ($_SERVER['REQUEST_URI'] ?? '') !== '/account/security'): ?><div class="wrap"><p class="flash flash-error" role="status">Your account can approve products and money. Protect it with <a href="/account/security">two-step sign-in</a>.</p></div><?php endif; ?>
 <main class="<?= !empty($full) ? '' : 'wrap main' ?>" id="main"><?= $content ?></main>

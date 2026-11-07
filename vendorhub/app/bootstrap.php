@@ -55,7 +55,7 @@ function vh_run(): void
             ob_end_clean();
         }
         http_response_code(500);
-        $detail = cfg('debug', false) ? $e->getMessage() : 'Something went wrong on our side. Please try again in a moment.';
+        $detail = cfg('debug', false) ? $e->getMessage() : 'Please try again in a moment.';
         // Signed-in admins see the real error so problems can be fixed quickly.
         try {
             $who = function_exists('current_user') ? current_user() : null;
@@ -106,6 +106,9 @@ function vh_run(): void
             csrf_verify();
         }
         $u = current_user();
+        if (!empty($u['viewAs']) && $method !== 'GET' && $path !== '/view-as/exit') {
+            abort(403, 'You are viewing this account as an admin, so nothing can be changed. Exit the view first.');
+        }
         if ($u === null && empty($GLOBALS['vh_csrf'])) {
             csrf_boot();
         }

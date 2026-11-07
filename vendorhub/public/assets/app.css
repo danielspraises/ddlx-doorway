@@ -526,3 +526,8 @@ input[readonly]{background:var(--soft)}
 .storeid{margin-top:0}
 .logo-wrap .cuetxt{display:none}
 .cuetxt{margin-left:6px}
+
+.viewas{background:#fff4cf;border-bottom:1px solid #f0d98a;color:#5b4300;position:sticky;top:56px;z-index:25}
+.viewas .wrap{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;padding-top:8px;padding-bottom:8px;font-size:.88rem}
+.viewas svg{width:16px;height:16px;vertical-align:-3px;margin-right:4px}
+.viewas form{margin:0}

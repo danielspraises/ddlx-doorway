@@ -848,5 +848,13 @@ eq(save_smtp_settings(['smtp_host' => 'smtp-relay.brevo.com', 'smtp_port' => '58
 eq(setting('mail_from', ''), 'no-reply@ddlx.shop', 'sender address stored');
 ok(save_smtp_settings(['smtp_host' => 'smtp-relay.brevo.com', 'smtp_port' => '587', 'smtp_secure' => 'tls', 'mail_from' => 'nope']) !== null, 'smtp: bad sender refused');
 
+// every PHP file must at least parse (a typo in a view once took every seller page down)
+$parseBad = [];
+foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(APP_ROOT . '/app', FilesystemIterator::SKIP_DOTS)) as $f) {
+    if ($f->getExtension() !== 'php') continue;
+    try { token_get_all((string) file_get_contents($f->getPathname()), TOKEN_PARSE); } catch (ParseError $e) { $parseBad[] = $f->getFilename() . ': ' . $e->getMessage(); }
+}
+ok(!$parseBad, 'all app files parse: ' . implode('; ', $parseBad));
+
 echo "$pass passed, $fail failed\n";
 exit($fail ? 1 : 0);

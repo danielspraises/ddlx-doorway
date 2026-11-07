@@ -60,7 +60,58 @@ function current_user(): ?array
     if (is_string($token) && strlen($token) > 20) {
         $user = user_from_token($token);
     }
+    if ($user && $user['isAdmin']) {
+        $as = view_as_target($user);
+        if ($as) $user = user_view_as($as, $user) ?? $user;
+    }
     return $GLOBALS['vh_user_cache'] = $user;
+}
+
+// ---------------------------------------------------------------- admin "view as seller" (read-only)
+
+const VIEWAS_COOKIE = 'vh_viewas';
+
+function viewas_secret(): string
+{
+    return hash('sha256', 'viewas|' . json_encode(cfg('db', [])));
+}
+
+function viewas_set(string $adminId, string $sellerId): void
+{
+    $payload = base64_encode(json_encode(['a' => $adminId, 's' => $sellerId, 'x' => time() + 3600]));
+    setcookie(VIEWAS_COOKIE, $payload . '.' . hash_hmac('sha256', $payload, viewas_secret()), cookie_opts(time() + 3600));
+}
+
+function viewas_clear(): void
+{
+    setcookie(VIEWAS_COOKIE, '', cookie_opts(time() - 3600));
+    unset($_COOKIE[VIEWAS_COOKIE], $GLOBALS['vh_user_cache']);
+}
+
+/** The seller id an admin is currently viewing as, or null. */
+function view_as_target(array $admin): ?string
+{
+    $c = $_COOKIE[VIEWAS_COOKIE] ?? '';
+    if (!is_string($c) || !str_contains($c, '.')) return null;
+    [$payload, $sig] = explode('.', $c, 2);
+    if (!hash_equals(hash_hmac('sha256', $payload, viewas_secret()), $sig)) return null;
+    $d = json_decode((string) base64_decode($payload, true), true);
+    if (!is_array($d) || ($d['a'] ?? '') !== $admin['id'] || (int) ($d['x'] ?? 0) < time() || !is_string($d['s'] ?? null)) return null;
+    return $d['s'];
+}
+
+/** What the seller's own screen is built from, plus a flag so the page knows it is a view-only visit. */
+function user_view_as(string $sellerId, array $admin): ?array
+{
+    $db = db();
+    $r = $db->one('SELECT u.id, u.email, u.totp_enabled, a.status AS application_status, v.status AS verification_status FROM users u LEFT JOIN seller_applications a ON a.user_id = u.id LEFT JOIN seller_verifications v ON v.user_id = u.id WHERE u.id = ?', [$sellerId]);
+    if (!$r) return null;
+    $pending = ['applications' => 0, 'verifications' => 0, 'products' => 0, 'payouts' => 0, 'orders' => 0, 'returns' => 0, 'messages' => 0,
+        'notifications' => (int) $db->val('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL', [$sellerId])];
+    $pending['messages'] = (int) $db->val('SELECT COUNT(*) FROM threads WHERE seller_id = ? AND seller_unread = 1', [$sellerId]);
+    $pending['returns'] = (int) $db->val("SELECT COUNT(*) FROM return_cases WHERE seller_id = ? AND status = 'open'", [$sellerId]);
+    return ['id' => $r['id'], 'email' => $r['email'], 'twofa' => true, 'isAdmin' => false, 'isStaff' => false, 'canReview' => false, 'canOrders' => false, 'canMessages' => false,
+        'stage' => seller_stage($r['application_status'], $r['verification_status']), 'pending' => $pending, 'viewAs' => true, 'viewAdmin' => $admin['email']];
 }
 
 function seller_stage(?string $application, ?string $verification): string

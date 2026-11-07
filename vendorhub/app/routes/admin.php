@@ -178,6 +178,21 @@ route('POST', '/admin/link', function () {
     redirect('/admin/link?seller=' . $id, $err ?? (input('action') === 'unlink' ? 'Link removed.' : 'Linked. Now import their products, then their past orders.'), $err ? 'error' : 'ok');
 });
 
+// Admin looks at a seller's account exactly as the seller sees it. Read-only: nothing can be changed while viewing.
+route('POST', '/admin/view-as', function () {
+    $u = require_admin();
+    $id = input('seller');
+    if (!is_uuid($id) || !db()->val('SELECT 1 FROM users WHERE id = ?', [$id]) || !db()->val('SELECT 1 FROM seller_applications WHERE user_id = ?', [$id])) abort(404);
+    viewas_set($u['id'], $id);
+    audit($u, 'seller.view_as', 'Viewed the account as the seller', $id);
+    redirect('/seller?tab=overview');
+});
+
+route('POST', '/view-as/exit', function () {
+    viewas_clear();
+    redirect('/admin?tab=sellers');
+});
+
 route('GET', '/admin/seller', function () {
     require_admin();
     $id = input('id');

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.5.1
+ * Version: 1.6.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -70,14 +70,9 @@ final class Verola_Connector {
 		}
 		add_action('wp_set_comment_status', [__CLASS__, 'review_changed']);
 		add_action(self::RATING, [__CLASS__, 'send_rating']);
-		// Show the seller level badge on product pages and in product grids.
-		add_action('woocommerce_single_product_summary', [__CLASS__, 'show_badge'], 6);
-		add_action('woocommerce_after_shop_loop_item_title', [__CLASS__, 'show_badge'], 4);
-		add_shortcode('vendor_hub_badge', function () {
-			ob_start();
-			self::show_badge();
-			return ob_get_clean();
-		});
+		// Verified sellers get a blue tick next to their store name, wherever the store name is shown. No level labels on products.
+		add_shortcode('vendor_hub_badge', '__return_empty_string');
+		add_action('wp_footer', [__CLASS__, 'store_ticks']);
 		add_action('woocommerce_admin_order_data_after_shipping_address', [__CLASS__, 'handoff_fields']);
 		add_action('woocommerce_process_shop_order_meta', [__CLASS__, 'save_handoff_fields']);
 		if (!wp_next_scheduled(self::CRON)) {
@@ -448,7 +443,7 @@ final class Verola_Connector {
 				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
 			];
 		}
-		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.5.1'];
+		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.6.0'];
 	}
 
 	public static function rest_link($request) {
@@ -562,7 +557,7 @@ final class Verola_Connector {
 				}
 				$img = $v->get_image_id() ? wp_get_attachment_url($v->get_image_id()) : '';
 				$row['variations'][] = ['id' => (int) $vid, 'sku' => (string) $v->get_sku(), 'options' => $opts, 'regular_price' => $v->get_regular_price(), 'sale_price' => $v->get_sale_price(),
-					'stock' => (int) $v->get_stock_quantity(), 'image' => $img ?: null, 'enabled' => $v->get_status() === 'publish'];
+					'stock' => (int) $v->get_stock_quantity(), 'manage_stock' => (bool) $v->managing_stock(), 'image' => $img ?: null, 'enabled' => $v->get_status() === 'publish'];
 			}
 		}
 		$from = $product->get_date_on_sale_from();
@@ -804,6 +799,7 @@ final class Verola_Connector {
 			foreach ($data['sellers'] as $seller) {
 				try {
 					$uid = self::vendor_user($seller);
+					update_user_meta($uid, '_verola_verified', '1');
 					if (!empty($seller['badge']['level'])) {
 						update_user_meta($uid, '_verola_level', sanitize_key($seller['badge']['level']));
 					}
@@ -815,6 +811,7 @@ final class Verola_Connector {
 				break;
 			}
 		}
+		delete_transient('verola_verified_stores');
 	}
 
 	// ------------------------------------------------------------------ seller discount codes (Vendor Hub -> store)
@@ -880,18 +877,68 @@ final class Verola_Connector {
 
 	// ------------------------------------------------------------------ ratings (store -> Vendor Hub)
 
-	public static function show_badge() {
-		global $product;
-		if (!$product) {
+	// Verified sellers: slug => store name. Cached briefly; cleared on every sync.
+	private static function verified_stores() {
+		$map = get_transient('verola_verified_stores');
+		if (is_array($map)) {
+			return $map;
+		}
+		$map = [];
+		$users = get_users(['meta_key' => '_verola_verified', 'meta_value' => '1', 'fields' => ['ID', 'user_nicename'], 'number' => 2000]);
+		foreach ($users as $u) {
+			$profile = get_user_meta($u->ID, 'dokan_profile_settings', true);
+			$name = is_array($profile) && !empty($profile['store_name']) ? $profile['store_name'] : (string) get_user_meta($u->ID, 'store_name', true);
+			if ($name !== '') {
+				$map[$u->user_nicename] = $name;
+			}
+		}
+		set_transient('verola_verified_stores', $map, 10 * MINUTE_IN_SECONDS);
+		return $map;
+	}
+
+	// Adds the tick after the store name on store pages, store lists and the seller line of product pages.
+	public static function store_ticks() {
+		if (is_admin()) {
 			return;
 		}
-		$level = get_post_meta($product->get_id(), '_verola_seller_level', true);
-		if (!$level || $level === 'starter') {
+		$map = self::verified_stores();
+		if (!$map) {
 			return;
 		}
-		$colors = ['bronze' => ['#f7e8dc', '#8a4b1c'], 'silver' => ['#eceef2', '#4a5160'], 'gold' => ['#fdf1c9', '#7a5a00'], 'blue' => ['#e4edff', '#1f4fd6']];
-		$c = $colors[$level] ?? ['#eee', '#333'];
-		printf('<span class="vh-badge vh-badge-%1$s" style="display:inline-block;margin:4px 0;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;background:%2$s;color:%3$s">%4$s seller</span>', esc_attr($level), esc_attr($c[0]), esc_attr($c[1]), esc_html(get_post_meta($product->get_id(), '_verola_seller_level_label', true)));
+		$json = wp_json_encode($map);
+		?>
+<style>.vh-tick{display:inline-block;width:1.05em;height:1.05em;min-width:14px;min-height:14px;margin-left:.3em;vertical-align:-.15em;line-height:0}.vh-tick svg{width:100%;height:100%;display:block}</style>
+<script>
+(function () {
+  var stores = <?php echo $json; ?>;
+  var svg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.6l2.5 1.9 3.1-.2 1.2 2.9 2.7 1.6-.6 3.1 1.3 2.8-2 2.4-.1 3.1-3 .9-1.9 2.5-2.9-1.1-2.9 1.1-1.9-2.5-3-.9-.1-3.1-2-2.4 1.3-2.8-.6-3.1 2.7-1.6 1.2-2.9 3.1.2z" fill="#1d9bf0" stroke="#1d9bf0" stroke-width="1.2" stroke-linejoin="round"/><path d="M7.6 12.4l3 3 5.9-6.2" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function norm(t) { return (t || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+  function tick(el) {
+    if (el.getAttribute('data-vh-tick')) return;
+    el.setAttribute('data-vh-tick', '1');
+    var s = document.createElement('span'); s.className = 'vh-tick'; s.title = 'Verified seller'; s.setAttribute('role', 'img'); s.setAttribute('aria-label', 'Verified seller'); s.innerHTML = svg;
+    el.appendChild(s);
+  }
+  function slugOf(href) { var m = /\/store\/([^\/?#]+)/.exec(href || ''); return m ? decodeURIComponent(m[1]) : null; }
+  function run() {
+    // Links to a store whose text is the store name (store lists, "Sold by", vendor info tab).
+    document.querySelectorAll('a[href*="/store/"]').forEach(function (a) {
+      var slug = slugOf(a.getAttribute('href'));
+      if (slug && stores[slug] && norm(a.textContent) === norm(stores[slug])) tick(a);
+    });
+    // The store's own page heading.
+    var here = slugOf(location.pathname);
+    if (here && stores[here]) {
+      document.querySelectorAll('.store-name, .dokan-store-name, .profile-info .store-name, h1').forEach(function (h) {
+        if (!h.querySelector('a') && norm(h.textContent) === norm(stores[here])) tick(h);
+      });
+    }
+  }
+  run();
+  if (window.MutationObserver) { var t; new MutationObserver(function () { clearTimeout(t); t = setTimeout(run, 150); }).observe(document.body, { childList: true, subtree: true }); }
+})();
+</script>
+		<?php
 	}
 
 	public static function review_changed($comment_id) {
@@ -1172,7 +1219,9 @@ final class Verola_Connector {
 			wp_update_post(['ID' => $id, 'menu_order' => (4 - (int) $badge['rank']) * 10]);
 		}
 		update_post_meta($id, '_verola_updated_at', $item['updated_at']);
-		wp_update_post(['ID' => $id, 'post_author' => self::vendor_user($seller)]);
+		$author = self::vendor_user($seller);
+		update_user_meta($author, '_verola_verified', '1');
+		wp_update_post(['ID' => $id, 'post_author' => $author]);
 		if (taxonomy_exists('product_brand') && !empty($item['brand'])) {
 			wp_set_object_terms($id, [$item['brand']], 'product_brand');
 		} else {
@@ -1199,8 +1248,16 @@ final class Verola_Connector {
 			$variation->set_attributes($attrs);
 			$variation->set_sku(self::free_sku($v['sku'], $vid, $seller));
 			self::set_prices($variation, $v);
-			$variation->set_manage_stock(true);
-			$variation->set_stock_quantity((int) $v['stock']);
+			// Only track variation stock when the seller tracks stock for this product. Otherwise leave it always available,
+			// so a variation that was never counted is not turned into "out of stock" at checkout.
+			if (!empty($item['manage_stock'])) {
+				$variation->set_manage_stock(true);
+				$variation->set_stock_quantity((int) $v['stock']);
+			} else {
+				$variation->set_manage_stock(false);
+				$variation->set_stock_quantity(null);
+				$variation->set_stock_status('instock');
+			}
 			$variation->set_backorders(!empty($item['allow_backorders']) ? 'yes' : 'no');
 			$variation->set_menu_order($position);
 			$variation->set_status('publish');

@@ -81,16 +81,28 @@ body.woocommerce-checkout .website-wrapper{padding:0!important;margin:0!importan
 body.woocommerce-checkout .main-page-wrapper{padding-top:20px;padding-bottom:40px;margin-top:0}
 .woocommerce-checkout form.checkout{max-width:1200px;margin:0 auto}
 
-/* "Returning customer?" and "Have a coupon?" toggles */
+/* "Returning customer?" and "Have a coupon?" toggles: compact side-by-side chips, not full-width bars */
+.woocommerce-form-login-toggle,
+.woocommerce-form-coupon-toggle{display:inline-block;vertical-align:top;margin:0 10px 12px 0}
 .woocommerce-form-login-toggle .woocommerce-info,
 .woocommerce-form-coupon-toggle .woocommerce-info{
-  padding:13px 18px!important; font-weight:500;
+  display:inline-flex!important; align-items:center; gap:10px; width:auto!important; max-width:100%;
+  margin:0!important; padding:6px 6px 6px 16px!important; border-radius:999px!important;
+  border:1px solid var(--dx-line)!important; border-left:1px solid var(--dx-line)!important;
+  font-size:.85rem; font-weight:600; color:var(--dx-muted)!important; box-shadow:none!important;
 }
+.woocommerce-form-login-toggle .woocommerce-info:before,
+.woocommerce-form-coupon-toggle .woocommerce-info:before{display:none!important}
 .woocommerce-form-login-toggle .woocommerce-info a,
 .woocommerce-form-coupon-toggle .woocommerce-info a{
-  color:var(--dx-primary); font-weight:700; text-decoration:underline; text-underline-offset:3px;
+  display:inline-flex; align-items:center; padding:7px 14px; border-radius:999px;
+  background:var(--dx-primary); color:#fff!important; font-size:.8rem; font-weight:700;
+  text-decoration:none!important; white-space:nowrap; transition:background-color .2s;
 }
+.woocommerce-form-login-toggle .woocommerce-info a:hover,
+.woocommerce-form-coupon-toggle .woocommerce-info a:hover{background:var(--dx-hover)}
 .checkout_coupon,.woocommerce-form-login{
+  clear:both;
   background:#fff; border:1px solid var(--dx-line); border-radius:var(--dx-radius);
   padding:20px; margin:0 0 20px; box-shadow:var(--dx-shadow);
 }

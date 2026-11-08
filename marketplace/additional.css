@@ -81,26 +81,37 @@ body.woocommerce-checkout .website-wrapper{padding:0!important;margin:0!importan
 body.woocommerce-checkout .main-page-wrapper{padding-top:20px;padding-bottom:40px;margin-top:0}
 .woocommerce-checkout form.checkout{max-width:1200px;margin:0 auto}
 
-/* "Returning customer?" and "Have a coupon?" toggles: compact side-by-side chips, not full-width bars */
+/* "Returning customer?" and "Have a coupon?" toggles: compact chips side by side */
 .woocommerce-form-login-toggle,
-.woocommerce-form-coupon-toggle{display:inline-block;vertical-align:top;margin:0 10px 12px 0}
+.woocommerce-form-coupon-toggle{
+  float:left!important; clear:none!important; width:auto!important; max-width:100%;
+  margin:0 10px 12px 0!important; padding:0!important;
+}
+form.woocommerce-checkout{clear:both}
 .woocommerce-form-login-toggle .woocommerce-info,
 .woocommerce-form-coupon-toggle .woocommerce-info{
   display:inline-flex!important; align-items:center; gap:10px; width:auto!important; max-width:100%;
-  margin:0!important; padding:6px 6px 6px 16px!important; border-radius:999px!important;
-  border:1px solid var(--dx-line)!important; border-left:1px solid var(--dx-line)!important;
-  font-size:.85rem; font-weight:600; color:var(--dx-muted)!important; box-shadow:none!important;
+  margin:0!important; padding-block:6px!important; padding-inline:16px 6px!important; text-indent:0!important;
+  border-radius:999px!important; border:1px solid var(--dx-line)!important; border-left:1px solid var(--dx-line)!important;
+  font-size:.85rem; font-weight:600; color:var(--dx-muted)!important; box-shadow:none!important; background:#fff!important;
 }
 .woocommerce-form-login-toggle .woocommerce-info:before,
 .woocommerce-form-coupon-toggle .woocommerce-info:before{display:none!important}
+/* The link becomes a button. Its own text is replaced by a short label so it always shows. */
 .woocommerce-form-login-toggle .woocommerce-info a,
 .woocommerce-form-coupon-toggle .woocommerce-info a{
-  display:inline-flex; align-items:center; padding:7px 14px; border-radius:999px;
-  background:var(--dx-primary); color:#fff!important; font-size:.8rem; font-weight:700;
-  text-decoration:none!important; white-space:nowrap; transition:background-color .2s;
+  display:inline-flex!important; align-items:center; justify-content:center; margin:0!important; padding:8px 16px!important;
+  border-radius:999px; background:var(--dx-primary)!important; border:0; text-decoration:none!important;
+  font-size:0!important; line-height:1; white-space:nowrap; transition:background-color .2s;
 }
+.woocommerce-form-login-toggle .woocommerce-info a:after,
+.woocommerce-form-coupon-toggle .woocommerce-info a:after{
+  font-size:.8rem; font-weight:700; line-height:1; color:#fff; -webkit-text-fill-color:#fff; opacity:1;
+}
+.woocommerce-form-login-toggle .woocommerce-info a:after{content:"Log in"}
+.woocommerce-form-coupon-toggle .woocommerce-info a:after{content:"Add coupon"}
 .woocommerce-form-login-toggle .woocommerce-info a:hover,
-.woocommerce-form-coupon-toggle .woocommerce-info a:hover{background:var(--dx-hover)}
+.woocommerce-form-coupon-toggle .woocommerce-info a:hover{background:var(--dx-hover)!important}
 .checkout_coupon,.woocommerce-form-login{
   clear:both;
   background:#fff; border:1px solid var(--dx-line); border-radius:var(--dx-radius);
@@ -163,6 +174,7 @@ body.woocommerce-checkout .main-page-wrapper{padding-top:20px;padding-bottom:40p
 
 /* Quantity stepper (order summary) */
 .woocommerce-checkout .quantity{
+  width:max-content!important; min-width:0!important; max-width:100%; flex:none; gap:0;
   display:inline-flex!important; align-items:center; height:38px; margin-top:8px;
   border:1px solid #cbd5e1; border-radius:10px; overflow:hidden; background:#fff; box-shadow:none;
 }

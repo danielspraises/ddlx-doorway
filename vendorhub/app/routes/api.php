@@ -214,6 +214,17 @@ route('POST', '/api/marketplace/returns/ship', function () {
     isset($r['error']) ? market_json(['error' => $r['error']], $r['code']) : market_json(['ok' => true]);
 }, ['api' => true]);
 
+// The courier collected a return or delivered it to the seller's store. Signed.
+route('POST', '/api/marketplace/returns/pickup-status', function () {
+    $raw = (string) file_get_contents('php://input');
+    if (strlen($raw) > 20000) market_json(['error' => 'Payload too large.'], 413);
+    market_check_signature($raw);
+    $d = json_decode($raw, true);
+    if (!is_array($d)) market_json(['error' => 'Invalid request.'], 400);
+    $r = return_pickup_update($d);
+    isset($r['error']) ? market_json(['error' => $r['error']], $r['code']) : market_json(['ok' => true]);
+}, ['api' => true]);
+
 // Every return request with its status, for the marketplace admin. ?status=open (default) or done or all.
 route('GET', '/api/marketplace/returns/all', function () {
     market_check_key();

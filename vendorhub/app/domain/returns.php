@@ -179,9 +179,11 @@ function customer_open_return(array $r): array
 function customer_cases_for_order(string $marketplaceOrderId): array
 {
     $out = [];
-    foreach (db()->all('SELECT c.id, c.reason, c.status, c.kind, c.resolution_note, c.created_at, c.respond_by, c.ship_by, c.return_carrier, c.return_tracking, i.product_id, i.variation_id FROM return_cases c JOIN order_items i ON i.id = c.order_item_id JOIN orders o ON o.id = i.order_id WHERE o.marketplace_order_id = ? ORDER BY c.created_at DESC', [$marketplaceOrderId]) as $r) {
-        $send = $r['status'] === 'seller_accepted' && $r['kind'] === 'return';
-        $label = ['open' => 'Waiting for the seller', 'seller_accepted' => $send ? 'Approved. Please send the item back' : 'Approved. Your refund is being processed', 'return_shipped' => 'Item on its way back to the seller', 'received' => 'Item received. Your refund is being processed',
+    foreach (db()->all('SELECT c.id, c.reason, c.status, c.kind, c.resolution_note, c.created_at, c.respond_by, c.ship_by, c.return_carrier, c.return_tracking, c.pickup_order_id, i.product_id, i.variation_id FROM return_cases c JOIN order_items i ON i.id = c.order_item_id JOIN orders o ON o.id = i.order_id WHERE o.marketplace_order_id = ? ORDER BY c.created_at DESC', [$marketplaceOrderId]) as $r) {
+        $waitingSend = $r['status'] === 'seller_accepted' && $r['kind'] === 'return';
+        $booked = $waitingSend && !empty($r['pickup_order_id']);
+        $send = $waitingSend && !$booked;
+        $label = ['open' => 'Waiting for the seller', 'seller_accepted' => $booked ? 'Approved. A courier pickup is being arranged' : ($send ? 'Approved. Please send the item back' : 'Approved. Your refund is being processed'), 'return_shipped' => 'Item on its way back to the seller', 'received' => 'Item received. Your refund is being processed',
             'seller_disputed' => 'Under review by DDLX', 'refunded' => 'Refunded', 'rejected' => 'Request declined'][$r['status']] ?? $r['status'];
         $out[] = ['id' => $r['id'], 'product_id' => $r['product_id'], 'variation_id' => $r['variation_id'], 'reason' => $r['reason'], 'status' => $r['status'], 'label' => $label, 'note' => $r['resolution_note'], 'created_at' => iso($r['created_at']),
             'can_ship' => $send, 'ship_by' => $send ? iso($r['ship_by']) : null, 'return_address' => $send ? (string) setting('return_address', '') : '', 'tracking' => trim($r['return_carrier'] . ' ' . $r['return_tracking'])];
@@ -235,8 +237,38 @@ function return_after_accept(string $caseId): void
     if (!$c || $c['source'] !== 'customer') return;
     if ($c['kind'] === 'refund_only') { return_auto_refund($caseId, 'Approved: refund without sending the item back', false); return; }
     $db->exec('UPDATE return_cases SET ship_by = ? WHERE id = ?', [db_plus('+' . RETURN_SHIP_DAYS . ' days'), $caseId]);
+    // Preferred: the marketplace books the return as a courier pickup (customer to the seller's store) through the same delivery system.
+    if (marketplace_connected() && setting('return_mode', 'pickup') !== 'self') {
+        $ctx = $db->one('SELECT i.product_id, i.variation_id, i.quantity, i.name, i.seller_id, o.marketplace_order_id FROM return_cases c JOIN order_items i ON i.id = c.order_item_id JOIN orders o ON o.id = i.order_id WHERE c.id = ?', [$caseId]);
+        $seller = $ctx && function_exists('marketplace_seller_payload') ? marketplace_seller_payload($ctx['seller_id']) : [];
+        $res = $ctx ? marketplace_call('/return-pickup', 'POST', ['case_id' => $caseId, 'order_id' => $ctx['marketplace_order_id'], 'product_id' => $ctx['product_id'], 'variation_id' => $ctx['variation_id'], 'quantity' => (int) $ctx['quantity'],
+            'item_name' => $ctx['name'], 'seller_id' => $ctx['seller_id'], 'seller_name' => $seller['store_name'] ?? '', 'pickup' => $seller['pickup'] ?? []], 15) : null;
+        if (is_array($res) && !empty($res['order_id'])) {
+            $db->exec('UPDATE return_cases SET pickup_order_id = ? WHERE id = ?', [str_limit((string) $res['order_id'], 40), $caseId]);
+            return_tell_customer($caseId, 'Your return request was approved. DDLX will arrange a courier to collect the item from your delivery address and take it back to the seller. Please have it packed. You do not need to do anything else.');
+            return;
+        }
+    }
     $addr = trim((string) setting('return_address', ''));
     return_tell_customer($caseId, 'Your return request was approved. Please send the item back within ' . RETURN_SHIP_DAYS . ' days' . ($addr !== '' ? ' to: ' . $addr : '') . ', then add the courier and tracking number in your account under this order.');
+}
+
+// The courier collected the return (shipped) or dropped it at the seller's store (delivered). Reported by the marketplace's return order.
+function return_pickup_update(array $r): array
+{
+    $db = db();
+    $c = $db->one("SELECT c.id, c.seller_id, c.status, i.name FROM return_cases c JOIN order_items i ON i.id = c.order_item_id WHERE c.id = ? AND c.pickup_order_id = ?", [(string) ($r['case_id'] ?? ''), (string) ($r['order_id'] ?? '')]);
+    if (!$c) return ['error' => 'Unknown return.', 'code' => 404];
+    $st = (string) ($r['status'] ?? '');
+    if (!in_array($st, ['shipped', 'delivered'], true)) return ['error' => 'Unknown status.', 'code' => 400];
+    if ($st === 'shipped' && $c['status'] === 'seller_accepted') {
+        $db->exec("UPDATE return_cases SET status = 'return_shipped', return_carrier = 'DDLX courier', return_tracking = ?, shipped_at = ?, updated_at = ? WHERE id = ? AND status = 'seller_accepted'", ['return ' . str_limit((string) $r['order_id'], 30), now_db(), now_db(), $c['id']]);
+        notify($c['seller_id'], 'return', 'A courier collected the return: ' . $c['name'], "It is on its way to your store.\n\nConfirm when it arrives. If you do not confirm within " . RETURN_RECEIVE_DAYS . ' days it counts as received and the customer is refunded.', '/seller?tab=returns');
+        return_tell_customer($c['id'], 'The courier collected your return. The seller will confirm when it arrives, and then your refund is sent.');
+    } elseif ($st === 'delivered' && $c['status'] === 'return_shipped') {
+        notify($c['seller_id'], 'return', 'The return reached your store: ' . $c['name'], 'Please check the item and confirm it arrived, or tell us if something is wrong.', '/seller?tab=returns');
+    }
+    return ['ok' => true];
 }
 
 // Approves the refund as the system: seller earnings are reversed and, when Paystack is on, the customer is paid back at once.

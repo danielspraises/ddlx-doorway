@@ -910,6 +910,28 @@ db()->exec('UPDATE return_cases SET shipped_at = ? WHERE id = ?', [db_plus('-6 d
 set_setting('returns_last_sweep', ''); returns_sweep_if_due();
 eq(db()->val('SELECT status FROM return_cases WHERE id = ?', [$r4['case_id']]), 'refunded', 'return flow: no confirmation in 5 days counts as received');
 
+// ---- returns collected by the marketplace's courier (customer to the seller's store)
+set_setting('marketplace_url', 'https://shop.test'); set_setting('marketplace_api_key', 'k');
+$GLOBALS['vh_market_stub'] = function ($path, $method, $body) use (&$stubCalls) { $stubCalls[] = [$path, $body]; return $path === '/return-pickup' ? ['ok' => true, 'order_id' => '5555'] : ['ok' => true]; };
+$stubCalls = [];
+db()->exec("UPDATE order_items SET status = 'paid', fulfilment = 'delivered' WHERE id = ?", [$retItem]);
+apply_marketplace_status(['id' => 'WC-RET', 'status' => 'delivered', 'carrier' => '', 'tracking' => '', 'note' => ''], 'marketplace');
+$p1 = customer_open_return(['order_id' => 'WC-RET', 'product_id' => $pid, 'reason' => 'Not as described', 'details' => 'Colour differs']);
+ok(!empty($p1['ok']), 'pickup: request opened');
+seller_respond_return($sid, $p1['case_id'], 'accept', '');
+eq(db()->val('SELECT pickup_order_id FROM return_cases WHERE id = ?', [$p1['case_id']]), '5555', 'pickup: the marketplace booked a return order');
+$call = array_values(array_filter($stubCalls, fn ($c) => $c[0] === '/return-pickup'))[0] ?? null;
+ok($call && $call[1]['case_id'] === $p1['case_id'] && isset($call[1]['pickup']), 'pickup: the seller\'s address is sent as the destination');
+$cc = array_values(array_filter(customer_cases_for_order('WC-RET'), fn ($c) => $c['id'] === $p1['case_id']))[0];
+ok(!$cc['can_ship'] && str_contains($cc['label'], 'courier'), 'pickup: the customer is not asked to send it themselves');
+ok(isset(return_pickup_update(['case_id' => $p1['case_id'], 'order_id' => 'wrong', 'status' => 'shipped'])['error']), 'pickup: wrong return order refused');
+ok(!empty(return_pickup_update(['case_id' => $p1['case_id'], 'order_id' => '5555', 'status' => 'shipped'])['ok']), 'pickup: courier collected');
+eq(db()->val('SELECT status FROM return_cases WHERE id = ?', [$p1['case_id']]), 'return_shipped', 'pickup: item on its way back');
+ok(!empty(return_pickup_update(['case_id' => $p1['case_id'], 'order_id' => '5555', 'status' => 'delivered'])['ok']), 'pickup: delivered to the seller');
+eq(seller_return_arrived($sid, $p1['case_id'], 'received', ''), null, 'pickup: seller confirms arrival');
+eq(db()->val('SELECT status FROM return_cases WHERE id = ?', [$p1['case_id']]), 'refunded', 'pickup: refunded after arrival');
+unset($GLOBALS['vh_market_stub']); set_setting('marketplace_url', ''); set_setting('marketplace_api_key', '');
+
 // marketplace admin sees every return with its stage
 $feed = marketplace_returns_feed('all', 50);
 ok(count($feed) >= 4, 'returns feed lists the cases');

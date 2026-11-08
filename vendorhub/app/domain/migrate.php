@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -113,6 +113,9 @@ function migration_steps(): array
             foreach (['ship_by DATETIME(3) NULL', "return_carrier VARCHAR(80) NOT NULL DEFAULT ''", "return_tracking VARCHAR(100) NOT NULL DEFAULT ''", 'shipped_at DATETIME(3) NULL'] as $def) {
                 if (!column_exists($db, 'return_cases', explode(' ', $def)[0])) $db->exec('ALTER TABLE return_cases ADD COLUMN ' . $def);
             }
+        },
+        12 => function (Db $db) {
+            if (!column_exists($db, 'return_cases', 'pickup_order_id')) $db->exec('ALTER TABLE return_cases ADD COLUMN pickup_order_id VARCHAR(40) NULL');
         },
     ];
 }

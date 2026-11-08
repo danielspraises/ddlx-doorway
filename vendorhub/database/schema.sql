@@ -336,6 +336,7 @@ CREATE TABLE return_cases (
   return_carrier VARCHAR(80) NOT NULL DEFAULT '',
   return_tracking VARCHAR(100) NOT NULL DEFAULT '',
   shipped_at DATETIME(3) NULL,
+  pickup_order_id VARCHAR(40) NULL,
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   CONSTRAINT rc_item_fk FOREIGN KEY (order_item_id) REFERENCES order_items(id),

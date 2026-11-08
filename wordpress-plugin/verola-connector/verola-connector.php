@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.8.0
+ * Version: 1.9.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -81,6 +81,8 @@ final class Verola_Connector {
 		add_filter('woocommerce_default_address_fields', [__CLASS__, 'address_fields']);
 		add_filter('woocommerce_checkout_fields', [__CLASS__, 'checkout_fields']);
 		add_action('add_meta_boxes', [__CLASS__, 'return_metabox']);
+		add_action('woocommerce_init', [__CLASS__, 'hook_origin']);
+		add_action(self::RETURN_EVENT, [__CLASS__, 'send_return_event'], 10, 3);
 		add_action('woocommerce_admin_order_data_after_shipping_address', [__CLASS__, 'handoff_fields']);
 		add_action('woocommerce_process_shop_order_meta', [__CLASS__, 'save_handoff_fields']);
 		if (!wp_next_scheduled(self::CRON)) {
@@ -224,6 +226,7 @@ final class Verola_Connector {
 
 	// ------------------------------------------------------------------ delivery statuses
 
+	const RETURN_EVENT = 'verola_return_event';
 	const STATUSES = ['ready-shipping' => 'Ready for shipping', 'shipped' => 'Shipped', 'delivered' => 'Delivered'];
 
 	public static function register_statuses() {
@@ -353,6 +356,7 @@ final class Verola_Connector {
 	}
 
 	public static function register_rest() {
+		register_rest_route('vendor-hub/v1', '/return-pickup', ['methods' => 'POST', 'callback' => [__CLASS__, 'rest_return_pickup'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
 		register_rest_route('vendor-hub/v1', '/order-status', ['methods' => 'POST', 'callback' => [__CLASS__, 'rest_order_status'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
 		register_rest_route('vendor-hub/v1', '/sku/next', ['methods' => 'GET', 'callback' => [__CLASS__, 'rest_sku_next'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
 		register_rest_route('vendor-hub/v1', '/sku/check', ['methods' => 'POST', 'callback' => [__CLASS__, 'rest_sku_check'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
@@ -462,7 +466,7 @@ final class Verola_Connector {
 				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
 			];
 		}
-		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.8.0'];
+		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.9.0'];
 	}
 
 	public static function rest_link($request) {
@@ -1495,6 +1499,7 @@ final class Verola_Connector {
 			$screens[] = wc_get_page_screen_id('shop-order');
 		}
 		add_meta_box('verola_returns', 'Returns (Vendor Hub)', [__CLASS__, 'return_metabox_html'], $screens, 'side', 'default');
+		add_meta_box('verola_origin', 'Courier pickup address', [__CLASS__, 'origin_metabox_html'], $screens, 'side', 'high');
 	}
 
 	public static function return_metabox_html($post) {
@@ -1512,6 +1517,212 @@ final class Verola_Connector {
 			echo '<p><strong>' . esc_html($c['label']) . '</strong><br>' . esc_html($c['reason']) . (!empty($c['tracking']) ? '<br>Sent with ' . esc_html($c['tracking']) : '') . '</p>';
 		}
 		echo '<p><a href="' . esc_url(admin_url('admin.php?page=verola-returns&status=all')) . '">All returns</a></p>';
+	}
+
+
+	// ------------------------------------------------------------------ return pickups and courier origin
+
+	// Vendor Hub asks for a courier pickup of a returned item: customer's delivery address to the seller's store.
+	// It becomes a normal order in "Ready for shipping", so the courier is booked the same way as any delivery.
+	public static function rest_return_pickup($request) {
+		$case = sanitize_text_field((string) $request->get_param('case_id'));
+		$orig = wc_get_order((int) $request->get_param('order_id'));
+		if (!$orig || $case === '') {
+			return new WP_REST_Response(['error' => 'Unknown order.'], 404);
+		}
+		$existing = wc_get_orders(['limit' => 1, 'meta_key' => '_vh_return_case', 'meta_value' => $case, 'return' => 'ids']);
+		if ($existing) {
+			return ['ok' => true, 'order_id' => (string) $existing[0]];
+		}
+		$hub_pid = (string) $request->get_param('product_id');
+		$hub_vid = (string) $request->get_param('variation_id');
+		$qty = max(1, (int) $request->get_param('quantity'));
+		$product = null;
+		foreach ($orig->get_items() as $line) {
+			$pid = (int) $line->get_product_id();
+			$vid = (int) $line->get_variation_id();
+			if (get_post_meta($pid, '_verola_product_id', true) === $hub_pid && ($hub_vid === '' || $hub_vid === 'null' || get_post_meta($vid, '_verola_variation_id', true) === $hub_vid)) {
+				$product = $line->get_product();
+				break;
+			}
+		}
+		$pick = (array) $request->get_param('pickup');
+		$country = stripos((string) ($pick['country'] ?? 'Nigeria'), 'nigeria') !== false || empty($pick['country']) ? 'NG' : strtoupper(substr((string) $pick['country'], 0, 2));
+		$dest = ['first_name' => sanitize_text_field((string) $request->get_param('seller_name')), 'last_name' => '(return)', 'address_1' => sanitize_text_field((string) ($pick['street'] ?? '')), 'city' => sanitize_text_field((string) ($pick['city'] ?? '')),
+			'state' => $country === 'NG' ? self::ng_state_code($pick['state'] ?? '') : sanitize_text_field((string) ($pick['state'] ?? '')), 'country' => $country, 'phone' => sanitize_text_field((string) ($pick['phone'] ?? ''))];
+		$from = [];
+		foreach (['first_name', 'last_name', 'address_1', 'address_2', 'city', 'state', 'postcode', 'country', 'phone'] as $f) {
+			$v = (string) $orig->{'get_shipping_' . $f}();
+			$from[$f] = $v !== '' ? $v : (string) $orig->{'get_billing_' . $f}();
+		}
+		$ret = wc_create_order(['customer_id' => $orig->get_customer_id(), 'created_via' => 'verola_return', 'status' => 'pending']);
+		if (is_wp_error($ret)) {
+			return new WP_REST_Response(['error' => $ret->get_error_message()], 500);
+		}
+		$ret->update_meta_data('_vh_return_case', $case);
+		$ret->update_meta_data('_vh_return_of', $orig->get_id());
+		$ret->update_meta_data('_vh_pickup_origin', $from);
+		$ret->set_address(['first_name' => $orig->get_billing_first_name(), 'last_name' => $orig->get_billing_last_name(), 'email' => $orig->get_billing_email(), 'phone' => $orig->get_billing_phone(),
+			'address_1' => $from['address_1'], 'city' => $from['city'], 'state' => $from['state'], 'postcode' => $from['postcode'], 'country' => $from['country']], 'billing');
+		$ret->set_address($dest, 'shipping');
+		$name = sanitize_text_field((string) $request->get_param('item_name'));
+		if ($product) {
+			$ret->add_product($product, $qty, ['subtotal' => 0, 'total' => 0]);
+		} else {
+			$fee = new WC_Order_Item_Fee();
+			$fee->set_name('Return: ' . $name);
+			$fee->set_total(0);
+			$ret->add_item($fee);
+		}
+		$ret->set_total(0);
+		$ret->save();
+		// The item is going back to the seller, not being sold again: never touch stock for this order.
+		try {
+			$ret->get_data_store()->set_stock_reduced($ret->get_id(), true);
+		} catch (Throwable $e) {
+			$ret->update_meta_data('_order_stock_reduced', 'yes');
+		}
+		$ret->add_order_note(sprintf('Return pickup for order #%s (%s). Collect from the customer at the shipping origin shown above and deliver to %s, %s. Vendor Hub case %s.', $orig->get_order_number(), $name, $dest['first_name'], trim($dest['address_1'] . ', ' . $dest['city']), $case));
+		$ret->set_status('ready-shipping', 'Return pickup requested by Vendor Hub.');
+		$ret->save();
+		$orig->add_order_note('Return pickup created as order #' . $ret->get_order_number() . ' for ' . $name . '.');
+		return ['ok' => true, 'order_id' => (string) $ret->get_id()];
+	}
+
+	// Tells Vendor Hub when the courier collected a return or delivered it to the seller. Retries if Vendor Hub is unreachable.
+	public static function send_return_event($order_id, $status, $attempt = 1) {
+		$order = wc_get_order($order_id);
+		$case = $order ? (string) $order->get_meta('_vh_return_case') : '';
+		if (!$order || $case === '' || !self::configured() || $order->get_meta('_verola_ret_' . $status)) {
+			return;
+		}
+		$s = self::settings();
+		$body = wp_json_encode(['case_id' => $case, 'order_id' => (string) $order_id, 'status' => $status]);
+		$ts = time();
+		$res = wp_remote_post($s['url'] . '/api/marketplace/returns/pickup-status', [
+			'timeout' => 20,
+			'headers' => ['Content-Type' => 'application/json', 'X-Verola-Timestamp' => (string) $ts, 'X-Verola-Signature' => 'sha256=' . hash_hmac('sha256', $ts . '.' . $body, $s['secret'])],
+			'body' => $body,
+		]);
+		$code = is_wp_error($res) ? 0 : (int) wp_remote_retrieve_response_code($res);
+		if ($code >= 200 && $code < 300) {
+			$order->update_meta_data('_verola_ret_' . $status, time());
+			$order->add_order_note('Reported to Vendor Hub (return ' . $status . ').');
+			$order->save();
+			return;
+		}
+		if ($code >= 400 && $code < 500 && $code !== 404 || $attempt >= 6) {
+			$order->add_order_note('Could not report the return to Vendor Hub (' . $status . '): ' . (is_wp_error($res) ? $res->get_error_message() : 'status ' . $code) . '. Not retrying.');
+			$order->save();
+			return;
+		}
+		wp_schedule_single_event(time() + 300 * $attempt, self::RETURN_EVENT, [(int) $order_id, $status, $attempt + 1]);
+	}
+
+	// ---- courier origin: the store address WooCommerce reports follows the seller
+
+	private static $pkg_vendor = null;
+	private static $origin_busy = false;
+
+	// Any courier plugin that reads the WooCommerce store address (Settings > General) while pricing or booking a parcel gets the
+	// seller's verified pickup address instead, so changing the courier needs no change here. Return pickups use the customer's address.
+	public static function hook_origin() {
+		if (!apply_filters('verola_use_vendor_origin', !defined('VEROLA_NO_VENDOR_ORIGIN'))) {
+			return;
+		}
+		$map = ['woocommerce_store_address' => 'address_1', 'woocommerce_store_address_2' => 'address_2', 'woocommerce_store_city' => 'city', 'woocommerce_store_postcode' => 'postcode', 'woocommerce_default_country' => 'country'];
+		foreach ($map as $option => $key) {
+			add_filter('pre_option_' . $option, function ($pre) use ($key) {
+				$o = self::current_origin();
+				if (!$o) {
+					return $pre;
+				}
+				return $key === 'country' ? ($o['country'] ?: 'NG') . (!empty($o['state']) ? ':' . $o['state'] : '') : (string) ($o[$key] ?? '');
+			});
+		}
+		// At checkout each vendor's package is priced on its own: note whose parcel it is just before the shipping methods run.
+		if (WC()->shipping()) {
+			foreach (array_keys(WC()->shipping()->get_shipping_method_class_names()) as $id) {
+				add_filter('woocommerce_shipping_' . $id . '_is_available', function ($available, $package) {
+					self::$pkg_vendor = self::package_vendor($package);
+					return $available;
+				}, 5, 2);
+			}
+		}
+		add_filter('woocommerce_package_rates', function ($rates) {
+			self::$pkg_vendor = null;
+			return $rates;
+		}, 1);
+	}
+
+	private static function package_vendor($package) {
+		foreach (['seller_id', 'vendor_id'] as $k) {
+			if (!empty($package[$k])) {
+				return (int) $package[$k];
+			}
+		}
+		$authors = [];
+		foreach ((array) ($package['contents'] ?? []) as $item) {
+			$authors[(int) get_post_field('post_author', (int) ($item['product_id'] ?? 0))] = true;
+		}
+		return count($authors) === 1 ? (int) array_key_first($authors) : null;
+	}
+
+	private static function order_origin($order) {
+		$o = $order->get_meta('_vh_pickup_origin');
+		if (is_array($o) && !empty($o['address_1'])) {
+			return ['address_1' => $o['address_1'], 'address_2' => $o['address_2'] ?? '', 'city' => $o['city'] ?? '', 'postcode' => $o['postcode'] ?? '', 'state' => $o['state'] ?? '', 'country' => $o['country'] ?? 'NG'];
+		}
+		$vendors = [];
+		$vid = (int) $order->get_meta('_dokan_vendor_id');
+		if ($vid) {
+			$vendors[$vid] = true;
+		} else {
+			foreach ($order->get_items() as $line) {
+				$vendors[(int) get_post_field('post_author', (int) $line->get_product_id())] = true;
+			}
+		}
+		if (count($vendors) !== 1) {
+			return null;
+		}
+		return self::vendor_origin((int) array_key_first($vendors));
+	}
+
+	private static function current_origin() {
+		if (self::$origin_busy) {
+			return null;
+		}
+		self::$origin_busy = true;
+		try {
+			if (self::$pkg_vendor) {
+				return self::vendor_origin(self::$pkg_vendor);
+			}
+			if (is_admin() && (($_GET['page'] ?? '') !== 'wc-settings')) {
+				foreach (['order_id', 'post', 'post_ID', 'id', 'order'] as $k) {
+					$id = isset($_REQUEST[$k]) && is_scalar($_REQUEST[$k]) ? absint($_REQUEST[$k]) : 0;
+					if ($id) {
+						$order = wc_get_order($id);
+						if ($order && $order->get_type() === 'shop_order') {
+							return self::order_origin($order);
+						}
+					}
+				}
+			}
+			return null;
+		} finally {
+			self::$origin_busy = false;
+		}
+	}
+
+	public static function origin_metabox_html($post) {
+		$order = $post instanceof WC_Order ? $post : wc_get_order(is_object($post) ? $post->ID : (int) $post);
+		$o = $order ? self::order_origin($order) : null;
+		if (!$o) {
+			echo '<p>No seller address on this order. The courier uses the store address from WooCommerce settings.</p>';
+			return;
+		}
+		echo '<p>The courier plugin collects from:<br><strong>' . esc_html(trim($o['address_1'] . ' ' . ($o['address_2'] ?? ''))) . '<br>' . esc_html($o['city']) . ', ' . esc_html($o['state']) . ' ' . esc_html($o['country']) . '</strong></p>'
+			. ($order->get_meta('_vh_return_case') ? '<p><em>Return pickup: collected from the customer.</em></p>' : '<p><em>The seller\'s verified business address.</em></p>');
 	}
 
 	// ------------------------------------------------------------------ customer returns (My Account -> Vendor Hub)
@@ -1537,7 +1748,7 @@ final class Verola_Connector {
 
 	// "Request a return" for each Vendor Hub item on an order that has shipped or been delivered.
 	public static function return_panel($order) {
-		if (!($order instanceof WC_Order) || !self::configured() || $order->get_parent_id() || !is_user_logged_in() || (int) $order->get_user_id() !== get_current_user_id()) {
+		if (!($order instanceof WC_Order) || !self::configured() || $order->get_parent_id() || $order->get_meta('_vh_return_case') || !is_user_logged_in() || (int) $order->get_user_id() !== get_current_user_id()) {
 			return;
 		}
 		if (self::hub_rank(self::hub_status($order->get_status())) < 3) {
@@ -1753,6 +1964,13 @@ final class Verola_Connector {
 		if (!$hub || !$order) {
 			return;
 		}
+		// A return pickup is its own order: the courier collecting or delivering it moves the return case, never the seller's sale.
+		if ($order->get_meta('_vh_return_case')) {
+			if (self::hub_rank($hub) >= 3) {
+				wp_schedule_single_event(time() + 5, self::RETURN_EVENT, [(int) $order_id, $hub === 'shipped' ? 'shipped' : 'delivered', 1]);
+			}
+			return;
+		}
 		$target = (int) $order_id;
 		// Dokan splits a multi-seller order into one sub-order per seller. Vendor Hub knows the parent order, so a
 		// sub-order's change is reported on the parent once every sub-order has reached that step.
@@ -1773,7 +1991,7 @@ final class Verola_Connector {
 		$order = wc_get_order($order_id);
 		// Dokan splits a multi-seller order into one sub-order per seller. The parent order already holds every
 		// item, so only parent orders are reported; reporting the sub-orders as well would pay sellers twice.
-		if (!$order || $order->get_parent_id() || $order->get_meta('_verola_sent_' . $event)) {
+		if (!$order || $order->get_parent_id() || $order->get_meta('_vh_return_case') || $order->get_meta('_verola_sent_' . $event)) {
 			return;
 		}
 		// Send in the background so checkout is never slowed down or broken by Vendor Hub being offline.

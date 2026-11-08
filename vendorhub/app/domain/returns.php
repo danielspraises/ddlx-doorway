@@ -8,8 +8,11 @@ const RETURN_REASONS = ['Damaged or defective', 'Wrong item sent', 'Not as descr
 // Refunded on photo evidence without sending the item back; every other reason is return first, then refund.
 const RETURN_REFUND_ONLY = ['Damaged or defective', 'Never arrived'];
 const RETURN_SELLER_HOURS = 48;
-const RETURN_LABEL = ['open' => 'Waiting for seller', 'seller_accepted' => 'Seller agrees', 'seller_disputed' => 'Seller disputes', 'refunded' => 'Refunded', 'rejected' => 'Rejected'];
-const RETURN_KINDS = ['open' => 'warn', 'seller_accepted' => 'warn', 'seller_disputed' => 'bad', 'refunded' => 'ok', 'rejected' => ''];
+const RETURN_LABEL = ['open' => 'Waiting for seller', 'seller_accepted' => 'Seller agrees', 'return_shipped' => 'Item on its way back', 'received' => 'Item received', 'seller_disputed' => 'Seller disputes', 'refunded' => 'Refunded', 'rejected' => 'Rejected'];
+const RETURN_KINDS = ['open' => 'warn', 'seller_accepted' => 'warn', 'return_shipped' => 'warn', 'received' => 'ok', 'seller_disputed' => 'bad', 'refunded' => 'ok', 'rejected' => ''];
+const RETURN_SHIP_DAYS = 7;     // the customer has this long to send the item back after the seller agrees
+const RETURN_RECEIVE_DAYS = 5;  // the seller has this long to confirm it arrived; after that it counts as received
+const RETURN_SYSTEM_ID = '00000000-0000-4000-8000-000000000001';
 const RETURN_FINAL = ['refunded', 'rejected'];
 
 function return_base_sql(): string
@@ -62,6 +65,8 @@ function seller_respond_return(string $sellerId, string $caseId, string $action,
     $n = $db->exec("UPDATE return_cases SET status = ?, seller_response = ?, updated_at = ? WHERE id = ? AND seller_id = ? AND status = 'open'", [$to, $response, now_db(), $caseId, $sellerId]);
     if (!$n) return 'This case is no longer waiting for you.';
     announce('orders', 'return', 'A seller answered a return case');
+    if ($action === 'accept') return_after_accept($caseId);
+    else return_tell_customer($caseId, 'The seller disagrees with your return request. DDLX will review it and decide. You do not need to do anything.');
     return null;
 }
 
@@ -70,12 +75,19 @@ function resolve_return(array $admin, string $caseId, string $decision, bool $re
 {
     $db = db();
     $note = trim($note);
-    if (!in_array($decision, ['refund', 'reject'], true)) return 'Unknown decision.';
+    if (!in_array($decision, ['refund', 'reject', 'approve'], true)) return 'Unknown decision.';
     if ($decision === 'reject' && $note === '') return 'Add a note so the seller knows why it was rejected.';
     $c = $db->one(return_base_sql() . ' WHERE c.id = ?', [$caseId]);
     if (!$c) return 'Case not found.';
     if (in_array($c['status'], RETURN_FINAL, true)) return 'This case is already closed.';
     $label = $c['number'] ?: $c['marketplace_order_id'];
+    if ($decision === 'approve') {
+        if ($c['kind'] !== 'return' || $c['source'] !== 'customer' || !in_array($c['status'], ['open', 'seller_disputed'], true)) return 'This case cannot be approved for a return.';
+        $db->exec("UPDATE return_cases SET status = 'seller_accepted', resolution_note = ?, updated_at = ? WHERE id = ?", [$note, now_db(), $c['id']]);
+        notify($c['seller_id'], 'return', 'Return approved by DDLX: ' . $c['item_name'] . ' (order ' . $label . ')', 'The customer will send the item back to DDLX. Your earnings stay on hold meanwhile.' . ($note !== '' ? "\n" . $note : ''), '/seller?tab=returns');
+        return_after_accept($c['id']);
+        return null;
+    }
     $sellers = [];
     $err = $db->tx(function () use ($db, $c, $decision, $restock, $note, $admin, $label, &$sellers) {
         if ($decision === 'refund') {
@@ -91,6 +103,7 @@ function resolve_return(array $admin, string $caseId, string $decision, bool $re
     if ($err) return $err;
     notify($c['seller_id'], 'return', $decision === 'refund' ? 'Refunded: ' . $c['item_name'] . ' (order ' . $label . ')' : 'Return rejected: ' . $c['item_name'] . ' (order ' . $label . ')',
         $decision === 'refund' ? 'Your earnings for this item were taken back.' . ($note !== '' ? "\n" . $note : '') : $note, '/seller?tab=returns');
+    if ($c['source'] === 'customer') return_tell_customer($c['id'], $decision === 'refund' ? 'Your return for ' . $c['item_name'] . ' was approved and your refund is being sent to your original payment method. It can take a few days to show on your statement.' : 'Your return request for ' . $c['item_name'] . ' was declined.' . ($note !== '' ? ' ' . $note : ''));
     if (marketplace_connected()) marketplace_call('/order-status', 'POST', ['order_id' => $c['marketplace_order_id'], 'status' => 'note', 'note' => 'Return case ' . ($decision === 'refund' ? 'approved (refund the customer for ' . $c['item_name'] . ' in WooCommerce)' : 'rejected') . ($note !== '' ? ': ' . $note : '')]);
     return null;
 }
@@ -166,14 +179,81 @@ function customer_open_return(array $r): array
 function customer_cases_for_order(string $marketplaceOrderId): array
 {
     $out = [];
-    foreach (db()->all('SELECT c.id, c.reason, c.status, c.kind, c.resolution_note, c.created_at, c.respond_by, i.product_id, i.variation_id FROM return_cases c JOIN order_items i ON i.id = c.order_item_id JOIN orders o ON o.id = i.order_id WHERE o.marketplace_order_id = ? ORDER BY c.created_at DESC', [$marketplaceOrderId]) as $r) {
-        $label = ['open' => 'Waiting for the seller', 'seller_accepted' => $r['kind'] === 'refund_only' ? 'Approved. Refund being processed' : 'Approved. Please return the item', 'seller_disputed' => 'Under review by DDLX', 'refunded' => 'Refunded', 'rejected' => 'Request declined'][$r['status']] ?? $r['status'];
-        $out[] = ['id' => $r['id'], 'product_id' => $r['product_id'], 'variation_id' => $r['variation_id'], 'reason' => $r['reason'], 'status' => $r['status'], 'label' => $label, 'note' => $r['resolution_note'], 'created_at' => iso($r['created_at'])];
+    foreach (db()->all('SELECT c.id, c.reason, c.status, c.kind, c.resolution_note, c.created_at, c.respond_by, c.ship_by, c.return_carrier, c.return_tracking, i.product_id, i.variation_id FROM return_cases c JOIN order_items i ON i.id = c.order_item_id JOIN orders o ON o.id = i.order_id WHERE o.marketplace_order_id = ? ORDER BY c.created_at DESC', [$marketplaceOrderId]) as $r) {
+        $send = $r['status'] === 'seller_accepted' && $r['kind'] === 'return';
+        $label = ['open' => 'Waiting for the seller', 'seller_accepted' => $send ? 'Approved. Please send the item back' : 'Approved. Your refund is being processed', 'return_shipped' => 'Item on its way back to the seller', 'received' => 'Item received. Your refund is being processed',
+            'seller_disputed' => 'Under review by DDLX', 'refunded' => 'Refunded', 'rejected' => 'Request declined'][$r['status']] ?? $r['status'];
+        $out[] = ['id' => $r['id'], 'product_id' => $r['product_id'], 'variation_id' => $r['variation_id'], 'reason' => $r['reason'], 'status' => $r['status'], 'label' => $label, 'note' => $r['resolution_note'], 'created_at' => iso($r['created_at']),
+            'can_ship' => $send, 'ship_by' => $send ? iso($r['ship_by']) : null, 'return_address' => $send ? (string) setting('return_address', '') : '', 'tracking' => trim($r['return_carrier'] . ' ' . $r['return_tracking'])];
     }
     return $out;
 }
 
-// No reply within the time limit counts as accepting. Checked hourly on whatever request comes first.
+// The customer tells us they sent the item back.
+function customer_ship_return(array $r): array
+{
+    $db = db();
+    $carrier = trim((string) ($r['carrier'] ?? ''));
+    $tracking = trim((string) ($r['tracking'] ?? ''));
+    if ($carrier === '' || $tracking === '') return ['error' => 'Enter the courier and the tracking number.', 'code' => 422];
+    $c = $db->one("SELECT c.id, c.seller_id, c.status, c.kind, i.name FROM return_cases c JOIN order_items i ON i.id = c.order_item_id JOIN orders o ON o.id = i.order_id WHERE c.id = ? AND o.marketplace_order_id = ? AND c.source = 'customer'", [(string) ($r['case_id'] ?? ''), (string) ($r['order_id'] ?? '')]);
+    if (!$c) return ['error' => 'We could not find that request.', 'code' => 404];
+    $n = $db->exec("UPDATE return_cases SET status = 'return_shipped', return_carrier = ?, return_tracking = ?, shipped_at = ?, updated_at = ? WHERE id = ? AND status = 'seller_accepted' AND kind = 'return'", [str_limit($carrier, 80), str_limit($tracking, 100), now_db(), now_db(), $c['id']]);
+    if (!$n) return ['error' => 'This request is not waiting for you to send the item.', 'code' => 422];
+    notify($c['seller_id'], 'return', 'A customer sent back: ' . $c['name'], trim($carrier . ' ' . $tracking) . "\n\nConfirm when it arrives. If you do not confirm within " . RETURN_RECEIVE_DAYS . ' days it counts as received and the customer is refunded.', '/seller?tab=returns');
+    return ['ok' => true];
+}
+
+// The seller says the returned item arrived (refund follows) or that something is wrong (DDLX decides).
+function seller_return_arrived(string $sellerId, string $caseId, string $action, string $note): ?string
+{
+    $db = db();
+    $note = trim($note);
+    if (!in_array($action, ['received', 'problem'], true)) return 'Unknown action.';
+    if ($action === 'problem' && $note === '') return 'Tell us what is wrong with the item.';
+    $to = $action === 'received' ? 'received' : 'seller_disputed';
+    $n = $db->exec("UPDATE return_cases SET status = ?, seller_response = CASE WHEN ? <> '' THEN ? ELSE seller_response END, updated_at = ? WHERE id = ? AND seller_id = ? AND status = 'return_shipped'", [$to, $note, str_limit($note, 2000), now_db(), $caseId, $sellerId]);
+    if (!$n) return 'This case is no longer waiting for you.';
+    if ($action === 'received') return_auto_refund($caseId, 'Item returned and received by the seller', true);
+    else { announce('orders', 'return', 'A seller reported a problem with a returned item'); return_tell_customer($caseId, 'The seller reported a problem with the item you sent back. DDLX will review it and decide. You do not need to do anything.'); }
+    return null;
+}
+
+// Tells the customer: becomes a note on their order that WooCommerce also emails to them.
+function return_tell_customer(string $caseId, string $text): void
+{
+    if (!marketplace_connected()) return;
+    $mid = db()->val('SELECT o.marketplace_order_id FROM return_cases c JOIN order_items i ON i.id = c.order_item_id JOIN orders o ON o.id = i.order_id WHERE c.id = ? AND c.source = \'customer\'', [$caseId]);
+    if ($mid) marketplace_call('/order-status', 'POST', ['order_id' => $mid, 'status' => 'note', 'note' => $text, 'customer' => true]);
+}
+
+// Seller agreed (or did not reply). A refund-without-return is paid straight away; otherwise the customer has to send the item back.
+function return_after_accept(string $caseId): void
+{
+    $db = db();
+    $c = $db->one('SELECT id, kind, source FROM return_cases WHERE id = ?', [$caseId]);
+    if (!$c || $c['source'] !== 'customer') return;
+    if ($c['kind'] === 'refund_only') { return_auto_refund($caseId, 'Approved: refund without sending the item back', false); return; }
+    $db->exec('UPDATE return_cases SET ship_by = ? WHERE id = ?', [db_plus('+' . RETURN_SHIP_DAYS . ' days'), $caseId]);
+    $addr = trim((string) setting('return_address', ''));
+    return_tell_customer($caseId, 'Your return request was approved. Please send the item back within ' . RETURN_SHIP_DAYS . ' days' . ($addr !== '' ? ' to: ' . $addr : '') . ', then add the courier and tracking number in your account under this order.');
+}
+
+// Approves the refund as the system: seller earnings are reversed and, when Paystack is on, the customer is paid back at once.
+function return_auto_refund(string $caseId, string $note, bool $restock): void
+{
+    $actor = ['id' => RETURN_SYSTEM_ID, 'email' => 'system'];
+    $err = resolve_return($actor, $caseId, 'refund', $restock, $note);
+    if ($err) { log_error('Automatic refund for case ' . $caseId . ': ' . $err); return; }
+    audit($actor, 'return', 'Approved a refund automatically (' . $note . ')', $caseId);
+    if (!paystack_on()) { announce('admins', 'payout', 'A customer refund is waiting to be sent'); return; }
+    $orderId = (string) db()->val('SELECT i.order_id FROM return_cases c JOIN order_items i ON i.id = c.order_item_id WHERE c.id = ?', [$caseId]);
+    $r = db()->one("SELECT id, amount FROM customer_refunds WHERE order_id = ? AND status = 'to_pay' ORDER BY created_at DESC", [$orderId]);
+    if ($r && ($e = paystack_send_refund($actor, $r['id'], (float) $r['amount']))) { log_error('Automatic Paystack refund: ' . $e); announce('admins', 'payout', 'A customer refund needs attention'); }
+}
+
+// Runs hourly on whatever request comes first: no reply counts as accepting, a return not sent back in time is closed,
+// and an unconfirmed arrival counts as received so a seller cannot stall a refund.
 function returns_sweep_if_due(): void
 {
     try {
@@ -183,7 +263,14 @@ function returns_sweep_if_due(): void
         $db = db();
         foreach ($db->all("SELECT c.id, c.seller_id, i.name FROM return_cases c JOIN order_items i ON i.id = c.order_item_id WHERE c.status = 'open' AND c.source = 'customer' AND c.respond_by IS NOT NULL AND c.respond_by < ?", [now_db()]) as $c) {
             $n = $db->exec("UPDATE return_cases SET status = 'seller_accepted', seller_response = ?, updated_at = ? WHERE id = ? AND status = 'open'", ['No reply within ' . RETURN_SELLER_HOURS . ' hours, so the request was accepted.', now_db(), $c['id']]);
-            if ($n) { notify($c['seller_id'], 'return', 'Return accepted automatically: ' . $c['name'], 'You did not reply within ' . RETURN_SELLER_HOURS . ' hours.', '/seller?tab=returns'); announce('orders', 'return', 'A return request was accepted because the seller did not reply'); }
+            if ($n) { notify($c['seller_id'], 'return', 'Return accepted automatically: ' . $c['name'], 'You did not reply within ' . RETURN_SELLER_HOURS . ' hours.', '/seller?tab=returns'); announce('orders', 'return', 'A return request was accepted because the seller did not reply'); return_after_accept($c['id']); }
+        }
+        foreach ($db->all("SELECT c.id, c.seller_id, c.order_item_id, i.name FROM return_cases c JOIN order_items i ON i.id = c.order_item_id WHERE c.status = 'seller_accepted' AND c.kind = 'return' AND c.source = 'customer' AND c.ship_by IS NOT NULL AND c.ship_by < ?", [now_db()]) as $c) {
+            $n = $db->exec("UPDATE return_cases SET status = 'rejected', resolution_note = ?, resolved_at = ?, updated_at = ? WHERE id = ? AND status = 'seller_accepted'", ['The item was not sent back in time.', now_db(), now_db(), $c['id']]);
+            if ($n) { return_unfreeze($c['id'], $c['order_item_id']); notify($c['seller_id'], 'return', 'Return closed: ' . $c['name'], 'The customer did not send the item back in time. Your earnings are released.', '/seller?tab=returns'); return_tell_customer($c['id'], 'Your return request for ' . $c['name'] . ' was closed because the item was not sent back within ' . RETURN_SHIP_DAYS . ' days.'); }
+        }
+        foreach ($db->all("SELECT id FROM return_cases WHERE status = 'return_shipped' AND source = 'customer' AND shipped_at IS NOT NULL AND shipped_at < ?", [db_plus('-' . RETURN_RECEIVE_DAYS . ' days')]) as $c) {
+            if ($db->exec("UPDATE return_cases SET status = 'received', updated_at = ? WHERE id = ? AND status = 'return_shipped'", [now_db(), $c['id']])) return_auto_refund($c['id'], 'Item sent back; the seller did not confirm within ' . RETURN_RECEIVE_DAYS . ' days', true);
         }
     } catch (Throwable $e) {
         log_error('returns sweep: ' . $e->getMessage());

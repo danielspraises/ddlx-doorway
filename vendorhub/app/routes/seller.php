@@ -25,6 +25,12 @@ route('POST', '/returns/respond', function () {
     redirect('/seller?tab=returns', $err ?? 'Your reply was sent.', $err ? 'error' : 'ok');
 });
 
+route('POST', '/returns/arrived', function () {
+    $u = require_seller();
+    $err = seller_return_arrived($u['id'], input('id'), input('action'), input_raw('note'));
+    redirect('/seller?tab=returns', $err ?? (input('action') === 'received' ? 'Thank you. The customer is being refunded.' : 'DDLX will review it.'), $err ? 'error' : 'ok');
+});
+
 // ---------------------------------------------------------------- exports
 
 route('GET', '/seller/export', function () {

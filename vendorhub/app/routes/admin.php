@@ -62,8 +62,8 @@ route('POST', '/admin/return/resolve', function () {
     $u = require_orders();
     $d = input('decision');
     $err = resolve_return($u, input('id'), $d, input('restock') === 'yes', input_raw('note'));
-    if (!$err) audit($u, 'return', $d === 'refund' ? 'Approved a refund' : 'Rejected a return', input('id'));
-    redirect('/admin?tab=returns', $err ?? ($d === 'refund' ? 'Refund recorded and the seller\'s earnings reversed. Refund the customer in WooCommerce.' : 'Case rejected.'), $err ? 'error' : 'ok');
+    if (!$err) audit($u, 'return', $d === 'refund' ? 'Approved a refund' : ($d === 'approve' ? 'Approved a return' : 'Rejected a return'), input('id'));
+    redirect('/admin?tab=returns', $err ?? ($d === 'refund' ? 'Refund recorded and the seller\'s earnings reversed. Refund the customer in WooCommerce.' : ($d === 'approve' ? 'Return approved. The customer will send the item back.' : 'Case rejected.')), $err ? 'error' : 'ok');
 });
 
 route('POST', '/admin/order', function () {

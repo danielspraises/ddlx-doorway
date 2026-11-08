@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.7.0
+ * Version: 1.7.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -76,6 +76,7 @@ final class Verola_Connector {
 		add_action('wp_footer', [__CLASS__, 'store_ticks']);
 		add_action('woocommerce_order_details_after_order_table', [__CLASS__, 'return_panel']);
 		add_action('admin_post_verola_return', [__CLASS__, 'return_submit']);
+		add_action('admin_post_verola_return_ship', [__CLASS__, 'return_ship_submit']);
 		add_action('woocommerce_admin_order_data_after_shipping_address', [__CLASS__, 'handoff_fields']);
 		add_action('woocommerce_process_shop_order_meta', [__CLASS__, 'save_handoff_fields']);
 		if (!wp_next_scheduled(self::CRON)) {
@@ -286,7 +287,10 @@ final class Verola_Connector {
 			return self::admin_order_status($order, $status, $request);
 		}
 		if ($order && $status === 'note') {
-			$order->add_order_note('Vendor Hub: ' . sanitize_text_field((string) $request->get_param('note')));
+			// A customer note is emailed to the buyer by WooCommerce and shown in their account; anything else stays private.
+			$text = sanitize_text_field((string) $request->get_param('note'));
+			$request->get_param('customer') ? $order->add_order_note($text, 1) : $order->add_order_note('Vendor Hub: ' . $text);
+			delete_transient('verola_rc_' . $order->get_id());
 			return ['ok' => true];
 		}
 		$seller = sanitize_text_field((string) $request->get_param('seller_id'));
@@ -453,7 +457,7 @@ final class Verola_Connector {
 				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
 			];
 		}
-		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.7.0'];
+		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.7.1'];
 	}
 
 	public static function rest_link($request) {
@@ -1395,7 +1399,13 @@ final class Verola_Connector {
 			}
 			$rows .= '<li class="vh-ret-item"><div class="vh-ret-name">' . esc_html($line->get_name()) . '</div>';
 			if ($mine && !in_array($mine['status'], ['rejected'], true)) {
-				$rows .= '<div class="vh-ret-status"><strong>' . esc_html($mine['label']) . '</strong>' . (!empty($mine['note']) ? '<span>' . esc_html($mine['note']) . '</span>' : '') . '</div>';
+				$rows .= '<div class="vh-ret-status"><strong>' . esc_html($mine['label']) . '</strong>' . (!empty($mine['note']) ? '<span>' . esc_html($mine['note']) . '</span>' : '') . (!empty($mine['tracking']) ? '<span>Sent with ' . esc_html($mine['tracking']) . '</span>' : '') . '</div>';
+				if (!empty($mine['can_ship'])) {
+					$rows .= '<div class="vh-ret-ship"><p>Send the item back' . (!empty($mine['ship_by']) ? ' by ' . esc_html(wp_date(get_option('date_format'), strtotime($mine['ship_by']))) : '') . ($mine['return_address'] !== '' ? ' to:<br><strong>' . nl2br(esc_html($mine['return_address'])) . '</strong>' : '.') . '</p>'
+						. '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="verola_return_ship"><input type="hidden" name="order_id" value="' . (int) $order->get_id() . '"><input type="hidden" name="case_id" value="' . esc_attr($mine['id']) . '">'
+						. wp_nonce_field('verola_return_ship_' . $order->get_id(), '_wpnonce', true, false)
+						. '<label>Courier<input type="text" name="carrier" required maxlength="80" placeholder="e.g. DHL, GIG Logistics"></label><label>Tracking number<input type="text" name="tracking" required maxlength="100"></label><button type="submit" class="button">I sent it</button></form></div>';
+				}
 			} else {
 				if ($mine) {
 					$rows .= '<div class="vh-ret-status"><strong>' . esc_html($mine['label']) . '</strong>' . (!empty($mine['note']) ? '<span>' . esc_html($mine['note']) . '</span>' : '') . '</div>';
@@ -1420,7 +1430,7 @@ final class Verola_Connector {
 		echo '<section class="vh-returns"><h2>Returns</h2>'
 			. '<p class="vh-ret-note">You can ask for a return within 7 days of delivery. For a change of mind, you pay the return shipping. Damaged items and items that never arrived are refunded on your photos, without sending them back.</p>'
 			. '<ul>' . $rows . '</ul></section>'
-			. '<style>.vh-returns{margin:24px 0;padding:20px;border:1px solid #e2e8f0;border-radius:14px;background:#fff}.vh-returns h2{margin:0 0 8px;font-size:1.15rem}.vh-ret-note{margin:0 0 14px;color:#64748b;font-size:.85rem}.vh-returns ul{list-style:none;margin:0;padding:0}.vh-ret-item{padding:14px 0;border-top:1px solid #eef2f6}.vh-ret-name{font-weight:600;margin-bottom:6px}.vh-ret-status strong{display:inline-block;padding:4px 10px;border-radius:999px;background:#eaf4fb;color:#1b88ca;font-size:.8rem}.vh-ret-status span{display:block;margin-top:4px;color:#64748b;font-size:.85rem}.vh-ret-form summary{cursor:pointer;color:#1b88ca;font-weight:700;margin-top:6px}.vh-ret-form form{display:grid;gap:12px;margin-top:12px}.vh-ret-form label{display:grid;gap:6px;font-size:.85rem;font-weight:600}</style>';
+			. '<style>.vh-returns{margin:24px 0;padding:20px;border:1px solid #e2e8f0;border-radius:14px;background:#fff}.vh-returns h2{margin:0 0 8px;font-size:1.15rem}.vh-ret-note{margin:0 0 14px;color:#64748b;font-size:.85rem}.vh-returns ul{list-style:none;margin:0;padding:0}.vh-ret-item{padding:14px 0;border-top:1px solid #eef2f6}.vh-ret-name{font-weight:600;margin-bottom:6px}.vh-ret-status strong{display:inline-block;padding:4px 10px;border-radius:999px;background:#eaf4fb;color:#1b88ca;font-size:.8rem}.vh-ret-status span{display:block;margin-top:4px;color:#64748b;font-size:.85rem}.vh-ret-form summary{cursor:pointer;color:#1b88ca;font-weight:700;margin-top:6px}.vh-ret-form form{display:grid;gap:12px;margin-top:12px}.vh-ret-form label,.vh-ret-ship label{display:grid;gap:6px;font-size:.85rem;font-weight:600}.vh-ret-ship{margin-top:10px;padding:12px;border-radius:10px;background:#f8fafc}.vh-ret-ship p{margin:0 0 10px;font-size:.88rem}.vh-ret-ship form{display:grid;gap:10px}</style>';
 	}
 
 	// Admin-post requests have no shopping session, so the result waits in a short-lived transient until the order page shows it.
@@ -1483,6 +1493,41 @@ final class Verola_Connector {
 			self::return_flash(sanitize_text_field($j['error']), 'error');
 		} else {
 			self::return_flash('We could not send your request right now. Please try again in a few minutes.', 'error');
+		}
+		wp_safe_redirect($back);
+		exit;
+	}
+
+
+	public static function return_ship_submit() {
+		$order_id = (int) ($_POST['order_id'] ?? 0);
+		$order = wc_get_order($order_id);
+		$back = $order ? $order->get_view_order_url() : wc_get_page_permalink('myaccount');
+		if (!is_user_logged_in() || !$order || (int) $order->get_user_id() !== get_current_user_id() || !self::configured()) {
+			wp_safe_redirect($back);
+			exit;
+		}
+		check_admin_referer('verola_return_ship_' . $order_id);
+		$payload = ['order_id' => (string) $order_id, 'case_id' => sanitize_text_field(wp_unslash($_POST['case_id'] ?? '')),
+			'carrier' => sanitize_text_field(wp_unslash($_POST['carrier'] ?? '')), 'tracking' => sanitize_text_field(wp_unslash($_POST['tracking'] ?? ''))];
+		$s = self::settings();
+		$body = wp_json_encode($payload);
+		$ts = time();
+		$res = wp_remote_post($s['url'] . '/api/marketplace/returns/ship', [
+			'timeout' => 20,
+			'headers' => ['Content-Type' => 'application/json', 'X-Verola-Timestamp' => (string) $ts, 'X-Verola-Signature' => 'sha256=' . hash_hmac('sha256', $ts . '.' . $body, $s['secret'])],
+			'body' => $body,
+		]);
+		$code = is_wp_error($res) ? 0 : (int) wp_remote_retrieve_response_code($res);
+		$j = is_wp_error($res) ? [] : (json_decode(wp_remote_retrieve_body($res), true) ?: []);
+		delete_transient('verola_rc_' . $order_id);
+		if ($code >= 200 && $code < 300) {
+			$order->add_order_note('Customer sent a return back (' . $payload['carrier'] . ' ' . $payload['tracking'] . ').');
+			self::return_flash('Thank you. The seller will confirm when it arrives, and then your refund is sent.', 'success');
+		} elseif ($code >= 400 && $code < 500 && !empty($j['error'])) {
+			self::return_flash(sanitize_text_field($j['error']), 'error');
+		} else {
+			self::return_flash('We could not send that right now. Please try again in a few minutes.', 'error');
 		}
 		wp_safe_redirect($back);
 		exit;

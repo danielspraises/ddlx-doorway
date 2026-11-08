@@ -872,6 +872,44 @@ eq(save_smtp_settings(['smtp_host' => 'smtp-relay.brevo.com', 'smtp_port' => '58
 eq(setting('mail_from', ''), 'no-reply@ddlx.shop', 'sender address stored');
 ok(save_smtp_settings(['smtp_host' => 'smtp-relay.brevo.com', 'smtp_port' => '587', 'smtp_secure' => 'tls', 'mail_from' => 'nope']) !== null, 'smtp: bad sender refused');
 
+// ---- returns: sending the item back, arrival, automatic refund (own order so nothing above is disturbed)
+set_setting('return_address', 'DDLX Returns, 1 Test Road, Lagos');
+$rt = parse_order_event(['event' => 'order.paid', 'order' => ['id' => 'WC-RET', 'number' => '7001', 'currency' => 'NGN', 'placed_at' => now_db(), 'customer_name' => 'Zed', 'ship_city' => 'Lagos', 'ship_state' => 'Lagos', 'restock' => false,
+    'items' => [['product_id' => $pid, 'quantity' => 1, 'unit_price' => 10000]]]]);
+record_paid_order($rt);
+apply_marketplace_status(['id' => 'WC-RET', 'status' => 'delivered', 'carrier' => '', 'tracking' => '', 'note' => ''], 'marketplace');
+$retItem = db()->val("SELECT i.id FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.marketplace_order_id = 'WC-RET'");
+$rr = customer_open_return(['order_id' => 'WC-RET', 'product_id' => $pid, 'reason' => 'Wrong item sent', 'details' => 'Sent a red one']);
+ok(!empty($rr['ok']), 'return flow: request opened');
+eq(seller_respond_return($sid, $rr['case_id'], 'accept', ''), null, 'return flow: seller accepts');
+eq(db()->val('SELECT status FROM return_cases WHERE id = ?', [$rr['case_id']]), 'seller_accepted', 'return flow: waiting for the customer to send it');
+ok(db()->val('SELECT ship_by FROM return_cases WHERE id = ?', [$rr['case_id']]) !== null, 'return flow: a send-back deadline is set');
+$cc = customer_cases_for_order('WC-RET')[0];
+ok($cc['can_ship'] && str_contains($cc['return_address'], 'Lagos'), 'return flow: customer is told where to send it');
+ok(isset(customer_ship_return(['case_id' => $rr['case_id'], 'order_id' => 'WC-RET', 'carrier' => '', 'tracking' => ''])['error']), 'return flow: tracking is required');
+ok(isset(customer_ship_return(['case_id' => $rr['case_id'], 'order_id' => 'OTHER', 'carrier' => 'DHL', 'tracking' => 'T1'])['error']), 'return flow: another order cannot use the case');
+ok(!empty(customer_ship_return(['case_id' => $rr['case_id'], 'order_id' => 'WC-RET', 'carrier' => 'DHL', 'tracking' => 'T1'])['ok']), 'return flow: customer sends it back');
+eq(db()->val('SELECT status FROM return_cases WHERE id = ?', [$rr['case_id']]), 'return_shipped', 'return flow: item on its way back');
+ok(seller_return_arrived($sid, $rr['case_id'], 'problem', '') !== null, 'return flow: a problem needs an explanation');
+eq(seller_return_arrived($sid, $rr['case_id'], 'received', ''), null, 'return flow: seller confirms arrival');
+eq(db()->val('SELECT status FROM return_cases WHERE id = ?', [$rr['case_id']]), 'refunded', 'return flow: refunded automatically');
+eq(db()->val('SELECT status FROM order_items WHERE id = ?', [$retItem]), 'refunded', 'return flow: the item is refunded');
+ok((float) db()->val("SELECT amount FROM customer_refunds WHERE order_id = (SELECT id FROM orders WHERE marketplace_order_id = 'WC-RET') AND status = 'to_pay'") > 0, 'return flow: customer refund queued (sent when Paystack is on)');
+// not sent back in time: the case closes and the money is released
+db()->exec("UPDATE order_items SET status = 'paid', fulfilment = 'delivered' WHERE id = ?", [$retItem]);
+$r3 = customer_open_return(['order_id' => 'WC-RET', 'product_id' => $pid, 'reason' => 'Changed mind', 'details' => '']);
+seller_respond_return($sid, $r3['case_id'], 'accept', '');
+db()->exec('UPDATE return_cases SET ship_by = ? WHERE id = ?', [db_plus('-1 days'), $r3['case_id']]);
+set_setting('returns_last_sweep', ''); returns_sweep_if_due();
+eq(db()->val('SELECT status FROM return_cases WHERE id = ?', [$r3['case_id']]), 'rejected', 'return flow: not sent back in time closes the case');
+// the seller does not confirm arrival: it counts as received
+$r4 = customer_open_return(['order_id' => 'WC-RET', 'product_id' => $pid, 'reason' => 'Changed mind', 'details' => '']);
+seller_respond_return($sid, $r4['case_id'], 'accept', '');
+customer_ship_return(['case_id' => $r4['case_id'], 'order_id' => 'WC-RET', 'carrier' => 'DHL', 'tracking' => 'T2']);
+db()->exec('UPDATE return_cases SET shipped_at = ? WHERE id = ?', [db_plus('-6 days'), $r4['case_id']]);
+set_setting('returns_last_sweep', ''); returns_sweep_if_due();
+eq(db()->val('SELECT status FROM return_cases WHERE id = ?', [$r4['case_id']]), 'refunded', 'return flow: no confirmation in 5 days counts as received');
+
 // every PHP file must at least parse (a typo in a view once took every seller page down)
 $parseBad = [];
 foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(APP_ROOT . '/app', FilesystemIterator::SKIP_DOTS)) as $f) {

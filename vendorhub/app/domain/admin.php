@@ -129,6 +129,7 @@ function save_settings(array $in): ?string
     set_setting('marketplace_url', rtrim($url, '/'));
     set_setting('app_url', rtrim($app, '/'));
     set_setting('mail_from', $mail);
+    if (array_key_exists('return_address', $in)) set_setting('return_address', str_limit(trim((string) $in['return_address']), 400));
     set_setting('ai_enabled', ($in['ai_enabled'] ?? '') === 'yes' ? '1' : '0');
     foreach (array_keys(AI_PROVIDERS) as $prov) {
         if (($in['ai_clear_' . $prov] ?? '') === 'yes') { set_setting('ai_key_' . $prov, ''); if (assistant_key($prov) !== '') set_setting('ai_api_key', ''); continue; }

@@ -200,6 +200,17 @@ route('POST', '/api/marketplace/returns', function () {
     isset($r['error']) ? market_json(['error' => $r['error']], $r['code']) : market_json(['ok' => true, 'case_id' => $r['case_id']]);
 }, ['api' => true]);
 
+// The customer sends the item back and gives the tracking number. Signed.
+route('POST', '/api/marketplace/returns/ship', function () {
+    $raw = (string) file_get_contents('php://input');
+    if (strlen($raw) > 20000) market_json(['error' => 'Payload too large.'], 413);
+    market_check_signature($raw);
+    $d = json_decode($raw, true);
+    if (!is_array($d)) market_json(['error' => 'Invalid request.'], 400);
+    $r = customer_ship_return($d);
+    isset($r['error']) ? market_json(['error' => $r['error']], $r['code']) : market_json(['ok' => true]);
+}, ['api' => true]);
+
 // Return requests for one order, so the customer can follow them in their account.
 route('GET', '/api/marketplace/returns', function () {
     market_check_key();

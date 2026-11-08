@@ -149,7 +149,7 @@ $docLinks = function (array $docs): string {
     <?php if (!in_array($c['status'], RETURN_FINAL, true)): ?><form method="post" action="/admin/return/resolve" class="stack" style="min-width:260px" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>">
       <input name="note" maxlength="500" placeholder="Note to the seller (required to reject)" aria-label="Note">
       <label class="check"><input type="checkbox" name="restock" value="yes"><span>Item comes back to stock</span></label>
-      <div class="row"><button class="btn btn-sm" name="decision" value="refund" type="submit" data-confirm="Refund this item and take the earnings back from the seller?">Refund</button><button class="btn btn-sm btn-outline" name="decision" value="reject" type="submit" data-confirm="Reject this case?">Reject</button></div>
+      <div class="row"><?php if ($c['kind'] === 'return' && $c['source'] === 'customer' && in_array($c['status'], ['open', 'seller_disputed'], true)): ?><button class="btn btn-sm" name="decision" value="approve" type="submit" data-confirm="Approve the return? The customer will be asked to send the item back, then refunded.">Approve return</button><?php endif; ?><button class="btn btn-sm <?= $c['kind'] === 'return' && $c['source'] === 'customer' && $c['status'] !== 'return_shipped' ? 'btn-outline' : '' ?>" name="decision" value="refund" type="submit" data-confirm="Refund this item and take the earnings back from the seller?">Refund now</button><button class="btn btn-sm btn-outline" name="decision" value="reject" type="submit" data-confirm="Reject this case?">Reject</button></div>
       <?= help('Refund reverses the seller\'s earnings. Return the customer\'s money in WooCommerce.') ?></form><?php endif; ?></div></li><?php endforeach; ?>
     <?php if (!$items): ?><li class="muted">No cases here.</li><?php endif; ?></ul>
 <?php endif; ?>
@@ -317,6 +317,7 @@ $docLinks = function (array $docs): string {
     <h3 id="s-general" style="margin-top:0">Money</h3>
     <div class="grid g2"><?= f_text('commission_percent', 'Marketplace commission (%)', (string) setting('commission_percent', '10'), null, ['inputmode' => 'decimal']) ?><?= f_text('payout_hold_days', 'Payout hold (days)', (string) setting('payout_hold_days', '7'), null, ['inputmode' => 'numeric', 'hint' => 'Sales become withdrawable after this many days.']) ?>
       <?= f_text('min_withdrawal', 'Smallest withdrawal', (string) setting('min_withdrawal', '1000'), null, ['inputmode' => 'decimal']) ?><?= f_text('withdrawal_fee', 'Fee per withdrawal', (string) setting('withdrawal_fee', '0'), null, ['inputmode' => 'decimal']) ?></div>
+    <?= f_area('return_address', 'Return address', (string) setting('return_address', ''), null, ['rows' => 3, 'maxlength' => 400, 'hint' => 'Where customers send items back. Shown to them when a return is approved.']) ?>
     <h3>Addresses</h3>
     <?= f_text('app_url', 'Vendor Hub address', (string) setting('app_url', ''), null, ['type' => 'url', 'placeholder' => 'https://vendor.ddlx.shop']) ?>
     <?= f_text('marketplace_url', 'Marketplace address', (string) setting('marketplace_url', ''), null, ['type' => 'url', 'placeholder' => 'https://ddlx.shop', 'hint' => 'Used to check SKUs against the store. Leave blank to skip.']) ?>

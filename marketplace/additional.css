@@ -75,7 +75,10 @@
 /* ==========================================================================
    CHECKOUT
    ========================================================================== */
-.woocommerce-checkout{background:var(--dx-canvas)!important;padding-top:20px;padding-bottom:48px}
+/* The checkout class sits on <body>: never pad the body (that pushed the header down and left a gap under the footer). */
+body.woocommerce-checkout{background:var(--dx-canvas)!important;padding:0!important;margin:0!important}
+body.woocommerce-checkout .website-wrapper{padding:0!important;margin:0!important}
+body.woocommerce-checkout .main-page-wrapper{padding-top:20px;padding-bottom:40px;margin-top:0}
 .woocommerce-checkout form.checkout{max-width:1200px;margin:0 auto}
 
 /* "Returning customer?" and "Have a coupon?" toggles */
@@ -122,7 +125,7 @@
 .woocommerce-checkout input[type=email],
 .woocommerce-checkout input[type=tel],
 .woocommerce-checkout input[type=password],
-.woocommerce-checkout input[type=number],
+.woocommerce-checkout input[type=number]:not(.qty),
 .woocommerce-checkout select,
 .woocommerce-checkout textarea,
 .woocommerce-checkout .select2-container--default .select2-selection--single{
@@ -146,18 +149,43 @@
 .woocommerce-checkout input[type=checkbox],
 .woocommerce-checkout input[type=radio]{accent-color:var(--dx-primary)}
 
+/* Quantity stepper (order summary) */
+.woocommerce-checkout .quantity{
+  display:inline-flex!important; align-items:center; height:38px; margin-top:8px;
+  border:1px solid #cbd5e1; border-radius:10px; overflow:hidden; background:#fff; box-shadow:none;
+}
+.woocommerce-checkout .quantity input.qty{
+  width:42px!important; height:38px!important; min-height:0!important; padding:0!important; margin:0!important;
+  border:0!important; border-radius:0!important; background:transparent!important; box-shadow:none!important;
+  text-align:center; font-size:.9rem!important; font-weight:700; color:var(--dx-ink)!important;
+  -moz-appearance:textfield; appearance:textfield;
+}
+.woocommerce-checkout .quantity input.qty::-webkit-outer-spin-button,
+.woocommerce-checkout .quantity input.qty::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.woocommerce-checkout .quantity .minus,
+.woocommerce-checkout .quantity .plus,
+.woocommerce-checkout .quantity input[type=button]{
+  width:34px!important; height:38px!important; min-height:0!important; padding:0!important; margin:0!important;
+  border:0!important; border-radius:0!important; background:#f1f5f9!important; color:var(--dx-ink)!important;
+  font-size:1rem; line-height:1; cursor:pointer; box-shadow:none!important; transition:background-color .2s;
+}
+.woocommerce-checkout .quantity .minus:hover,
+.woocommerce-checkout .quantity .plus:hover{background:#e2e8f0!important}
+.woocommerce-checkout td.product-name .remove,
+.woocommerce-checkout .product-remove a{color:var(--dx-muted)}
+
 /* Shipping methods as selectable cards */
 .woocommerce-checkout #shipping_method{list-style:none!important;padding:0!important;margin:10px 0!important}
 .woocommerce-checkout #shipping_method li{
   display:flex!important; align-items:center; gap:10px; margin:0 0 8px!important; padding:13px 16px!important;
   background:#f8fafc!important; border:1px solid var(--dx-line)!important; border-radius:10px!important;
-  cursor:pointer; transition:border-color .2s,background-color .2s!important;
+  cursor:pointer; text-align:left!important; transition:border-color .2s,background-color .2s!important;
 }
 .woocommerce-checkout #shipping_method li:hover{border-color:#cbd5e1!important}
 .woocommerce-checkout #shipping_method li:has(input:checked){
   border-color:var(--dx-primary)!important; background:rgba(27,136,202,.06)!important;
 }
-.woocommerce-checkout #shipping_method li label{margin:0!important;font-weight:600!important;color:var(--dx-ink)!important;cursor:pointer;flex:1}
+.woocommerce-checkout #shipping_method li label{margin:0!important;font-weight:600!important;color:var(--dx-ink)!important;cursor:pointer;flex:1;text-align:left!important}
 
 /* Order summary table */
 .woocommerce-checkout table.shop_table{
@@ -225,7 +253,7 @@
 
 /* Mobile */
 @media (max-width:767px){
-  .woocommerce-checkout{padding-top:12px}
+  body.woocommerce-checkout .main-page-wrapper{padding-top:12px;padding-bottom:28px}
   .woocommerce-checkout #customer_details,
   .woocommerce-checkout #order_review{padding:18px!important;border-radius:12px!important}
   .woocommerce-message,.woocommerce-info,.woocommerce-error{padding:12px 14px!important;font-size:.88rem}

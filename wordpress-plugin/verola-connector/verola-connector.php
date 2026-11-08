@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.6.2
+ * Version: 1.6.3
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -451,7 +451,7 @@ final class Verola_Connector {
 				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
 			];
 		}
-		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.6.2'];
+		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.6.3'];
 	}
 
 	public static function rest_link($request) {
@@ -1357,13 +1357,54 @@ final class Verola_Connector {
 		}
 	}
 
+	// Maps any marketplace status to the step Vendor Hub knows, by its slug or its label. Custom statuses from other plugins
+	// (for example "Out for delivery" or "Order Delivered" from a status plugin) are recognised too. Returns null for anything else.
+	private static function hub_status($slug) {
+		$slug = strtolower(preg_replace('/^wc-/', '', (string) $slug));
+		if ($slug === 'completed') {
+			return 'completed';
+		}
+		$text = $slug . ' ' . strtolower((string) wc_get_order_status_name($slug));
+		if (preg_match('/ready[\s_-]*(for)?[\s_-]*ship/', $text)) {
+			return 'ready_for_shipping';
+		}
+		if (preg_match('/out[\s_-]*for[\s_-]*deliver/', $text)) {
+			return 'shipped';
+		}
+		if (preg_match('/deliver/', $text) && !preg_match('/awaiting|pending|failed|to[\s_-]*be/', $text)) {
+			return 'delivered';
+		}
+		if (preg_match('/shipped|dispatch|transit/', $text)) {
+			return 'shipped';
+		}
+		return null;
+	}
+
+	private static function hub_rank($s) {
+		return ['ready_for_shipping' => 2, 'shipped' => 3, 'delivered' => 4, 'completed' => 5][$s] ?? 0;
+	}
+
 	// Reports delivery progress. The hub must already know the order, so an order that skipped "processing" is reported as paid first.
 	public static function order_status_changed($order_id, $from, $to) {
-		if (!in_array($to, ['ready-shipping', 'shipped', 'delivered', 'completed'], true)) {
+		$hub = self::hub_status($to);
+		$order = wc_get_order($order_id);
+		if (!$hub || !$order) {
 			return;
 		}
-		self::queue($order_id, 'order.paid');
-		self::queue($order_id, 'order.status:' . ($to === 'ready-shipping' ? 'ready_for_shipping' : $to), 60);
+		$target = (int) $order_id;
+		// Dokan splits a multi-seller order into one sub-order per seller. Vendor Hub knows the parent order, so a
+		// sub-order's change is reported on the parent once every sub-order has reached that step.
+		if ($order->get_parent_id()) {
+			$target = (int) $order->get_parent_id();
+			foreach (wc_get_orders(['parent' => $target, 'limit' => -1, 'return' => 'ids']) as $kid) {
+				$k = wc_get_order($kid);
+				if (!$k || self::hub_rank(self::hub_status($k->get_status())) < self::hub_rank($hub)) {
+					return;
+				}
+			}
+		}
+		self::queue($target, 'order.paid');
+		self::queue($target, 'order.status:' . $hub, 20);
 	}
 
 	private static function queue($order_id, $event, $delay = 5) {

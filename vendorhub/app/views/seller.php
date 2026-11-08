@@ -168,6 +168,8 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
     <div class="row between"><strong><?= e($c['item_name']) ?></strong> <?= pill($c['status'], RETURN_LABEL, RETURN_KINDS) ?></div>
     <div class="muted small">Order <?= e($c['number'] ?: $c['marketplace_order_id']) ?> · <?= e($m($c['line_total'], $c['currency'])) ?> · opened <?= e(human_date($c['created_at'], true)) ?></div>
     <div class="small" style="margin-top:6px"><strong><?= e($c['reason']) ?></strong><?= $c['details'] !== '' ? ' — ' . e($c['details']) : '' ?></div>
+    <?php foreach ((array) json_decode((string) ($c['photos'] ?? '[]'), true) as $i => $ph): ?><a class="small" href="<?= e($ph) ?>" target="_blank" rel="noopener">Photo <?= $i + 1 ?></a> <?php endforeach; ?>
+    <?php if ($c['status'] === 'open' && !empty($c['respond_by'])): ?><div class="muted small" style="margin-top:6px">Reply by <?= e(human_date($c['respond_by'], true)) ?>. No reply counts as accepting. The money for this item is on hold until the case is closed.</div><?php endif; ?>
     <?php if ($c['seller_response'] !== ''): ?><div class="small" style="margin-top:6px"><span class="muted">You:</span> <?= e($c['seller_response']) ?></div><?php endif; ?>
     <?php if ($c['resolution_note'] !== ''): ?><div class="small" style="margin-top:6px"><span class="muted">DDLX:</span> <?= e($c['resolution_note']) ?></div><?php endif; ?>
     <?php if ($c['status'] === 'open'): ?><form method="post" action="/returns/respond" class="stack" style="margin-top:10px" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>">

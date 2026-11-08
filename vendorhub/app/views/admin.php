@@ -134,13 +134,16 @@ $docLinks = function (array $docs): string {
 <?php endif; ?>
 
 <?php if ($tab === 'returns'): ?>
-  <p class="muted">Customer complaints. Open a case from the Orders tab; the seller answers here, you decide.</p>
+  <p class="muted">Customers ask for returns from their account on the marketplace, and you can also open a case from the Orders tab. The seller answers here and you decide. Earnings for the item are frozen while a case is open.</p>
   <div class="row" style="margin:16px 0"><?php foreach (['open' => 'Open', 'done' => 'Closed', 'all' => 'All'] as $k => $l): ?><a class="btn btn-sm <?= $filter === $k ? '' : 'btn-outline' ?>" href="/admin?tab=returns&filter=<?= $k ?>"><?= e($l) ?></a><?php endforeach; ?></div>
   <ul class="list"><?php foreach ($items as $c): ?><li>
     <div class="row between" style="align-items:flex-start;gap:16px"><div>
       <strong><?= e($c['item_name']) ?></strong> · order <?= e($c['number'] ?: $c['marketplace_order_id']) ?> · <?= e($m($c['line_total'], $c['currency'])) ?> <?= pill($c['status'], RETURN_LABEL, RETURN_KINDS) ?>
       <div class="muted small"><?= e($c['seller_email']) ?> · <?= e($c['customer_name'] ?: 'Customer') ?> · opened <?= e(human_date($c['created_at'], true)) ?></div>
-      <div class="small" style="margin-top:6px"><strong><?= e($c['reason']) ?></strong><?= $c['details'] !== '' ? ' — ' . e($c['details']) : '' ?></div>
+      <div class="small" style="margin-top:6px"><strong><?= e($c['reason']) ?></strong><?= $c['details'] !== '' ? ' — ' . e($c['details']) : '' ?>
+        <span class="muted"> · <?= $c['source'] === 'customer' ? 'asked by the customer' : 'opened by DDLX' ?> · <?= $c['kind'] === 'refund_only' ? 'refund without sending it back' : 'item comes back first' ?></span></div>
+      <?php foreach ((array) json_decode((string) ($c['photos'] ?? '[]'), true) as $i => $ph): ?><a class="small" href="<?= e($ph) ?>" target="_blank" rel="noopener">Photo <?= $i + 1 ?></a> <?php endforeach; ?>
+      <?php if ($c['status'] === 'open' && !empty($c['respond_by'])): ?><div class="muted small" style="margin-top:6px">Seller must reply by <?= e(human_date($c['respond_by'], true)) ?>. No reply counts as accepting.</div><?php endif; ?>
       <?php if ($c['seller_response'] !== ''): ?><div class="small" style="margin-top:6px"><span class="muted">Seller:</span> <?= e($c['seller_response']) ?></div><?php endif; ?>
       <?php if ($c['resolution_note'] !== ''): ?><div class="small" style="margin-top:6px"><span class="muted">Decision:</span> <?= e($c['resolution_note']) ?></div><?php endif; ?></div>
     <?php if (!in_array($c['status'], RETURN_FINAL, true)): ?><form method="post" action="/admin/return/resolve" class="stack" style="min-width:260px" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>">

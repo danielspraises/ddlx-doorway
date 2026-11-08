@@ -189,6 +189,23 @@ route('POST', '/api/marketplace/orders', function () {
     }
 }, ['api' => true]);
 
+// A customer asks for a return on the marketplace. Signed like orders. The reply's "error" is safe to show the customer.
+route('POST', '/api/marketplace/returns', function () {
+    $raw = (string) file_get_contents('php://input');
+    if (strlen($raw) > 100000) market_json(['error' => 'Payload too large.'], 413);
+    market_check_signature($raw);
+    $d = json_decode($raw, true);
+    if (!is_array($d)) market_json(['error' => 'Invalid request.'], 400);
+    $r = customer_open_return($d);
+    isset($r['error']) ? market_json(['error' => $r['error']], $r['code']) : market_json(['ok' => true, 'case_id' => $r['case_id']]);
+}, ['api' => true]);
+
+// Return requests for one order, so the customer can follow them in their account.
+route('GET', '/api/marketplace/returns', function () {
+    market_check_key();
+    market_json(['cases' => customer_cases_for_order((string) ($_GET['order_id'] ?? ''))]);
+}, ['api' => true]);
+
 // Seller discount codes the marketplace should offer.
 route('GET', '/api/marketplace/coupons', function () {
     market_check_key();

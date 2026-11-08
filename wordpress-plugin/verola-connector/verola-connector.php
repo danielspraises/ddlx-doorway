@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.6.3
+ * Version: 1.7.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -74,6 +74,8 @@ final class Verola_Connector {
 		// Verified sellers get a blue tick next to their store name, wherever the store name is shown. No level labels on products.
 		add_shortcode('vendor_hub_badge', '__return_empty_string');
 		add_action('wp_footer', [__CLASS__, 'store_ticks']);
+		add_action('woocommerce_order_details_after_order_table', [__CLASS__, 'return_panel']);
+		add_action('admin_post_verola_return', [__CLASS__, 'return_submit']);
 		add_action('woocommerce_admin_order_data_after_shipping_address', [__CLASS__, 'handoff_fields']);
 		add_action('woocommerce_process_shop_order_meta', [__CLASS__, 'save_handoff_fields']);
 		if (!wp_next_scheduled(self::CRON)) {
@@ -451,7 +453,7 @@ final class Verola_Connector {
 				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
 			];
 		}
-		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.6.3'];
+		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.7.0'];
 	}
 
 	public static function rest_link($request) {
@@ -1337,6 +1339,153 @@ final class Verola_Connector {
 			}
 		}
 		WC_Product_Variable::sync($parent_id);
+	}
+
+
+	// ------------------------------------------------------------------ customer returns (My Account -> Vendor Hub)
+
+	const RETURN_REASONS = ['Damaged or defective', 'Wrong item sent', 'Not as described', 'Never arrived', 'Arrived late', 'Changed mind', 'Other'];
+
+	private static function return_cases($order) {
+		$key = 'verola_rc_' . $order->get_id();
+		$cached = get_transient($key);
+		if (is_array($cached)) {
+			return $cached;
+		}
+		$s = self::settings();
+		$cases = [];
+		$res = wp_remote_get($s['url'] . '/api/marketplace/returns?order_id=' . rawurlencode((string) $order->get_id()), ['timeout' => 8, 'headers' => ['Authorization' => 'Bearer ' . $s['api_key']]]);
+		if (!is_wp_error($res) && (int) wp_remote_retrieve_response_code($res) === 200) {
+			$j = json_decode(wp_remote_retrieve_body($res), true);
+			$cases = is_array($j['cases'] ?? null) ? $j['cases'] : [];
+		}
+		set_transient($key, $cases, 60);
+		return $cases;
+	}
+
+	// "Request a return" for each Vendor Hub item on an order that has shipped or been delivered.
+	public static function return_panel($order) {
+		if (!($order instanceof WC_Order) || !self::configured() || $order->get_parent_id() || !is_user_logged_in() || (int) $order->get_user_id() !== get_current_user_id()) {
+			return;
+		}
+		if (self::hub_rank(self::hub_status($order->get_status())) < 3) {
+			return;
+		}
+		$flash = get_transient('verola_rn_' . get_current_user_id());
+		if (is_array($flash)) {
+			delete_transient('verola_rn_' . get_current_user_id());
+			echo '<div class="woocommerce-' . ($flash[0] === 'error' ? 'error' : 'message') . '" role="alert">' . esc_html($flash[1]) . '</div>';
+		}
+		$cases = self::return_cases($order);
+		$rows = '';
+		foreach ($order->get_items() as $item_id => $line) {
+			$pid = (int) $line->get_product_id();
+			if (!get_post_meta($pid, '_verola_product_id', true)) {
+				continue;
+			}
+			$vid = (int) $line->get_variation_id();
+			$hub_vid = $vid ? get_post_meta($vid, '_verola_variation_id', true) : '';
+			$hub_pid = get_post_meta($pid, '_verola_product_id', true);
+			$mine = null;
+			foreach ($cases as $c) {
+				if (($c['product_id'] ?? '') === $hub_pid && (($c['variation_id'] ?? '') ?: '') === ($hub_vid ?: '')) {
+					$mine = $c;
+					break;
+				}
+			}
+			$rows .= '<li class="vh-ret-item"><div class="vh-ret-name">' . esc_html($line->get_name()) . '</div>';
+			if ($mine && !in_array($mine['status'], ['rejected'], true)) {
+				$rows .= '<div class="vh-ret-status"><strong>' . esc_html($mine['label']) . '</strong>' . (!empty($mine['note']) ? '<span>' . esc_html($mine['note']) . '</span>' : '') . '</div>';
+			} else {
+				if ($mine) {
+					$rows .= '<div class="vh-ret-status"><strong>' . esc_html($mine['label']) . '</strong>' . (!empty($mine['note']) ? '<span>' . esc_html($mine['note']) . '</span>' : '') . '</div>';
+				}
+				$rows .= '<details class="vh-ret-form"><summary>Request a return</summary>'
+					. '<form method="post" enctype="multipart/form-data" action="' . esc_url(admin_url('admin-post.php')) . '">'
+					. '<input type="hidden" name="action" value="verola_return"><input type="hidden" name="order_id" value="' . (int) $order->get_id() . '"><input type="hidden" name="item_id" value="' . (int) $item_id . '">'
+					. wp_nonce_field('verola_return_' . $order->get_id(), '_wpnonce', true, false)
+					. '<label>Reason<select name="reason" required><option value="">Choose a reason</option>';
+				foreach (self::RETURN_REASONS as $r) {
+					$rows .= '<option>' . esc_html($r) . '</option>';
+				}
+				$rows .= '</select></label><label>What happened?<textarea name="details" rows="3" maxlength="2000" placeholder="Tell us what is wrong"></textarea></label>'
+					. '<label>Photos (needed for damaged items)<input type="file" name="photos[]" accept="image/*" multiple></label>'
+					. '<button type="submit" class="button">Send request</button></form></details>';
+			}
+			$rows .= '</li>';
+		}
+		if ($rows === '') {
+			return;
+		}
+		echo '<section class="vh-returns"><h2>Returns</h2>'
+			. '<p class="vh-ret-note">You can ask for a return within 7 days of delivery. For a change of mind, you pay the return shipping. Damaged items and items that never arrived are refunded on your photos, without sending them back.</p>'
+			. '<ul>' . $rows . '</ul></section>'
+			. '<style>.vh-returns{margin:24px 0;padding:20px;border:1px solid #e2e8f0;border-radius:14px;background:#fff}.vh-returns h2{margin:0 0 8px;font-size:1.15rem}.vh-ret-note{margin:0 0 14px;color:#64748b;font-size:.85rem}.vh-returns ul{list-style:none;margin:0;padding:0}.vh-ret-item{padding:14px 0;border-top:1px solid #eef2f6}.vh-ret-name{font-weight:600;margin-bottom:6px}.vh-ret-status strong{display:inline-block;padding:4px 10px;border-radius:999px;background:#eaf4fb;color:#1b88ca;font-size:.8rem}.vh-ret-status span{display:block;margin-top:4px;color:#64748b;font-size:.85rem}.vh-ret-form summary{cursor:pointer;color:#1b88ca;font-weight:700;margin-top:6px}.vh-ret-form form{display:grid;gap:12px;margin-top:12px}.vh-ret-form label{display:grid;gap:6px;font-size:.85rem;font-weight:600}</style>';
+	}
+
+	// Admin-post requests have no shopping session, so the result waits in a short-lived transient until the order page shows it.
+	private static function return_flash($msg, $kind) {
+		set_transient('verola_rn_' . get_current_user_id(), [$kind, $msg], 300);
+	}
+
+	public static function return_submit() {
+		$order_id = (int) ($_POST['order_id'] ?? 0);
+		$order = wc_get_order($order_id);
+		$back = $order ? $order->get_view_order_url() : wc_get_page_permalink('myaccount');
+		if (!is_user_logged_in() || !$order || (int) $order->get_user_id() !== get_current_user_id() || !self::configured()) {
+			wp_safe_redirect($back);
+			exit;
+		}
+		check_admin_referer('verola_return_' . $order_id);
+		$line = $order->get_item((int) ($_POST['item_id'] ?? 0));
+		$pid = $line ? (int) $line->get_product_id() : 0;
+		$hub_pid = $pid ? get_post_meta($pid, '_verola_product_id', true) : '';
+		if (!$hub_pid) {
+			self::return_flash('That item cannot be returned here.', 'error');
+			wp_safe_redirect($back);
+			exit;
+		}
+		$vid = (int) $line->get_variation_id();
+		$photos = [];
+		if (!empty($_FILES['photos']['name'][0])) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			$mimes = ['jpg|jpeg|jpe' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif'];
+			foreach (array_slice(array_keys($_FILES['photos']['name']), 0, 4) as $i) {
+				if ($_FILES['photos']['error'][$i] !== UPLOAD_ERR_OK || $_FILES['photos']['size'][$i] > 6 * MB_IN_BYTES) {
+					continue;
+				}
+				$up = wp_handle_upload([
+					'name' => $_FILES['photos']['name'][$i], 'type' => $_FILES['photos']['type'][$i], 'tmp_name' => $_FILES['photos']['tmp_name'][$i],
+					'error' => 0, 'size' => $_FILES['photos']['size'][$i],
+				], ['test_form' => false, 'mimes' => $mimes]);
+				if (!empty($up['url'])) {
+					$photos[] = $up['url'];
+				}
+			}
+		}
+		$payload = ['order_id' => (string) $order_id, 'product_id' => $hub_pid, 'variation_id' => $vid ? (get_post_meta($vid, '_verola_variation_id', true) ?: null) : null,
+			'reason' => sanitize_text_field(wp_unslash($_POST['reason'] ?? '')), 'details' => sanitize_textarea_field(wp_unslash($_POST['details'] ?? '')), 'photos' => $photos];
+		$s = self::settings();
+		$body = wp_json_encode($payload);
+		$ts = time();
+		$res = wp_remote_post($s['url'] . '/api/marketplace/returns', [
+			'timeout' => 20,
+			'headers' => ['Content-Type' => 'application/json', 'X-Verola-Timestamp' => (string) $ts, 'X-Verola-Signature' => 'sha256=' . hash_hmac('sha256', $ts . '.' . $body, $s['secret'])],
+			'body' => $body,
+		]);
+		$code = is_wp_error($res) ? 0 : (int) wp_remote_retrieve_response_code($res);
+		$j = is_wp_error($res) ? [] : (json_decode(wp_remote_retrieve_body($res), true) ?: []);
+		if ($code >= 200 && $code < 300) {
+			delete_transient('verola_rc_' . $order_id);
+			$order->add_order_note('Customer asked for a return (' . $payload['reason'] . ') for ' . $line->get_name() . '. Sent to Vendor Hub.');
+			self::return_flash('Your return request was sent. The seller has 48 hours to reply, and you will see the progress here.', 'success');
+		} elseif ($code >= 400 && $code < 500 && !empty($j['error'])) {
+			self::return_flash(sanitize_text_field($j['error']), 'error');
+		} else {
+			self::return_flash('We could not send your request right now. Please try again in a few minutes.', 'error');
+		}
+		wp_safe_redirect($back);
+		exit;
 	}
 
 	// ------------------------------------------------------------------ sales (store -> Vendor Hub)

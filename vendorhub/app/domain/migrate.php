@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -104,6 +104,11 @@ function migration_steps(): array
         6 => function (Db $db) {
             if (!column_exists($db, 'seller_levels', 'below_since')) $db->exec('ALTER TABLE seller_levels ADD COLUMN below_since DATETIME(3) NULL');
         },
+        10 => function (Db $db) {
+            foreach (["source VARCHAR(10) NOT NULL DEFAULT 'admin'", "kind VARCHAR(12) NOT NULL DEFAULT 'return'", 'respond_by DATETIME(3) NULL', 'photos TEXT NULL', 'frozen_from DATETIME(3) NULL'] as $def) {
+                if (!column_exists($db, 'return_cases', explode(' ', $def)[0])) $db->exec('ALTER TABLE return_cases ADD COLUMN ' . $def);
+            }
+        },
     ];
 }
 
@@ -113,7 +118,8 @@ function migrate_if_needed(): void
     $have = (int) setting('schema_version', 0);
     if ($have >= SCHEMA_VERSION) return;
     try {
-        foreach (migration_steps() as $v => $step) {
+        $steps = migration_steps(); ksort($steps);
+        foreach ($steps as $v => $step) {
             if ($v <= $have) continue;
             $step($db);
         }

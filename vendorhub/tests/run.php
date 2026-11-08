@@ -163,6 +163,30 @@ apply_marketplace_status($st('completed'));
 eq(db()->val('SELECT fulfilment FROM order_items WHERE id = ?', [$itemId]), 'completed', 'completed');
 ok(count(item_history([$itemId])[$itemId]) >= 5, 'history recorded');
 
+// ---- customer return requests
+$rq = ['order_id' => $mk, 'product_id' => $pid, 'reason' => 'Changed mind', 'details' => 'Too small'];
+ok(isset(customer_open_return(['reason' => 'Nope'] + $rq)['error']), 'return: unknown reason refused');
+ok(isset(customer_open_return(['reason' => 'Damaged or defective'] + $rq)['error']), 'return: damage needs a photo');
+ok(isset(customer_open_return(['order_id' => 'nope'] + $rq)['error']), 'return: unknown order refused');
+$netItem = (float) db()->val('SELECT net FROM order_items WHERE id = ?', [$itemId]);
+$availBefore = wallet_balances($sid)[0]['available'];
+$rc = customer_open_return($rq);
+ok(!empty($rc['ok']), 'return: customer request opened');
+eq(wallet_balances($sid)[0]['available'], $availBefore - $netItem, 'return: the item\'s earnings are frozen while the case is open');
+ok(isset(customer_open_return($rq)['error']), 'return: a second open request for the same item is refused');
+eq(db()->val('SELECT kind FROM return_cases WHERE id = ?', [$rc['case_id']]), 'return', 'return: change of mind means the item comes back first');
+eq(customer_cases_for_order($mk)[0]['label'], 'Waiting for the seller', 'return: customer sees the case');
+db()->exec("UPDATE return_cases SET respond_by = ? WHERE id = ?", [db_plus('-1 hours'), $rc['case_id']]);
+set_setting('returns_last_sweep', '');
+returns_sweep_if_due();
+eq(db()->val('SELECT status FROM return_cases WHERE id = ?', [$rc['case_id']]), 'seller_accepted', 'return: no reply in 48 hours counts as accepting');
+eq(resolve_return(['id' => $sid], $rc['case_id'], 'reject', false, 'Not eligible'), null, 'return: admin can reject');
+eq(wallet_balances($sid)[0]['available'], $availBefore, 'return: a rejected case gives the money back');
+db()->exec("UPDATE order_item_log SET created_at = ? WHERE order_item_id = ?", [db_plus('-10 days'), $itemId]);
+ok(str_contains((string) (customer_open_return($rq)['error'] ?? ''), 'return period'), 'return: asking after the return period is refused');
+db()->exec('DELETE FROM return_cases WHERE id = ?', [$rc['case_id']]);
+db()->exec('UPDATE order_item_log SET created_at = ? WHERE order_item_id = ?', [now_db(), $itemId]);
+
 // ---- notifications
 $unread = notifications_unread($sid);
 ok($unread >= 3, "seller has notifications for sale/status/product ($unread)");

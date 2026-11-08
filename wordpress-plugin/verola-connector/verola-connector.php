@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.7.1
+ * Version: 1.8.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -77,6 +77,10 @@ final class Verola_Connector {
 		add_action('woocommerce_order_details_after_order_table', [__CLASS__, 'return_panel']);
 		add_action('admin_post_verola_return', [__CLASS__, 'return_submit']);
 		add_action('admin_post_verola_return_ship', [__CLASS__, 'return_ship_submit']);
+		add_action('woocommerce_after_checkout_validation', [__CLASS__, 'validate_checkout'], 10, 2);
+		add_filter('woocommerce_default_address_fields', [__CLASS__, 'address_fields']);
+		add_filter('woocommerce_checkout_fields', [__CLASS__, 'checkout_fields']);
+		add_action('add_meta_boxes', [__CLASS__, 'return_metabox']);
 		add_action('woocommerce_admin_order_data_after_shipping_address', [__CLASS__, 'handoff_fields']);
 		add_action('woocommerce_process_shop_order_meta', [__CLASS__, 'save_handoff_fields']);
 		if (!wp_next_scheduled(self::CRON)) {
@@ -153,6 +157,7 @@ final class Verola_Connector {
 
 	public static function menu() {
 		add_submenu_page('woocommerce', 'Vendor Hub', 'Vendor Hub', 'manage_woocommerce', 'verola-connector', [__CLASS__, 'page']);
+		add_submenu_page('woocommerce', 'Returns', 'Returns', 'manage_woocommerce', 'verola-returns', [__CLASS__, 'returns_page']);
 	}
 
 	public static function page() {
@@ -457,7 +462,7 @@ final class Verola_Connector {
 				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
 			];
 		}
-		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.7.1'];
+		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.8.0'];
 	}
 
 	public static function rest_link($request) {
@@ -1087,6 +1092,7 @@ final class Verola_Connector {
 			}
 			update_user_meta($uid, '_verola_seller_id', $seller['id']);
 		}
+		self::save_pickup($uid, $seller);
 		if ($linked) {
 			return (int) $uid;
 		}
@@ -1345,6 +1351,168 @@ final class Verola_Connector {
 		WC_Product_Variable::sync($parent_id);
 	}
 
+
+
+	// ------------------------------------------------------------------ addresses
+
+	// WooCommerce's Nigerian state codes, keyed by lower-case name.
+	private static function ng_state_code($name) {
+		static $map = ['abia' => 'AB', 'abuja' => 'FC', 'fct' => 'FC', 'federal capital territory' => 'FC', 'adamawa' => 'AD', 'akwa ibom' => 'AK', 'anambra' => 'AN', 'bauchi' => 'BA', 'bayelsa' => 'BY', 'benue' => 'BE', 'borno' => 'BO',
+			'cross river' => 'CR', 'delta' => 'DE', 'ebonyi' => 'EB', 'edo' => 'ED', 'ekiti' => 'EK', 'enugu' => 'EN', 'gombe' => 'GO', 'imo' => 'IM', 'jigawa' => 'JI', 'kaduna' => 'KD', 'kano' => 'KN', 'katsina' => 'KT', 'kebbi' => 'KE',
+			'kogi' => 'KO', 'kwara' => 'KW', 'lagos' => 'LA', 'nasarawa' => 'NA', 'niger' => 'NI', 'ogun' => 'OG', 'ondo' => 'ON', 'osun' => 'OS', 'oyo' => 'OY', 'plateau' => 'PL', 'rivers' => 'RI', 'sokoto' => 'SO', 'taraba' => 'TA', 'yobe' => 'YO', 'zamfara' => 'ZA'];
+		$k = trim(preg_replace('/\s+state$/i', '', strtolower((string) $name)));
+		return $map[$k] ?? '';
+	}
+
+	// The seller's verified business address from Vendor Hub. Stored on the vendor and copied onto the Dokan store address,
+	// so anything that prices or books delivery from the store address uses the seller's real address, not the marketplace's.
+	private static function save_pickup($uid, $seller) {
+		$p = is_array($seller['pickup'] ?? null) ? $seller['pickup'] : [];
+		if (empty($p['street']) && empty($p['city'])) {
+			return;
+		}
+		$country = stripos((string) ($p['country'] ?? 'Nigeria'), 'nigeria') !== false || empty($p['country']) ? 'NG' : strtoupper(substr((string) $p['country'], 0, 2));
+		$state = $country === 'NG' ? self::ng_state_code($p['state'] ?? '') : (string) ($p['state'] ?? '');
+		$origin = ['address_1' => (string) $p['street'], 'city' => (string) $p['city'], 'state' => $state, 'state_name' => (string) ($p['state'] ?? ''), 'country' => $country, 'postcode' => '', 'phone' => (string) ($p['phone'] ?? '')];
+		update_user_meta($uid, '_verola_pickup', $origin);
+		if (function_exists('dokan')) {
+			$profile = get_user_meta($uid, 'dokan_profile_settings', true);
+			$profile = is_array($profile) ? $profile : [];
+			$addr = is_array($profile['address'] ?? null) ? $profile['address'] : [];
+			$profile['address'] = array_merge($addr, ['street_1' => $origin['address_1'], 'city' => $origin['city'], 'state' => $origin['state'], 'country' => $origin['country'], 'zip' => $addr['zip'] ?? '']);
+			update_user_meta($uid, 'dokan_profile_settings', $profile);
+		}
+	}
+
+	// Where a vendor's parcels are collected: ['address_1','city','state','country','postcode','phone'] or null when unknown.
+	// Delivery code should call this with the package's vendor (Dokan: $package['seller_id']). Filter: verola_vendor_origin.
+	public static function vendor_origin($vendor_id) {
+		$o = get_user_meta((int) $vendor_id, '_verola_pickup', true);
+		return apply_filters('verola_vendor_origin', is_array($o) && !empty($o['address_1']) ? $o : null, (int) $vendor_id);
+	}
+
+	public static function address_fields($fields) {
+		if (isset($fields['address_1'])) {
+			$fields['address_1']['label'] = 'Street address';
+			$fields['address_1']['placeholder'] = 'House number, street and area, e.g. 12 Allen Avenue, Ikeja';
+			$fields['address_1']['autocomplete'] = 'address-line1';
+		}
+		if (isset($fields['city'])) {
+			$fields['city']['required'] = true;
+			$fields['city']['label'] = 'Town / City';
+		}
+		if (isset($fields['state'])) {
+			$fields['state']['required'] = true;
+		}
+		return $fields;
+	}
+
+	public static function checkout_fields($fields) {
+		if (isset($fields['billing']['billing_phone'])) {
+			$fields['billing']['billing_phone']['required'] = true;
+			$fields['billing']['billing_phone']['placeholder'] = '0803 000 0000';
+			$fields['billing']['billing_phone']['autocomplete'] = 'tel';
+		}
+		return $fields;
+	}
+
+	// A rider has to find the door, so an address that cannot be found is stopped before payment.
+	public static function validate_checkout($data, $errors) {
+		if (!WC()->cart || !WC()->cart->needs_shipping()) {
+			return;
+		}
+		$types = ['billing'];
+		if (!empty($data['ship_to_different_address'])) {
+			$types[] = 'shipping';
+		}
+		foreach ($types as $t) {
+			if (($data[$t . '_country'] ?? '') !== 'NG') {
+				continue;
+			}
+			$label = $t === 'shipping' ? 'Delivery' : 'Billing';
+			$street = trim((string) ($data[$t . '_address_1'] ?? ''));
+			$city = trim((string) ($data[$t . '_city'] ?? ''));
+			if (empty($data[$t . '_state'])) {
+				$errors->add('verola_state', $label . ': please choose your state.');
+			}
+			if (mb_strlen($city) < 3 || !preg_match('/\p{L}{3}/u', $city)) {
+				$errors->add('verola_city', $label . ': please enter your town or city.');
+			}
+			if (mb_strlen($street) < 8 || !preg_match('/\p{L}{3}/u', $street) || strcasecmp($street, $city) === 0) {
+				$errors->add('verola_street', $label . ': please enter your full street address, with the house number or name, street and area, so the rider can find you.');
+			}
+		}
+		$phone = preg_replace('/[\s\-\(\)\.]/', '', (string) ($data['billing_phone'] ?? ''));
+		if (($data['billing_country'] ?? '') === 'NG' && !preg_match('/^(\+?234|0)[789][01]\d{8}$/', $phone)) {
+			$errors->add('verola_phone', 'Please enter a phone number the rider can call, for example 0803 000 0000.');
+		}
+	}
+
+	// ------------------------------------------------------------------ returns (marketplace admin)
+
+	private static function returns_feed($status) {
+		$s = self::settings();
+		$res = wp_remote_get($s['url'] . '/api/marketplace/returns/all?status=' . rawurlencode($status) . '&limit=100', ['timeout' => 15, 'headers' => ['Authorization' => 'Bearer ' . $s['api_key']]]);
+		if (is_wp_error($res) || (int) wp_remote_retrieve_response_code($res) !== 200) {
+			return null;
+		}
+		$j = json_decode(wp_remote_retrieve_body($res), true);
+		return is_array($j['cases'] ?? null) ? $j['cases'] : [];
+	}
+
+	public static function returns_page() {
+		if (!current_user_can('manage_woocommerce')) {
+			return;
+		}
+		$status = in_array($_GET['status'] ?? 'open', ['open', 'done', 'all'], true) ? $_GET['status'] : 'open';
+		$cases = self::configured() ? self::returns_feed($status) : null;
+		echo '<div class="wrap"><h1>Returns and refunds</h1><p>Return requests from customers, where each one stands, and who is waiting on whom. Sellers answer and DDLX decides in Vendor Hub.</p><p>';
+		foreach (['open' => 'Open', 'done' => 'Closed', 'all' => 'All'] as $k => $l) {
+			echo '<a class="button' . ($status === $k ? ' button-primary' : '') . '" style="margin-right:6px" href="' . esc_url(admin_url('admin.php?page=verola-returns&status=' . $k)) . '">' . esc_html($l) . '</a>';
+		}
+		echo '</p>';
+		if ($cases === null) {
+			echo '<div class="notice notice-error inline"><p>Could not reach Vendor Hub. Check the connection on the Vendor Hub settings page.</p></div></div>';
+			return;
+		}
+		echo '<table class="widefat striped"><thead><tr><th>Order</th><th>Item</th><th>Seller</th><th>Reason</th><th>Stage</th><th>Waiting on</th><th>Refund</th><th>Opened</th></tr></thead><tbody>';
+		foreach ($cases as $c) {
+			$o = wc_get_order((int) $c['order_id']);
+			$link = $o ? '<a href="' . esc_url($o->get_edit_order_url()) . '">#' . esc_html($o->get_order_number()) . '</a>' : esc_html('#' . ($c['order_number'] ?: $c['order_id']));
+			$refund = ['to_pay' => 'To pay', 'sending' => 'Sending', 'refunded' => 'Refunded', 'manual' => 'Refunded', 'failed' => 'Failed, needs attention'][$c['refund_status'] ?? ''] ?? '';
+			echo '<tr><td>' . $link . '</td><td>' . esc_html($c['item']) . '<br><small>' . esc_html(strip_tags(wc_price($c['amount']))) . '</small></td><td>' . esc_html($c['seller']) . '</td><td>' . esc_html($c['reason']) . '<br><small>' . ($c['kind'] === 'refund_only' ? 'Refund without sending it back' : 'Item comes back first') . '</small></td>'
+				. '<td><strong>' . esc_html($c['stage']) . '</strong>' . ($c['tracking'] ? '<br><small>Sent with ' . esc_html($c['tracking']) . '</small>' : '') . '</td><td>' . esc_html($c['waiting_on']) . '</td><td>' . esc_html($refund) . '</td><td>' . esc_html(wp_date(get_option('date_format'), strtotime($c['created_at']))) . '</td></tr>';
+		}
+		if (!$cases) {
+			echo '<tr><td colspan="8">No return requests here.</td></tr>';
+		}
+		echo '</tbody></table></div>';
+	}
+
+	public static function return_metabox() {
+		$screens = ['shop_order'];
+		if (function_exists('wc_get_page_screen_id')) {
+			$screens[] = wc_get_page_screen_id('shop-order');
+		}
+		add_meta_box('verola_returns', 'Returns (Vendor Hub)', [__CLASS__, 'return_metabox_html'], $screens, 'side', 'default');
+	}
+
+	public static function return_metabox_html($post) {
+		$order = $post instanceof WC_Order ? $post : wc_get_order(is_object($post) ? $post->ID : (int) $post);
+		if (!$order || !self::configured()) {
+			echo 'Not connected.';
+			return;
+		}
+		$cases = self::return_cases($order);
+		if (!$cases) {
+			echo '<p>No return requests on this order.</p>';
+			return;
+		}
+		foreach ($cases as $c) {
+			echo '<p><strong>' . esc_html($c['label']) . '</strong><br>' . esc_html($c['reason']) . (!empty($c['tracking']) ? '<br>Sent with ' . esc_html($c['tracking']) : '') . '</p>';
+		}
+		echo '<p><a href="' . esc_url(admin_url('admin.php?page=verola-returns&status=all')) . '">All returns</a></p>';
+	}
 
 	// ------------------------------------------------------------------ customer returns (My Account -> Vendor Hub)
 

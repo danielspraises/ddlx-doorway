@@ -276,3 +276,22 @@ function returns_sweep_if_due(): void
         log_error('returns sweep: ' . $e->getMessage());
     }
 }
+
+// For the marketplace admin: every case with its stage, who is waiting on whom, and the customer's refund.
+function marketplace_returns_feed(string $filter, int $limit): array
+{
+    $where = $filter === 'done' ? "c.status IN ('refunded', 'rejected')" : ($filter === 'all' ? '1 = 1' : "c.status NOT IN ('refunded', 'rejected')");
+    $waiting = ['open' => 'Seller to reply', 'seller_accepted' => 'Customer to send the item', 'return_shipped' => 'Seller to confirm arrival', 'seller_disputed' => 'DDLX to decide', 'received' => 'Refund being processed', 'refunded' => 'Done', 'rejected' => 'Done'];
+    $out = [];
+    foreach (db()->all('SELECT c.id, c.reason, c.kind, c.status, c.source, c.details, c.resolution_note, c.respond_by, c.ship_by, c.return_carrier, c.return_tracking, c.created_at, c.updated_at,
+            i.name AS item_name, i.line_total, o.number, o.marketplace_order_id, o.currency, o.customer_name,
+            (SELECT status FROM customer_refunds r WHERE r.order_id = o.id ORDER BY r.created_at DESC LIMIT 1) AS refund_status,
+            (SELECT a.brand FROM seller_applications a WHERE a.user_id = c.seller_id) AS brand
+        FROM return_cases c JOIN order_items i ON i.id = c.order_item_id JOIN orders o ON o.id = i.order_id WHERE ' . $where . ' ORDER BY c.created_at DESC LIMIT ' . $limit) as $r) {
+        $brand = jdec($r['brand'] ?? '', []);
+        $out[] = ['id' => $r['id'], 'order_id' => $r['marketplace_order_id'], 'order_number' => $r['number'], 'item' => $r['item_name'], 'amount' => (float) $r['line_total'], 'currency' => $r['currency'], 'customer' => $r['customer_name'],
+            'seller' => trim((string) ($brand['store_name'] ?? '')), 'reason' => $r['reason'], 'kind' => $r['kind'], 'status' => $r['status'], 'stage' => RETURN_LABEL[$r['status']] ?? $r['status'], 'waiting_on' => $waiting[$r['status']] ?? '',
+            'tracking' => trim($r['return_carrier'] . ' ' . $r['return_tracking']), 'refund_status' => $r['refund_status'], 'note' => $r['resolution_note'], 'created_at' => iso($r['created_at']), 'updated_at' => iso($r['updated_at'])];
+    }
+    return $out;
+}

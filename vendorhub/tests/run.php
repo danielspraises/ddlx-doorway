@@ -910,6 +910,11 @@ db()->exec('UPDATE return_cases SET shipped_at = ? WHERE id = ?', [db_plus('-6 d
 set_setting('returns_last_sweep', ''); returns_sweep_if_due();
 eq(db()->val('SELECT status FROM return_cases WHERE id = ?', [$r4['case_id']]), 'refunded', 'return flow: no confirmation in 5 days counts as received');
 
+// marketplace admin sees every return with its stage
+$feed = marketplace_returns_feed('all', 50);
+ok(count($feed) >= 4, 'returns feed lists the cases');
+ok(count(array_filter($feed, fn ($f) => $f['status'] === 'refunded' && $f['waiting_on'] === 'Done')) >= 1, 'returns feed shows who is waiting on whom');
+ok(count(marketplace_returns_feed('open', 50)) < count($feed), 'returns feed can show open cases only');
 // every PHP file must at least parse (a typo in a view once took every seller page down)
 $parseBad = [];
 foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(APP_ROOT . '/app', FilesystemIterator::SKIP_DOTS)) as $f) {

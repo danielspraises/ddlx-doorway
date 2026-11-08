@@ -80,6 +80,9 @@ function marketplace_seller_payload(string $sid): array
         'badge' => ['level' => $level, 'label' => LEVEL_LABEL[$level], 'rank' => level_rank($level)],
         'id' => $sid, 'store_name' => $storeName, 'store_slug' => slugify($storeName) . '-' . substr($sid, 0, 6), 'email' => $email,
         'city' => $business['city'] ?? null, 'state' => $business['state'] ?? null,
+        // The verified business address: this is where couriers collect from and where delivery is priced from.
+        'pickup' => ['street' => trim((string) ($business['address'] ?? '')), 'city' => trim((string) ($business['city'] ?? '')), 'state' => trim((string) ($business['state'] ?? '')), 'country' => trim((string) ($business['country'] ?? 'Nigeria')),
+            'phone' => trim((string) (($profile['phone'] ?? '') ?: ($business['phone'] ?? '')))],
         'profile' => ['tagline' => $pf('tagline'), 'description' => $pf('description'), 'phone' => $pf('phone'), 'support_email' => $pf('support_email'), 'return_policy' => $pf('return_policy'),
             'shipping_policy' => $pf('shipping_policy'), 'logo' => media_url($profile['logo']), 'banner' => media_url($profile['banner']), 'vacation' => (bool) $profile['vacation'], 'vacation_message' => $pf('vacation_message')],
     ];
@@ -209,6 +212,12 @@ route('POST', '/api/marketplace/returns/ship', function () {
     if (!is_array($d)) market_json(['error' => 'Invalid request.'], 400);
     $r = customer_ship_return($d);
     isset($r['error']) ? market_json(['error' => $r['error']], $r['code']) : market_json(['ok' => true]);
+}, ['api' => true]);
+
+// Every return request with its status, for the marketplace admin. ?status=open (default) or done or all.
+route('GET', '/api/marketplace/returns/all', function () {
+    market_check_key();
+    market_json(['cases' => marketplace_returns_feed((string) ($_GET['status'] ?? 'open'), min(200, max(1, (int) ($_GET['limit'] ?? 100))))]);
 }, ['api' => true]);
 
 // Return requests for one order, so the customer can follow them in their account.

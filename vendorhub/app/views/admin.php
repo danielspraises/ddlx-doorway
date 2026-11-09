@@ -134,23 +134,24 @@ $docLinks = function (array $docs): string {
 <?php endif; ?>
 
 <?php if ($tab === 'returns'): ?>
-  <p class="muted">Customers ask for returns from their account on the marketplace, and you can also open a case from the Orders tab. The seller answers here and you decide. Earnings for the item are frozen while a case is open.</p>
-  <div class="row" style="margin:16px 0"><?php foreach (['open' => 'Open', 'done' => 'Closed', 'all' => 'All'] as $k => $l): ?><a class="btn btn-sm <?= $filter === $k ? '' : 'btn-outline' ?>" href="/admin?tab=returns&filter=<?= $k ?>"><?= e($l) ?></a><?php endforeach; ?></div>
-  <ul class="list"><?php foreach ($items as $c): ?><li>
-    <div class="row between" style="align-items:flex-start;gap:16px"><div>
-      <strong><?= e($c['item_name']) ?></strong> · order <?= e($c['number'] ?: $c['marketplace_order_id']) ?> · <?= e($m($c['line_total'], $c['currency'])) ?> <?= pill($c['status'], RETURN_LABEL, RETURN_KINDS) ?>
-      <div class="muted small"><?= e($c['seller_email']) ?> · <?= e($c['customer_name'] ?: 'Customer') ?> · opened <?= e(human_date($c['created_at'], true)) ?></div>
-      <div class="small" style="margin-top:6px"><strong><?= e($c['reason']) ?></strong><?= $c['details'] !== '' ? ' — ' . e($c['details']) : '' ?>
-        <span class="muted"> · <?= $c['source'] === 'customer' ? 'asked by the customer' : 'opened by DDLX' ?> · <?= $c['kind'] === 'refund_only' ? 'refund without sending it back' : 'item comes back first' ?></span></div>
-      <?php foreach ((array) json_decode((string) ($c['photos'] ?? '[]'), true) as $i => $ph): ?><a class="small" href="<?= e($ph) ?>" target="_blank" rel="noopener">Photo <?= $i + 1 ?></a> <?php endforeach; ?>
-      <?php if ($c['status'] === 'open' && !empty($c['respond_by'])): ?><div class="muted small" style="margin-top:6px">Seller must reply by <?= e(human_date($c['respond_by'], true)) ?>. No reply counts as accepting.</div><?php endif; ?>
-      <?php if ($c['seller_response'] !== ''): ?><div class="small" style="margin-top:6px"><span class="muted">Seller:</span> <?= e($c['seller_response']) ?></div><?php endif; ?>
-      <?php if ($c['resolution_note'] !== ''): ?><div class="small" style="margin-top:6px"><span class="muted">Decision:</span> <?= e($c['resolution_note']) ?></div><?php endif; ?></div>
-    <?php if (!in_array($c['status'], RETURN_FINAL, true)): ?><form method="post" action="/admin/return/resolve" class="stack" style="min-width:260px" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>">
-      <input name="note" maxlength="500" placeholder="Note to the seller (required to reject)" aria-label="Note">
+  <p class="muted">Every return request is a case with its own number and history. Customers ask from their account on the marketplace, you can also open one from the Orders tab. Earnings for the item stay frozen while a case is open.</p>
+  <form method="get" action="/admin" class="case-filters" data-keep><input type="hidden" name="tab" value="returns">
+    <select name="filter" aria-label="Status"><?php foreach (['open' => 'Open cases', 'done' => 'Closed cases', 'all' => 'All cases'] as $k => $l): ?><option value="<?= $k ?>" <?= $filter === $k ? 'selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select>
+    <select name="seller" aria-label="Seller"><option value="">All sellers</option><?php foreach ($sellers as $sid => $nm): ?><option value="<?= e($sid) ?>" <?= $sellerFilter === $sid ? 'selected' : '' ?>><?= e($nm) ?></option><?php endforeach; ?></select>
+    <input type="search" name="q" value="<?= e($q) ?>" placeholder="Case number, item, order or customer" aria-label="Search cases"><button class="btn btn-sm btn-outline" type="submit">Filter</button></form>
+  <ul class="cases"><?php foreach ($items as $c): $ev = $events[$c['id']] ?? []; ?><li><article class="case">
+    <?= case_summary($c, 'admin') ?>
+    <?php if ($c['seller_response'] !== ''): ?><p class="small" style="margin:0"><span class="muted">Seller:</span> <?= e($c['seller_response']) ?></p><?php endif; ?>
+    <?php if ($c['resolution_note'] !== ''): ?><p class="small" style="margin:0"><span class="muted">Decision:</span> <?= e($c['resolution_note']) ?></p><?php endif; ?>
+    <?php if (!empty($c['refund_status'])): ?><p class="small" style="margin:0"><span class="muted">Customer refund:</span> <?= e(CR_LABEL[$c['refund_status']] ?? $c['refund_status']) ?> · <a href="/admin?tab=refunds&amp;filter=all">see refunds</a></p><?php endif; ?>
+    <?php if ($c['status'] === 'return_shipped'): ?><p class="small" style="margin:0"><span class="muted">Sent back with</span> <?= e(trim($c['return_carrier'] . ' ' . $c['return_tracking'])) ?></p><?php endif; ?>
+    <?php if (!in_array($c['status'], RETURN_FINAL, true)): ?><form method="post" action="/admin/return/resolve" class="case-actions" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>">
+      <input name="note" maxlength="500" placeholder="Note (shown to the seller; required to decline)" aria-label="Note">
       <label class="check"><input type="checkbox" name="restock" value="yes"><span>Item comes back to stock</span></label>
-      <div class="row"><?php if ($c['kind'] === 'return' && $c['source'] === 'customer' && in_array($c['status'], ['open', 'seller_disputed'], true)): ?><button class="btn btn-sm" name="decision" value="approve" type="submit" data-confirm="Approve the return? The customer will be asked to send the item back, then refunded.">Approve return</button><?php endif; ?><button class="btn btn-sm <?= $c['kind'] === 'return' && $c['source'] === 'customer' && $c['status'] !== 'return_shipped' ? 'btn-outline' : '' ?>" name="decision" value="refund" type="submit" data-confirm="Refund this item and take the earnings back from the seller?">Refund now</button><button class="btn btn-sm btn-outline" name="decision" value="reject" type="submit" data-confirm="Reject this case?">Reject</button></div>
-      <?= help('Refund reverses the seller\'s earnings. Return the customer\'s money in WooCommerce.') ?></form><?php endif; ?></div></li><?php endforeach; ?>
+      <div class="row"><?php if ($c['kind'] === 'return' && $c['source'] === 'customer' && in_array($c['status'], ['open', 'seller_disputed'], true)): ?><button class="btn btn-sm" name="decision" value="approve" type="submit" data-confirm="Approve the return? The item is collected from the customer, then they are refunded.">Approve return</button><?php endif; ?><button class="btn btn-sm <?= $c['kind'] === 'return' && $c['source'] === 'customer' && $c['status'] !== 'return_shipped' ? 'btn-outline' : '' ?>" name="decision" value="refund" type="submit" data-confirm="Refund this item now and take the earnings back from the seller?">Refund now</button><button class="btn btn-sm btn-outline" name="decision" value="reject" type="submit" data-confirm="Decline this request?">Decline</button></div></form><?php endif; ?>
+    <details class="case-history"><summary>History (<?= count($ev) ?>)</summary><?= case_history_html($ev) ?>
+      <form method="post" action="/admin/return/message" class="case-msg" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>"><input name="message" maxlength="1000" placeholder="Write to the seller about this case" aria-label="Message to the seller" required><button class="btn btn-sm btn-outline" type="submit">Send</button></form></details>
+  </article></li><?php endforeach; ?>
     <?php if (!$items): ?><li class="muted">No cases here.</li><?php endif; ?></ul>
 <?php endif; ?>
 
@@ -212,17 +213,26 @@ $docLinks = function (array $docs): string {
 <?php endif; ?>
 
 <?php if ($tab === 'refunds'): ?>
+  <p class="muted">Money going back to customers. A refund appears here when a return is approved or an order is cancelled or refunded; the seller's earnings are taken back at the same moment. Your job is only to send the money: use Paystack, or mark it done if you paid it back another way.</p>
+  <div class="refund-stats">
+    <div><strong><?= (int) $summary['to_pay']['n'] ?> · <?= e($m($summary['to_pay']['amount'])) ?></strong><span>To send</span></div>
+    <div><strong><?= (int) $summary['sending']['n'] ?> · <?= e($m($summary['sending']['amount'])) ?></strong><span>With Paystack</span></div>
+    <div><strong><?= (int) $summary['failed']['n'] ?> · <?= e($m($summary['failed']['amount'])) ?></strong><span>Failed, need attention</span></div></div>
   <div class="row" style="margin:12px 0"><?php foreach (['open' => 'To do', 'done' => 'Done', 'all' => 'All'] as $k => $l): ?><a class="chip" style="<?= $filter === $k ? 'border-color:var(--ink);font-weight:700' : '' ?>" href="/admin?tab=refunds&amp;filter=<?= e($k) ?>"><?= e($l) ?></a><?php endforeach; ?></div>
-  <ul class="list"><?php foreach ($items as $r): ?><li>
-    <div class="row between"><div><strong>Order <?= e($r['number'] ?: $r['marketplace_order_id']) ?></strong> <span class="muted">· <?= e($r['customer_name']) ?> · <?= e(human_date($r['created_at'], true)) ?></span>
-      <div>Refund <strong><?= e($m((float) $r['amount'], $r['currency'])) ?></strong> <?= pill($r['status'], CR_LABEL, ['to_pay' => 'warn', 'sending' => 'warn', 'failed' => 'bad', 'refunded' => 'ok', 'manual' => 'ok']) ?></div>
-      <div class="muted small"><?= $r['payment_ref'] !== '' ? 'Paystack payment ' . e($r['payment_ref']) : 'No Paystack payment reference on this order' ?><?= $r['payment_method'] !== '' ? ' · ' . e($r['payment_method']) : '' ?><?= $r['note'] ? ' · ' . e($r['note']) : '' ?></div></div>
-      <?php if (in_array($r['status'], ['to_pay', 'failed', 'sending'], true)): ?>
-      <form method="post" action="/admin/refund" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($r['id']) ?>">
-        <input name="amount" value="<?= e(number_format((float) $r['amount'], 2, '.', '')) ?>" inputmode="decimal" style="width:110px" aria-label="Amount to refund">
-        <?php if ($ps && $r['currency'] === 'NGN' && $r['payment_ref'] !== '' && $r['status'] !== 'sending'): ?><button class="btn btn-sm btn-accent" name="action" value="paystack" data-confirm="Refund this amount to the customer through Paystack? This cannot be undone.">Refund with Paystack</button><?php endif; ?>
-        <input name="note" placeholder="Note (optional)" maxlength="300" style="width:170px" aria-label="Note"><button class="btn btn-sm btn-outline" name="action" value="manual" data-confirm="Mark as refunded? Only do this if the customer already got the money back.">Mark done</button></form>
-      <?php endif; ?></div></li><?php endforeach; ?>
+  <ul class="cases"><?php foreach ($items as $r): ?><li><article class="case">
+    <header class="case-head"><div><div class="case-ref"><?= $r['case_ref'] ? 'Return ' . e($r['case_ref']) : 'Order refund' ?> · Order <?= e($r['number'] ?: $r['marketplace_order_id']) ?></div>
+      <h3 class="case-title"><span class="refund-amount"><?= e($m((float) $r['amount'], $r['currency'])) ?></span> to <?= e($r['customer_name'] ?: 'the customer') ?></h3></div>
+      <?= pill($r['status'], CR_LABEL, ['to_pay' => 'warn', 'sending' => 'warn', 'failed' => 'bad', 'refunded' => 'ok', 'manual' => 'ok']) ?></header>
+    <div class="case-meta"><span><?= e($r['reason'] !== '' ? $r['reason'] : 'Order cancelled or refunded') ?></span><?php if ($r['item_name']): ?><span><?= e($r['item_name']) ?></span><?php endif; ?><span><?= e(human_date($r['created_at'], true)) ?></span>
+      <span><?= $r['payment_ref'] !== '' ? 'Paid with Paystack · ' . e($r['payment_ref']) : 'No Paystack reference on this order' ?></span></div>
+    <?php if ($r['impact']): ?><div class="refund-impact">Taken from sellers' earnings: <?php foreach ($r['impact'] as $k => $imp): ?><?= $k ? ', ' : '' ?><strong><?= e($imp['seller']) ?></strong> <?= e($m($imp['amount'], $r['currency'])) ?><?php endforeach; ?></div><?php endif; ?>
+    <p class="case-next"><?= e(CR_NEXT[$r['status']] ?? '') ?><?= $r['note'] ? ' ' . e($r['note']) : '' ?></p>
+    <?php if (in_array($r['status'], ['to_pay', 'failed', 'sending'], true)): ?>
+    <form method="post" action="/admin/refund" class="case-actions" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($r['id']) ?>">
+      <div class="row"><label class="small muted" for="amt-<?= e($r['id']) ?>">Amount</label><input id="amt-<?= e($r['id']) ?>" name="amount" value="<?= e(number_format((float) $r['amount'], 2, '.', '')) ?>" inputmode="decimal" style="width:130px">
+        <?php if ($ps && $r['currency'] === 'NGN' && $r['payment_ref'] !== '' && $r['status'] !== 'sending'): ?><button class="btn btn-sm" name="action" value="paystack" data-confirm="Send this refund to the customer through Paystack? This cannot be undone."><?= $r['status'] === 'failed' ? 'Try again with Paystack' : 'Send refund with Paystack' ?></button><?php endif; ?></div>
+      <details><summary class="muted small">Already refunded another way?</summary><div class="row" style="margin-top:8px"><input name="note" placeholder="How it was paid (optional)" maxlength="300" style="flex:1;min-width:160px" aria-label="Note"><button class="btn btn-sm btn-outline" name="action" value="manual" data-confirm="Mark as refunded? Only do this if the customer already got the money back.">Mark done</button></div></details></form>
+    <?php endif; ?></article></li><?php endforeach; ?>
   <?php if (!$items): ?><li class="muted">Nothing to refund.</li><?php endif; ?></ul>
 <?php endif; ?>
 

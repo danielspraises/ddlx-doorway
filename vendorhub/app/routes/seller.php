@@ -13,7 +13,7 @@ route('GET', '/seller', function () {
     if ($tab === 'sales') { $vars['sales'] = seller_sales($u['id']); $vars['history'] = item_history(array_column($vars['sales'], 'id')); }
     if ($tab === 'store') $vars['scripts'] = ['upload.js'];
     if ($tab === 'payouts') { $vars['scripts'] = ['bank.js']; $vars['banks'] = bank_options(); $vars['verify'] = paystack_on(); $vars['accounts'] = bank_accounts($u['id']); $vars['withdrawals'] = seller_withdrawals($u['id']); }
-    if ($tab === 'returns') $vars['cases'] = seller_returns($u['id']);
+    if ($tab === 'returns') { $vars['cases'] = seller_returns($u['id']); $vars['events'] = return_events_map(array_column($vars['cases'], 'id')); }
     if ($tab === 'promotions') { $vars['coupons'] = coupons_for_seller($u['id']); $vars['all_products'] = array_values(array_filter(seller_products($u['id']), fn ($p) => $p['status'] !== 'draft' || $p['live'])); $vars['edit'] = null; foreach ($vars['coupons'] as $c) if ($c['id'] === input('edit')) $vars['edit'] = $c; $vars['err'] = null; }
     if ($tab === 'store') $vars['store'] = store_profile($u['id']);
     render('seller', $vars);
@@ -23,6 +23,12 @@ route('POST', '/returns/respond', function () {
     $u = require_seller();
     $err = seller_respond_return($u['id'], input('id'), input('action'), input_raw('response'));
     redirect('/seller?tab=returns', $err ?? 'Your reply was sent.', $err ? 'error' : 'ok');
+});
+
+route('POST', '/returns/message', function () {
+    $u = require_seller();
+    $err = return_message('seller', $u['id'], input('id'), input_raw('message'));
+    redirect('/seller?tab=returns', $err ?? 'Your message was added to the case.', $err ? 'error' : 'ok');
 });
 
 route('POST', '/returns/arrived', function () {

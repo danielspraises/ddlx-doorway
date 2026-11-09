@@ -227,23 +227,49 @@ function paystack_check_withdrawal(string $id): ?string
 
 // ---------------------------------------------------------------- customer refunds
 
-const CR_LABEL = ['to_pay' => 'Waiting to be refunded', 'sending' => 'Sending', 'refunded' => 'Refunded', 'failed' => 'Failed', 'manual' => 'Refunded outside Vendor Hub'];
+const CR_LABEL = ['to_pay' => 'To send', 'sending' => 'With Paystack', 'refunded' => 'Refunded', 'failed' => 'Failed', 'manual' => 'Refunded elsewhere'];
 
 // Called when sellers' lines are refunded: remembers how much customer money should go back for that order.
-function customer_refund_add(\Db $db, string $orderId, string $currency, float $amount): void
+function customer_refund_add(\Db $db, string $orderId, string $currency, float $amount, ?string $caseId = null, string $why = ''): void
 {
     if ($amount <= 0) return;
-    $open = $db->one("SELECT id FROM customer_refunds WHERE order_id = ? AND status = 'to_pay'" . $db->lock(), [$orderId]);
     $now = now_db();
+    // A refund for a return case stands on its own so it can be traced to that case. Others for the same order are added together.
+    $open = $caseId === null ? $db->one("SELECT id FROM customer_refunds WHERE order_id = ? AND case_id IS NULL AND status = 'to_pay'" . $db->lock(), [$orderId]) : null;
     if ($open) $db->exec('UPDATE customer_refunds SET amount = amount + ?, updated_at = ? WHERE id = ?', [$amount, $now, $open['id']]);
-    else $db->insert('customer_refunds', ['id' => uuid(), 'order_id' => $orderId, 'currency' => $currency, 'amount' => $amount, 'status' => 'to_pay', 'note' => '', 'created_at' => $now, 'updated_at' => $now]);
+    else $db->insert('customer_refunds', ['id' => uuid(), 'order_id' => $orderId, 'case_id' => $caseId, 'reason' => str_limit($why !== '' ? $why : 'Order cancelled or refunded', 120), 'currency' => $currency, 'amount' => $amount, 'status' => 'to_pay', 'note' => '', 'created_at' => $now, 'updated_at' => $now]);
 }
 
 function customer_refunds_list(string $filter = 'open'): array
 {
     $where = $filter === 'done' ? "r.status IN ('refunded','manual')" : ($filter === 'all' ? '1 = 1' : "r.status IN ('to_pay','sending','failed')");
-    return db()->all("SELECT r.*, o.number, o.marketplace_order_id, o.payment_ref, o.payment_method, o.customer_name FROM customer_refunds r JOIN orders o ON o.id = r.order_id WHERE $where ORDER BY r.created_at DESC LIMIT 200");
+    $rows = db()->all("SELECT r.*, o.number, o.marketplace_order_id, o.payment_ref, o.payment_method, o.customer_name, rc.ref AS case_ref, rc.order_item_id AS case_item,
+            (SELECT i.name FROM order_items i WHERE i.id = rc.order_item_id) AS item_name
+        FROM customer_refunds r JOIN orders o ON o.id = r.order_id LEFT JOIN return_cases rc ON rc.id = r.case_id WHERE $where ORDER BY r.created_at DESC LIMIT 200");
+    foreach ($rows as &$r) {
+        // Which sellers lose earnings for this refund, and how much.
+        $args = [$r['order_id']];
+        $sql = "SELECT w.seller_id, SUM(-w.amount) AS taken, (SELECT a.brand FROM seller_applications a WHERE a.user_id = w.seller_id) AS brand FROM wallet_entries w JOIN order_items i ON i.id = w.order_item_id WHERE w.kind = 'refund' AND i.order_id = ?";
+        if ($r['case_item']) { $sql .= ' AND i.id = ?'; $args[] = $r['case_item']; }
+        $r['impact'] = [];
+        foreach (db()->all($sql . ' GROUP BY w.seller_id', $args) as $w) {
+            $brand = jdec((string) ($w['brand'] ?? ''), []);
+            $r['impact'][] = ['seller' => trim((string) ($brand['store_name'] ?? '')) ?: 'Seller', 'amount' => (float) $w['taken']];
+        }
+    }
+    return $rows;
 }
+
+// The numbers at the top of the refunds page.
+function customer_refund_summary(): array
+{
+    $out = ['to_pay' => ['n' => 0, 'amount' => 0.0], 'sending' => ['n' => 0, 'amount' => 0.0], 'failed' => ['n' => 0, 'amount' => 0.0]];
+    foreach (db()->all("SELECT status, COUNT(*) AS n, SUM(amount) AS amt FROM customer_refunds WHERE status IN ('to_pay','sending','failed') GROUP BY status") as $r) $out[$r['status']] = ['n' => (int) $r['n'], 'amount' => (float) $r['amt']];
+    return $out;
+}
+
+const CR_NEXT = ['to_pay' => 'Needs you: send this money back to the customer.', 'sending' => 'Sent to Paystack. Waiting for Paystack to confirm, usually within minutes.',
+    'failed' => 'Paystack could not complete it. Try again, or refund outside Vendor Hub and mark it done.', 'refunded' => 'Done. Paystack confirmed the refund.', 'manual' => 'Done. Refunded outside Vendor Hub.'];
 
 function customer_refund_open_count(): int
 {

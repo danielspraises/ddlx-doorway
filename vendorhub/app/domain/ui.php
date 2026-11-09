@@ -214,3 +214,29 @@ function rich_text(string $text): string
     $out = trim(str_replace("\xC2\xA0", ' ', $out));
     return '<div class="rich">' . $out . '</div>';
 }
+
+// ---------------------------------------------------------------- return cases (shared by sellers and admin)
+
+// The top of a case card: number, item, status, the facts, what the customer said and what happens next.
+function case_summary(array $c, string $role): string
+{
+    $photos = '';
+    foreach ((array) json_decode((string) ($c['photos'] ?? '[]'), true) as $i => $ph) $photos .= '<a class="case-photo" href="' . e($ph) . '" target="_blank" rel="noopener">Photo ' . ($i + 1) . '</a>';
+    $who = $role === 'admin' ? '<a href="/admin/seller?id=' . e($c['seller_id']) . '">' . e($c['store_name']) . '</a>' : '';
+    $meta = ['<span>' . e(money((float) $c['line_total'], $c['currency'])) . '</span>', '<span>Order ' . e($c['number'] ?: $c['marketplace_order_id']) . '</span>', '<span>' . e($c['customer_name'] ?: 'Customer') . '</span>', '<span>Opened ' . e(human_date($c['created_at'], true)) . '</span>'];
+    if ($who !== '') array_unshift($meta, '<span class="case-store">' . $who . '</span>');
+    $how = $c['kind'] === 'refund_only' ? 'Refund without sending it back' : 'Item comes back first';
+    return '<header class="case-head"><div><div class="case-ref">' . e((string) ($c['ref'] ?? 'Case')) . ' · ' . e($c['source'] === 'customer' ? 'Asked by the customer' : 'Opened by DDLX') . '</div><h3 class="case-title">' . e($c['item_name']) . '</h3></div>'
+        . pill($c['status'], RETURN_LABEL, RETURN_KINDS) . '</header>'
+        . '<div class="case-meta">' . implode('', $meta) . '</div>'
+        . '<div class="case-said"><strong>' . e($c['reason']) . '</strong><span class="muted small"> · ' . e($how) . '</span>' . ($c['details'] !== '' ? '<p>' . e($c['details']) . '</p>' : '') . ($photos !== '' ? '<div class="case-photos">' . $photos . '</div>' : '') . '</div>'
+        . ($c['next_step'] !== '' ? '<p class="case-next">' . e($c['next_step']) . '</p>' : '');
+}
+
+function case_history_html(array $events): string
+{
+    if (!$events) return '<p class="muted small">Nothing recorded yet.</p>';
+    $h = '<ol class="timeline">';
+    foreach ($events as $ev) $h .= '<li class="tl-' . e($ev['actor']) . '"><div class="tl-who">' . e(RETURN_ACTOR[$ev['actor']] ?? $ev['actor']) . '<span class="muted"> · ' . e(human_date($ev['created_at'], true)) . '</span></div><div class="tl-body">' . e($ev['body']) . '</div></li>';
+    return $h . '</ol>';
+}

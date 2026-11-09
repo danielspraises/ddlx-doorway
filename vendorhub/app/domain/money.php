@@ -267,7 +267,7 @@ function record_paid_order(array $event): array
 }
 
 // Takes the listed paid lines back: earnings reversed (on the same availability date) and, if asked, stock returned.
-function refund_lines(Db $db, string $currency, array $lines, string $label, bool $restock, array &$sellers): void
+function refund_lines(Db $db, string $currency, array $lines, string $label, bool $restock, array &$sellers, ?string $caseId = null, string $why = ''): void
 {
     $owed = [];
     foreach ($lines as $l) {
@@ -286,7 +286,7 @@ function refund_lines(Db $db, string $currency, array $lines, string $label, boo
         }
         $sellers[$l['seller_id']] = true;
     }
-    foreach ($owed as $oid => $amt) customer_refund_add($db, $oid, $currency, round2($amt));
+    foreach ($owed as $oid => $amt) customer_refund_add($db, $oid, $currency, round2($amt), $caseId, $why);
 }
 
 // Reverses every line of an order: the credit is taken back (on the same availability date) and, if asked, the stock returns.

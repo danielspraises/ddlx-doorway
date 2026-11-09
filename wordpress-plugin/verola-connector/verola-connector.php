@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.9.0
+ * Version: 1.9.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -466,7 +466,7 @@ final class Verola_Connector {
 				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
 			];
 		}
-		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.9.0'];
+		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.9.1'];
 	}
 
 	public static function rest_link($request) {
@@ -1807,7 +1807,7 @@ final class Verola_Connector {
 			return;
 		}
 		echo '<section class="vh-returns"><h2>Returns</h2>'
-			. '<p class="vh-ret-note">You can ask for a return within 7 days of delivery. For a change of mind, you pay the return shipping. Damaged items and items that never arrived are refunded on your photos, without sending them back.</p>'
+			. '<p class="vh-ret-note">You can ask for a return within 7 days of delivery. For a change of mind, you pay the return shipping. Damaged items and items that never arrived are refunded without the item being sent back.</p>'
 			. '<ul>' . $rows . '</ul></section>'
 			. '<style>.vh-returns{margin:24px 0;padding:20px;border:1px solid #e2e8f0;border-radius:14px;background:#fff}.vh-returns h2{margin:0 0 8px;font-size:1.15rem}.vh-ret-note{margin:0 0 14px;color:#64748b;font-size:.85rem}.vh-returns ul{list-style:none;margin:0;padding:0}.vh-ret-item{padding:14px 0;border-top:1px solid #eef2f6}.vh-ret-name{font-weight:600;margin-bottom:6px}.vh-ret-status strong{display:inline-block;padding:4px 10px;border-radius:999px;background:#eaf4fb;color:#1b88ca;font-size:.8rem}.vh-ret-status span{display:block;margin-top:4px;color:#64748b;font-size:.85rem}.vh-ret-form summary{cursor:pointer;color:#1b88ca;font-weight:700;margin-top:6px}.vh-ret-form form{display:grid;gap:12px;margin-top:12px}.vh-ret-form label,.vh-ret-ship label{display:grid;gap:6px;font-size:.85rem;font-weight:600}.vh-ret-ship{margin-top:10px;padding:12px;border-radius:10px;background:#f8fafc}.vh-ret-ship p{margin:0 0 10px;font-size:.88rem}.vh-ret-ship form{display:grid;gap:10px}</style>';
 	}
@@ -1867,7 +1867,7 @@ final class Verola_Connector {
 		if ($code >= 200 && $code < 300) {
 			delete_transient('verola_rc_' . $order_id);
 			$order->add_order_note('Customer asked for a return (' . $payload['reason'] . ') for ' . $line->get_name() . '. Sent to Vendor Hub.');
-			self::return_flash('Your return request was sent. The seller has 48 hours to reply, and you will see the progress here.', 'success');
+			self::return_flash('Your return request has been received. We will keep you updated, and you can follow its progress on this page.', 'success');
 		} elseif ($code >= 400 && $code < 500 && !empty($j['error'])) {
 			self::return_flash(sanitize_text_field($j['error']), 'error');
 		} else {
@@ -1902,7 +1902,7 @@ final class Verola_Connector {
 		delete_transient('verola_rc_' . $order_id);
 		if ($code >= 200 && $code < 300) {
 			$order->add_order_note('Customer sent a return back (' . $payload['carrier'] . ' ' . $payload['tracking'] . ').');
-			self::return_flash('Thank you. The seller will confirm when it arrives, and then your refund is sent.', 'success');
+			self::return_flash('Thank you. Once your item is received, your refund will be initiated.', 'success');
 		} elseif ($code >= 400 && $code < 500 && !empty($j['error'])) {
 			self::return_flash(sanitize_text_field($j['error']), 'error');
 		} else {

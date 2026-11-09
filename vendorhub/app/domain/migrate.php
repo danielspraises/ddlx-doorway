@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 12;
+const SCHEMA_VERSION = 13;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -116,6 +116,21 @@ function migration_steps(): array
         },
         12 => function (Db $db) {
             if (!column_exists($db, 'return_cases', 'pickup_order_id')) $db->exec('ALTER TABLE return_cases ADD COLUMN pickup_order_id VARCHAR(40) NULL');
+        },
+        13 => function (Db $db) use ($engine) {
+            if (!column_exists($db, 'return_cases', 'ref')) $db->exec('ALTER TABLE return_cases ADD COLUMN ref VARCHAR(12) NULL');
+            if (!column_exists($db, 'customer_refunds', 'case_id')) $db->exec('ALTER TABLE customer_refunds ADD COLUMN case_id CHAR(36) NULL');
+            if (!column_exists($db, 'customer_refunds', 'reason')) $db->exec("ALTER TABLE customer_refunds ADD COLUMN reason VARCHAR(120) NOT NULL DEFAULT ''");
+            if (!table_exists($db, 'return_events')) {
+                $db->exec('CREATE TABLE return_events (id CHAR(36) NOT NULL PRIMARY KEY, case_id CHAR(36) NOT NULL, actor VARCHAR(10) NOT NULL, body VARCHAR(1000) NOT NULL, created_at DATETIME(3) NOT NULL)' . $engine($db));
+                $db->exec('CREATE INDEX return_events_case_idx ON return_events (case_id, created_at)');
+            }
+            $n = (int) setting('return_ref_seq', '0');
+            foreach ($db->all('SELECT id FROM return_cases WHERE ref IS NULL ORDER BY created_at, id') as $r) {
+                $n++;
+                $db->exec('UPDATE return_cases SET ref = ? WHERE id = ?', ['RT-' . str_pad((string) $n, 6, '0', STR_PAD_LEFT), $r['id']]);
+            }
+            set_setting('return_ref_seq', (string) $n);
         },
     ];
 }

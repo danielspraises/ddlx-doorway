@@ -175,7 +175,7 @@ ok(!empty($rc['ok']), 'return: customer request opened');
 eq(wallet_balances($sid)[0]['available'], $availBefore - $netItem, 'return: the item\'s earnings are frozen while the case is open');
 ok(isset(customer_open_return($rq)['error']), 'return: a second open request for the same item is refused');
 eq(db()->val('SELECT kind FROM return_cases WHERE id = ?', [$rc['case_id']]), 'return', 'return: change of mind means the item comes back first');
-eq(customer_cases_for_order($mk)[0]['label'], 'Waiting for the seller', 'return: customer sees the case');
+eq(customer_cases_for_order($mk)[0]['label'], 'Request received', 'return: customer sees the case');
 db()->exec("UPDATE return_cases SET respond_by = ? WHERE id = ?", [db_plus('-1 hours'), $rc['case_id']]);
 set_setting('returns_last_sweep', '');
 returns_sweep_if_due();
@@ -923,7 +923,7 @@ eq(db()->val('SELECT pickup_order_id FROM return_cases WHERE id = ?', [$p1['case
 $call = array_values(array_filter($stubCalls, fn ($c) => $c[0] === '/return-pickup'))[0] ?? null;
 ok($call && $call[1]['case_id'] === $p1['case_id'] && isset($call[1]['pickup']), 'pickup: the seller\'s address is sent as the destination');
 $cc = array_values(array_filter(customer_cases_for_order('WC-RET'), fn ($c) => $c['id'] === $p1['case_id']))[0];
-ok(!$cc['can_ship'] && str_contains($cc['label'], 'courier'), 'pickup: the customer is not asked to send it themselves');
+ok(!$cc['can_ship'] && str_contains($cc['label'], 'Pickup'), 'pickup: the customer is not asked to send it themselves');
 ok(isset(return_pickup_update(['case_id' => $p1['case_id'], 'order_id' => 'wrong', 'status' => 'shipped'])['error']), 'pickup: wrong return order refused');
 ok(!empty(return_pickup_update(['case_id' => $p1['case_id'], 'order_id' => '5555', 'status' => 'shipped'])['ok']), 'pickup: courier collected');
 eq(db()->val('SELECT status FROM return_cases WHERE id = ?', [$p1['case_id']]), 'return_shipped', 'pickup: item on its way back');
@@ -931,6 +931,28 @@ ok(!empty(return_pickup_update(['case_id' => $p1['case_id'], 'order_id' => '5555
 eq(seller_return_arrived($sid, $p1['case_id'], 'received', ''), null, 'pickup: seller confirms arrival');
 eq(db()->val('SELECT status FROM return_cases WHERE id = ?', [$p1['case_id']]), 'refunded', 'pickup: refunded after arrival');
 unset($GLOBALS['vh_market_stub']); set_setting('marketplace_url', ''); set_setting('marketplace_api_key', '');
+
+// ---- case history, numbers, messages, refunds tied to the case
+$hist = db()->one("SELECT id, ref FROM return_cases WHERE id = ?", [$p1['case_id']]);
+ok(preg_match('/^RT-\d{6}$/', (string) $hist['ref']) === 1, 'case: has a ticket-style number');
+$ev = return_events_map([$p1['case_id']])[$p1['case_id']] ?? [];
+$who = array_column($ev, 'actor');
+ok(in_array('customer', $who, true) && in_array('seller', $who, true) && in_array('system', $who, true), 'case: history records customer, seller and automatic steps');
+ok(count($ev) >= 6, 'case: every step is in the history (' . count($ev) . ')');
+eq(return_message('seller', $sid, $p1['case_id'], 'Item received in good order'), null, 'case: seller can write on the case');
+ok(return_message('seller', 'someone-else', $p1['case_id'], 'x') !== null, 'case: another seller cannot write on it');
+eq(return_message('admin', null, $p1['case_id'], 'Noted, thank you'), null, 'case: DDLX can write on the case');
+$last = array_slice(return_events_map([$p1['case_id']])[$p1['case_id']], -2);
+eq([$last[0]['actor'], $last[1]['actor']], ['seller', 'admin'], 'case: messages join the history in order');
+$rf = db()->one("SELECT * FROM customer_refunds WHERE case_id = ?", [$p1['case_id']]);
+ok($rf && $rf['reason'] === 'Not as described', 'refund: tied to the case and its reason');
+$mine = admin_returns('all', $sid);
+ok(count($mine) >= 3 && count(admin_returns('all', 'nobody')) === 0, 'case: admin can filter by seller');
+ok(count(admin_returns('all', '', (string) $hist['ref'])) === 1, 'case: admin can find it by number');
+ok(str_contains($mine[0]['next_step'] . $mine[1]['next_step'] . $mine[2]['next_step'], 'Closed'), 'case: says what happens next');
+ok(!str_contains(json_encode(customer_cases_for_order('WC-RET')), 'seller has 48'), 'case: customers are not shown seller deadlines');
+$cl = array_column(customer_cases_for_order('WC-RET'), 'label');
+ok(in_array('Refund initiated', $cl, true), 'case: customer sees "Refund initiated"');
 
 // marketplace admin sees every return with its stage
 $feed = marketplace_returns_feed('all', 50);

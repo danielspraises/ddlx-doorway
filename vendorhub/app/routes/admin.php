@@ -25,12 +25,11 @@ route('GET', '/admin', function () {
         case 'verifications': $vars['items'] = verification_review_list(); break;
         case 'products': $vars['items'] = review_queue(); break;
         case 'overview': $vars['o'] = admin_overview(); $vars['live_refresh'] = true; break;
-        case 'returns': $f = array_key_exists(input('filter'), ['open' => 1, 'done' => 1, 'all' => 1]) ? input('filter') : 'open'; $vars['items'] = admin_returns($f); $vars['filter'] = $f; break;
+        case 'returns': $f = array_key_exists(input('filter'), ['open' => 1, 'done' => 1, 'all' => 1]) ? input('filter') : 'open'; $vars['sellerFilter'] = input('seller'); $vars['q'] = input('q'); $vars['items'] = admin_returns($f, $vars['sellerFilter'], $vars['q']); $vars['events'] = return_events_map(array_column($vars['items'], 'id')); $vars['sellers'] = return_sellers(); $vars['filter'] = $f; break;
         case 'orders': $f = array_key_exists(input('filter'), ADMIN_ORDER_FILTERS) ? input('filter') : 'open'; $vars['items'] = admin_orders($f); $vars['filter'] = $f; $vars['history'] = []; break;
-        case 'payouts': $vars['items'] = withdrawal_review_list(); break;
         case 'categories': $vars['all'] = categories_all(true); break;
         case 'staff': $vars['items'] = staff_list(); break;
-        case 'refunds': $f = in_array(input('filter'), ['open', 'done', 'all'], true) ? input('filter') : 'open'; $vars['items'] = customer_refunds_list($f); $vars['filter'] = $f; break;
+        case 'refunds': $f = in_array(input('filter'), ['open', 'done', 'all'], true) ? input('filter') : 'open'; $vars['items'] = customer_refunds_list($f); $vars['summary'] = customer_refund_summary(); $vars['ps'] = paystack_on(); $vars['filter'] = $f; break;
         case 'payouts': $vars['items'] = withdrawal_review_list(); $vars['ps'] = paystack_on(); break;
         case 'codes': $vars['items'] = coupons_admin_list(); break;
         case 'sellers': $vars['items'] = levels_admin_list(input('q')); $vars['q'] = input('q'); $vars['links'] = seller_links_map(); break;
@@ -58,12 +57,18 @@ route('POST', '/admin/return/open', function () {
     redirect('/admin?tab=' . ($err ? 'orders' : 'returns'), $err ?? 'Return case opened. The seller has been told.', $err ? 'error' : 'ok');
 });
 
+route('POST', '/admin/return/message', function () {
+    $u = require_orders();
+    $err = return_message('admin', null, input('id'), input_raw('message'));
+    redirect('/admin?tab=returns', $err ?? 'Your message was added to the case and the seller was told.', $err ? 'error' : 'ok');
+});
+
 route('POST', '/admin/return/resolve', function () {
     $u = require_orders();
     $d = input('decision');
     $err = resolve_return($u, input('id'), $d, input('restock') === 'yes', input_raw('note'));
     if (!$err) audit($u, 'return', $d === 'refund' ? 'Approved a refund' : ($d === 'approve' ? 'Approved a return' : 'Rejected a return'), input('id'));
-    redirect('/admin?tab=returns', $err ?? ($d === 'refund' ? 'Refund recorded and the seller\'s earnings reversed. Refund the customer in WooCommerce.' : ($d === 'approve' ? 'Return approved. The customer will send the item back.' : 'Case rejected.')), $err ? 'error' : 'ok');
+    redirect('/admin?tab=returns', $err ?? ($d === 'refund' ? 'Refund recorded and the seller\'s earnings reversed. The customer\'s money is waiting under Customer refunds.' : ($d === 'approve' ? 'Return approved. The customer will send the item back.' : 'Case rejected.')), $err ? 'error' : 'ok');
 });
 
 route('POST', '/admin/order', function () {

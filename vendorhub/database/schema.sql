@@ -337,11 +337,20 @@ CREATE TABLE return_cases (
   return_tracking VARCHAR(100) NOT NULL DEFAULT '',
   shipped_at DATETIME(3) NULL,
   pickup_order_id VARCHAR(40) NULL,
+  ref VARCHAR(12) NULL,
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
   CONSTRAINT rc_item_fk FOREIGN KEY (order_item_id) REFERENCES order_items(id),
   CONSTRAINT rc_seller_fk FOREIGN KEY (seller_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE return_events (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  case_id CHAR(36) NOT NULL,
+  actor VARCHAR(10) NOT NULL,
+  body VARCHAR(1000) NOT NULL,
+  created_at DATETIME(3) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX return_events_case_idx ON return_events (case_id, created_at);
 CREATE INDEX return_cases_seller_idx ON return_cases (seller_id, status);
 CREATE INDEX return_cases_status_idx ON return_cases (status, created_at);
 
@@ -476,6 +485,8 @@ CREATE INDEX withdrawals_transfer_idx ON withdrawals (transfer_ref);
 CREATE TABLE customer_refunds (
   id CHAR(36) NOT NULL PRIMARY KEY,
   order_id CHAR(36) NOT NULL,
+  case_id CHAR(36) NULL,
+  reason VARCHAR(120) NOT NULL DEFAULT '',
   currency CHAR(3) NOT NULL,
   amount DECIMAL(12,2) NOT NULL,
   status VARCHAR(10) NOT NULL DEFAULT 'to_pay',

@@ -533,3 +533,39 @@ input[readonly]{background:var(--soft)}
 .viewas form{margin:0}
 .orbits .tote-wrap{width:46%;display:grid;place-items:center;position:relative;z-index:2;justify-self:center;align-self:center}
 .orbits .tote-wrap .tote{width:100%}
+
+/* ---- return cases and refunds ---- */
+.cases{display:grid;gap:14px;margin:0;padding:0;list-style:none}
+.case{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:grid;gap:12px;box-shadow:0 1px 2px rgba(15,27,45,.03)}
+.case-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.case-ref{font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.case-title{margin:3px 0 0;font-size:1.05rem;line-height:1.3}
+.case-meta{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.82rem;color:var(--muted)}
+.case-meta .case-store a{font-weight:700;color:var(--ink);text-decoration:none}
+.case-said{background:var(--bg);border:1px solid var(--soft);border-radius:10px;padding:10px 12px;font-size:.9rem}
+.case-said p{margin:6px 0 0;color:var(--ink)}
+.case-photos{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.case-photo{font-size:.75rem;font-weight:600;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--card);text-decoration:none;color:var(--accent-text)}
+.case-next{margin:0;padding:2px 0 2px 12px;border-left:3px solid var(--accent);font-size:.86rem;color:var(--ink)}
+.case-actions{display:grid;gap:10px;padding-top:12px;border-top:1px solid var(--soft)}
+.case-actions textarea,.case-actions input[type=text],.case-actions input:not([type]){width:100%}
+.case-history{border-top:1px solid var(--soft);padding-top:10px}
+.case-history>summary{cursor:pointer;font-size:.85rem;font-weight:700;color:var(--accent-text);list-style:none}
+.case-history>summary::-webkit-details-marker{display:none}
+.case-history>summary:after{content:" +";font-weight:400}
+.case-history[open]>summary:after{content:" \2212"}
+.timeline{list-style:none;margin:12px 0 4px 6px;padding:0 0 0 18px;border-left:2px solid var(--soft);display:grid;gap:12px}
+.timeline li{position:relative}
+.timeline li:before{content:"";position:absolute;left:-25px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--card);border:2px solid var(--line)}
+.timeline li.tl-customer:before{border-color:#3568f4}.timeline li.tl-seller:before{border-color:var(--warn)}.timeline li.tl-admin:before{border-color:var(--ok)}
+.tl-who{font-size:.76rem;font-weight:700}
+.tl-body{font-size:.88rem;margin-top:2px;word-break:break-word}
+.case-msg{display:flex;gap:8px;margin-top:10px}.case-msg input{flex:1;min-width:0}
+.case-filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0}
+.case-filters select,.case-filters input[type=search]{width:auto;min-width:170px}
+.refund-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0}
+.refund-stats div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.refund-stats strong{display:block;font-size:1.15rem}.refund-stats span{font-size:.78rem;color:var(--muted)}
+.refund-amount{font-size:1.25rem;font-weight:700}
+.refund-impact{font-size:.82rem;color:var(--muted)}
+@media(max-width:600px){.case{padding:14px}.case-head{flex-direction:column}.case-msg{flex-direction:column}}

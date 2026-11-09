@@ -164,21 +164,24 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 <?php endif; ?>
 
 <?php if ($tab === 'returns'): ?>
-  <ul class="cases"><?php foreach ($cases as $c): $ev = $events[$c['id']] ?? []; ?><li><article class="case">
-    <?= case_summary($c, 'seller') ?>
-    <?php if ($c['seller_response'] !== ''): ?><p class="small" style="margin:0"><span class="muted">Your reply:</span> <?= e($c['seller_response']) ?></p><?php endif; ?>
-    <?php if ($c['resolution_note'] !== ''): ?><p class="small" style="margin:0"><span class="muted">DDLX:</span> <?= e($c['resolution_note']) ?></p><?php endif; ?>
-    <?php if ($c['status'] === 'return_shipped'): ?><div class="small"><span class="muted">Sent back with</span> <?= e(trim($c['return_carrier'] . ' ' . $c['return_tracking'])) ?></div>
+  <p class="muted small" style="margin:0 0 14px">Select a case to see the details, reply, and read the history.</p>
+  <?php if ($cases): ?><ul class="clist"><?php foreach ($cases as $c): ?><li><?= case_row($c, 'seller') ?></li><?php endforeach; ?></ul>
+  <?php foreach ($cases as $c): $ev = $events[$c['id']] ?? [];
+    ob_start(); ?>
+    <?php if ($c['seller_response'] !== ''): ?><p class="small"><span class="muted">Your reply:</span> <?= e($c['seller_response']) ?></p><?php endif; ?>
+    <?php if ($c['resolution_note'] !== ''): ?><p class="small"><span class="muted">DDLX:</span> <?= e($c['resolution_note']) ?></p><?php endif; ?>
+    <?php if ($c['status'] === 'return_shipped'): ?><h4>Your response</h4><p class="small">The customer sent it back with <strong><?= e(trim($c['return_carrier'] . ' ' . $c['return_tracking'])) ?></strong>.</p>
       <form method="post" action="/returns/arrived" class="case-actions" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>">
-        <textarea name="note" rows="2" maxlength="2000" placeholder="Only if something is wrong with the item" aria-label="Note"></textarea>
-        <div class="row"><button class="btn btn-sm" name="action" value="received" type="submit" data-confirm="The item arrived and the customer will be refunded. Continue?">It arrived</button><button class="btn btn-sm btn-outline" name="action" value="problem" type="submit">There is a problem</button></div></form><?php endif; ?>
-    <?php if ($c['status'] === 'open'): ?><form method="post" action="/returns/respond" class="case-actions" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>">
-      <textarea name="response" rows="2" maxlength="2000" placeholder="Your reply (required if you disagree)" aria-label="Your reply"></textarea>
-      <div class="row"><button class="btn btn-sm" name="action" value="accept" type="submit" data-confirm="Accept this return? DDLX may refund the customer and take the earnings back.">I agree</button><button class="btn btn-sm btn-outline" name="action" value="dispute" type="submit">I disagree</button></div></form><?php endif; ?>
-    <details class="case-history"><summary>History (<?= count($ev) ?>)</summary><?= case_history_html($ev) ?>
-      <form method="post" action="/returns/message" class="case-msg" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>"><input name="message" maxlength="1000" placeholder="Write to DDLX about this case" aria-label="Message to DDLX" required><button class="btn btn-sm btn-outline" type="submit">Send</button></form></details>
-  </article></li><?php endforeach; ?>
-    <?php if (!$cases): ?><li class="muted">No return cases. Good.</li><?php endif; ?></ul>
+        <label class="cd-note" for="n-<?= e($c['id']) ?>">Note (only if something is wrong with the item)</label><textarea id="n-<?= e($c['id']) ?>" name="note" rows="2" maxlength="2000"></textarea>
+        <div class="row"><button class="btn" name="action" value="received" type="submit" data-confirm="The item arrived and the customer will be refunded. Continue?">It arrived</button><button class="btn btn-outline" name="action" value="problem" type="submit">There is a problem</button></div></form><?php endif; ?>
+    <?php if ($c['status'] === 'open'): ?><h4>Your response</h4><form method="post" action="/returns/respond" class="case-actions" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>">
+      <label class="cd-note" for="r-<?= e($c['id']) ?>">Your reply (required if you disagree)</label><textarea id="r-<?= e($c['id']) ?>" name="response" rows="3" maxlength="2000"></textarea>
+      <div class="row"><button class="btn" name="action" value="accept" type="submit" data-confirm="Accept this return? DDLX may refund the customer and take the earnings back.">I agree</button><button class="btn btn-outline" name="action" value="dispute" type="submit">I disagree</button></div></form><?php endif; ?>
+    <?php $act = ob_get_clean();
+    ob_start(); ?><?= case_history_html($ev) ?>
+      <form method="post" action="/returns/message" class="case-msg" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>"><input name="message" maxlength="1000" placeholder="Write to DDLX about this case" aria-label="Message to DDLX" required><button class="btn btn-sm" type="submit">Send</button></form>
+    <?php $hist = ob_get_clean(); ?><?= case_modal($c, 'seller', $act, $hist) ?>
+  <?php endforeach; else: ?><p class="muted">No return cases. Good.</p><?php endif; ?>
 <?php endif; ?>
 
 <?php if ($tab === 'payouts'): $cur = $balances[0]['currency'] ?? 'NGN'; ?>

@@ -240,3 +240,37 @@ function case_history_html(array $events): string
     foreach ($events as $ev) $h .= '<li class="tl-' . e($ev['actor']) . '"><div class="tl-who">' . e(RETURN_ACTOR[$ev['actor']] ?? $ev['actor']) . '<span class="muted"> · ' . e(human_date($ev['created_at'], true)) . '</span></div><div class="tl-body">' . e($ev['body']) . '</div></li>';
     return $h . '</ol>';
 }
+
+/** One compact line in the cases list. Clicking it opens that case's dialog. */
+function case_row(array $c, string $role): string
+{
+    $store = $role === 'admin' ? '<span class="crow-store">' . e($c['store_name']) . '</span>' : '';
+    return '<button type="button" class="crow" data-case-open="case-' . e($c['id']) . '"><span class="crow-ref"><strong>' . e((string) ($c['ref'] ?? 'Case')) . '</strong><small>' . e(human_date($c['created_at'], false)) . '</small></span>'
+        . '<span class="crow-main"><strong>' . e($c['item_name']) . '</strong><small>' . e($c['reason']) . ' · Order ' . e($c['number'] ?: $c['marketplace_order_id']) . '</small></span>'
+        . $store . '<span class="crow-status">' . pill($c['status'], RETURN_LABEL, RETURN_KINDS) . '</span><span class="crow-amt">' . e(money((float) $c['line_total'], $c['currency'])) . '</span><span class="crow-go" aria-hidden="true">&rsaquo;</span></button>';
+}
+
+/** The full case in a dialog: details, what happens next, actions (passed in) and history (passed in). */
+function case_modal(array $c, string $role, string $actions, string $history): string
+{
+    $photos = '';
+    foreach ((array) json_decode((string) ($c['photos'] ?? '[]'), true) as $i => $ph) $photos .= '<a class="case-photo" href="' . e($ph) . '" target="_blank" rel="noopener">Photo ' . ($i + 1) . '</a>';
+    $how = $c['kind'] === 'refund_only' ? 'Refund without sending it back' : 'Item comes back first';
+    $dl = [];
+    if ($role === 'admin') $dl['Store'] = '<a href="/admin/seller?id=' . e($c['seller_id']) . '">' . e($c['store_name']) . '</a>';
+    $dl['Order'] = e($c['number'] ?: $c['marketplace_order_id']);
+    $dl['Customer'] = e($c['customer_name'] ?: 'Customer');
+    $dl['Item value'] = e(money((float) $c['line_total'], $c['currency']));
+    $dl['Opened'] = e(human_date($c['created_at'], true));
+    $dl['Started by'] = $c['source'] === 'customer' ? 'The customer' : 'DDLX';
+    $grid = '';
+    foreach ($dl as $k => $v) $grid .= '<div><dt>' . e($k) . '</dt><dd>' . $v . '</dd></div>';
+    return '<dialog class="case-dlg" id="case-' . e($c['id']) . '"><div class="cd-head"><div><div class="case-ref">' . e((string) ($c['ref'] ?? 'Case')) . '</div><h3>' . e($c['item_name']) . '</h3></div>'
+        . pill($c['status'], RETURN_LABEL, RETURN_KINDS) . '<button class="btn btn-sm btn-outline" type="button" data-case-close>Close</button></div>'
+        . '<div class="cd-body">'
+        . ($c['next_step'] !== '' ? '<p class="case-next">' . e($c['next_step']) . '</p>' : '')
+        . '<section><h4>Request</h4><p class="cd-reason"><strong>' . e($c['reason']) . '</strong><span class="muted"> · ' . e($how) . '</span></p>' . ($c['details'] !== '' ? '<p class="cd-quote">' . e($c['details']) . '</p>' : '') . ($photos !== '' ? '<div class="case-photos">' . $photos . '</div>' : '') . '</section>'
+        . '<section><h4>Details</h4><dl class="cd-grid">' . $grid . '</dl></section>'
+        . ($actions !== '' ? '<section>' . $actions . '</section>' : '')
+        . '<section><h4>History</h4>' . $history . '</section></div></dialog>';
+}

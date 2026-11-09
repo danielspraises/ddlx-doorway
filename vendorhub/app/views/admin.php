@@ -139,20 +139,22 @@ $docLinks = function (array $docs): string {
     <select name="filter" aria-label="Status"><?php foreach (['open' => 'Open cases', 'done' => 'Closed cases', 'all' => 'All cases'] as $k => $l): ?><option value="<?= $k ?>" <?= $filter === $k ? 'selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select>
     <select name="seller" aria-label="Seller"><option value="">All sellers</option><?php foreach ($sellers as $sid => $nm): ?><option value="<?= e($sid) ?>" <?= $sellerFilter === $sid ? 'selected' : '' ?>><?= e($nm) ?></option><?php endforeach; ?></select>
     <input type="search" name="q" value="<?= e($q) ?>" placeholder="Case number, item, order or customer" aria-label="Search cases"><button class="btn btn-sm btn-outline" type="submit">Filter</button></form>
-  <ul class="cases"><?php foreach ($items as $c): $ev = $events[$c['id']] ?? []; ?><li><article class="case">
-    <?= case_summary($c, 'admin') ?>
-    <?php if ($c['seller_response'] !== ''): ?><p class="small" style="margin:0"><span class="muted">Seller:</span> <?= e($c['seller_response']) ?></p><?php endif; ?>
-    <?php if ($c['resolution_note'] !== ''): ?><p class="small" style="margin:0"><span class="muted">Decision:</span> <?= e($c['resolution_note']) ?></p><?php endif; ?>
-    <?php if (!empty($c['refund_status'])): ?><p class="small" style="margin:0"><span class="muted">Customer refund:</span> <?= e(CR_LABEL[$c['refund_status']] ?? $c['refund_status']) ?> · <a href="/admin?tab=refunds&amp;filter=all">see refunds</a></p><?php endif; ?>
-    <?php if ($c['status'] === 'return_shipped'): ?><p class="small" style="margin:0"><span class="muted">Sent back with</span> <?= e(trim($c['return_carrier'] . ' ' . $c['return_tracking'])) ?></p><?php endif; ?>
-    <?php if (!in_array($c['status'], RETURN_FINAL, true)): ?><form method="post" action="/admin/return/resolve" class="case-actions" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>">
-      <input name="note" maxlength="500" placeholder="Note (shown to the seller; required to decline)" aria-label="Note">
+  <?php if ($items): ?><div class="clist"><div class="crow-head"><span>Case</span><span>Item</span><span>Store</span><span>Status</span><span style="text-align:right">Value</span><span></span></div><ul class="clist" style="border:0;border-radius:0"><?php foreach ($items as $c): ?><li><?= str_replace('class="crow"', 'class="crow has-store"', case_row($c, 'admin')) ?></li><?php endforeach; ?></ul></div>
+  <?php foreach ($items as $c): $ev = $events[$c['id']] ?? [];
+    ob_start(); ?>
+    <?php if ($c['seller_response'] !== ''): ?><p class="small"><span class="muted">Seller:</span> <?= e($c['seller_response']) ?></p><?php endif; ?>
+    <?php if ($c['resolution_note'] !== ''): ?><p class="small"><span class="muted">Decision:</span> <?= e($c['resolution_note']) ?></p><?php endif; ?>
+    <?php if (!empty($c['refund_status'])): ?><p class="small"><span class="muted">Customer refund:</span> <?= e(CR_LABEL[$c['refund_status']] ?? $c['refund_status']) ?> · <a href="/admin?tab=refunds&amp;filter=all">see refunds</a></p><?php endif; ?>
+    <?php if ($c['status'] === 'return_shipped'): ?><p class="small"><span class="muted">Sent back with</span> <?= e(trim($c['return_carrier'] . ' ' . $c['return_tracking'])) ?></p><?php endif; ?>
+    <?php if (!in_array($c['status'], RETURN_FINAL, true)): ?><h4>Decision</h4><form method="post" action="/admin/return/resolve" class="case-actions" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>">
+      <label class="cd-note" for="dn-<?= e($c['id']) ?>">Note (shown to the seller; required to decline)</label><input id="dn-<?= e($c['id']) ?>" name="note" maxlength="500">
       <label class="check"><input type="checkbox" name="restock" value="yes"><span>Item comes back to stock</span></label>
-      <div class="row"><?php if ($c['kind'] === 'return' && $c['source'] === 'customer' && in_array($c['status'], ['open', 'seller_disputed'], true)): ?><button class="btn btn-sm" name="decision" value="approve" type="submit" data-confirm="Approve the return? The item is collected from the customer, then they are refunded.">Approve return</button><?php endif; ?><button class="btn btn-sm <?= $c['kind'] === 'return' && $c['source'] === 'customer' && $c['status'] !== 'return_shipped' ? 'btn-outline' : '' ?>" name="decision" value="refund" type="submit" data-confirm="Refund this item now and take the earnings back from the seller?">Refund now</button><button class="btn btn-sm btn-outline" name="decision" value="reject" type="submit" data-confirm="Decline this request?">Decline</button></div></form><?php endif; ?>
-    <details class="case-history"><summary>History (<?= count($ev) ?>)</summary><?= case_history_html($ev) ?>
-      <form method="post" action="/admin/return/message" class="case-msg" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>"><input name="message" maxlength="1000" placeholder="Write to the seller about this case" aria-label="Message to the seller" required><button class="btn btn-sm btn-outline" type="submit">Send</button></form></details>
-  </article></li><?php endforeach; ?>
-    <?php if (!$items): ?><li class="muted">No cases here.</li><?php endif; ?></ul>
+      <div class="row"><?php if ($c['kind'] === 'return' && $c['source'] === 'customer' && in_array($c['status'], ['open', 'seller_disputed'], true)): ?><button class="btn" name="decision" value="approve" type="submit" data-confirm="Approve the return? The item is collected from the customer, then they are refunded.">Approve return</button><?php endif; ?><button class="btn <?= $c['kind'] === 'return' && $c['source'] === 'customer' && $c['status'] !== 'return_shipped' ? 'btn-outline' : '' ?>" name="decision" value="refund" type="submit" data-confirm="Refund this item now and take the earnings back from the seller?">Refund now</button><button class="btn btn-outline" name="decision" value="reject" type="submit" data-confirm="Decline this request?">Decline</button></div></form><?php endif; ?>
+    <?php $act = ob_get_clean();
+    ob_start(); ?><?= case_history_html($ev) ?>
+      <form method="post" action="/admin/return/message" class="case-msg" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>"><input name="message" maxlength="1000" placeholder="Write to the seller about this case" aria-label="Message to the seller" required><button class="btn btn-sm" type="submit">Send</button></form>
+    <?php $hist = ob_get_clean(); ?><?= case_modal($c, 'admin', $act, $hist) ?>
+  <?php endforeach; else: ?><p class="muted">No cases here.</p><?php endif; ?>
 <?php endif; ?>
 
 <?php if ($tab === 'orders'): ?>

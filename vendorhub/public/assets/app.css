@@ -562,10 +562,44 @@ input[readonly]{background:var(--soft)}
 .tl-body{font-size:.88rem;margin-top:2px;word-break:break-word}
 .case-msg{display:flex;gap:8px;margin-top:10px}.case-msg input{flex:1;min-width:0}
 .case-filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0}
-.case-filters select,.case-filters input[type=search]{width:auto;min-width:170px}
+.case-filters select{width:auto;min-width:160px}.case-filters input[type=search]{width:auto;min-width:300px;flex:1;max-width:420px}
 .refund-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0}
 .refund-stats div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
 .refund-stats strong{display:block;font-size:1.15rem}.refund-stats span{font-size:.78rem;color:var(--muted)}
 .refund-amount{font-size:1.25rem;font-weight:700}
 .refund-impact{font-size:.82rem;color:var(--muted)}
 @media(max-width:600px){.case{padding:14px}.case-head{flex-direction:column}.case-msg{flex-direction:column}}
+
+/* ---------- cases list + dialog ---------- */
+.clist{display:block;margin:0;padding:0;list-style:none;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.clist li+li{border-top:1px solid var(--soft)}
+.crow{all:unset;box-sizing:border-box;display:grid;grid-template-columns:110px minmax(0,1fr) 130px 110px 24px;align-items:center;gap:16px;width:100%;padding:16px 20px;cursor:pointer;font:inherit;color:var(--ink)}
+.crow.has-store{grid-template-columns:110px minmax(0,1fr) 150px 130px 110px 24px}
+.crow:hover{background:var(--bg)}.crow:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.crow strong{display:block;font-weight:600;font-size:.95rem;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crow small{display:block;margin-top:2px;font-size:.8rem;color:var(--muted);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crow-store{font-size:.88rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crow-amt{font-weight:600;text-align:right;font-size:.92rem;white-space:nowrap}
+.crow-go{color:var(--muted);font-size:1.4rem;text-align:right}
+.case-dlg{width:min(640px,94vw);height:auto;max-height:90vh;overflow:hidden;flex-direction:column}
+.case-dlg[open]{display:flex}
+.cd-head{display:flex;align-items:flex-start;gap:12px;padding:20px 24px 16px;border-bottom:1px solid var(--line)}
+.cd-head>div:first-child{flex:1;min-width:0}.cd-head h3{margin:4px 0 0;font-size:1.2rem;line-height:1.25}
+.cd-body{overflow:auto;padding:8px 24px 24px;display:grid;gap:0}
+.cd-body section{padding:18px 0;border-bottom:1px solid var(--soft)}.cd-body section:last-child{border-bottom:0}
+.cd-body h4{margin:0 0 10px;font-family:var(--font-sans);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.cd-body .case-next{margin:16px 0 0}
+.cd-reason{margin:0 0 8px}.cd-quote{margin:0;padding:12px 14px;background:var(--bg);border-radius:10px;font-size:.92rem;line-height:1.55}
+.cd-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 24px;margin:0}
+.cd-grid dt{font-size:.75rem;color:var(--muted);margin-bottom:2px}.cd-grid dd{margin:0;font-weight:600;font-size:.92rem;overflow-wrap:anywhere}
+.cd-note{display:block;margin:0 0 6px;font-size:.88rem}
+.case-dlg .case-actions{border-top:0;padding-top:0}
+.case-dlg .case-actions .row{gap:8px}
+.crow-head{display:grid;grid-template-columns:110px minmax(0,1fr) 150px 130px 110px 24px;gap:16px;padding:10px 20px;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;background:var(--bg);border-bottom:1px solid var(--line)}
+@media(max-width:760px){
+ .crow,.crow.has-store{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main status" "ref amt";gap:6px 12px;padding:14px 16px}
+ .crow-main{grid-area:main}.crow-status{grid-area:status;justify-self:end}.crow-ref{grid-area:ref}.crow-amt{grid-area:amt}.crow-store,.crow-go,.crow-head{display:none}
+ .cd-head,.cd-body{padding-left:16px;padding-right:16px}.cd-grid{grid-template-columns:1fr 1fr}
+}
+
+div.clist{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}div.clist>.clist{border:0;border-radius:0}

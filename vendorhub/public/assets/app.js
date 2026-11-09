@@ -100,6 +100,16 @@
     dlg.addEventListener('close', function () { dlg.querySelector('.dlg-body').innerHTML = ''; });
   }
 
+  // Return cases open in a dialog
+  document.addEventListener('click', function (ev) {
+    var o = ev.target.closest && ev.target.closest('[data-case-open]');
+    if (o) { var d = document.getElementById(o.getAttribute('data-case-open')); if (d && d.showModal) d.showModal(); return; }
+    var x = ev.target.closest && ev.target.closest('[data-case-close]');
+    if (x) { var dd = x.closest('dialog'); if (dd) dd.close(); return; }
+    if (ev.target.classList && ev.target.classList.contains('case-dlg')) ev.target.close();
+  });
+  if (location.hash.indexOf('#case-') === 0) { var hd = document.getElementById(location.hash.slice(1)); if (hd && hd.showModal) hd.showModal(); }
+
   // Live updates: poll for new sales, reviews and payouts (shared hosting cannot hold a live connection open).
   if (document.body.hasAttribute('data-live')) {
     var since = null;

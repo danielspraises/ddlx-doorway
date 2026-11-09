@@ -431,9 +431,20 @@ CREATE TABLE messages (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX messages_thread_idx ON messages (thread_id, created_at);
 
+CREATE TABLE assistant_chats (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  title VARCHAR(80) NOT NULL,
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL,
+  CONSTRAINT assistant_chats_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX assistant_chats_user_idx ON assistant_chats (user_id, updated_at);
+
 CREATE TABLE assistant_messages (
   id CHAR(36) NOT NULL PRIMARY KEY,
   user_id CHAR(36) NOT NULL,
+  chat_id CHAR(36) NULL,
   role VARCHAR(10) NOT NULL,
   body TEXT NOT NULL,
   created_at DATETIME(3) NOT NULL,

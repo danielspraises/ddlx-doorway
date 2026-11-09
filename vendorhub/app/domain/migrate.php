@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 13;
+const SCHEMA_VERSION = 14;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -131,6 +131,19 @@ function migration_steps(): array
                 $db->exec('UPDATE return_cases SET ref = ? WHERE id = ?', ['RT-' . str_pad((string) $n, 6, '0', STR_PAD_LEFT), $r['id']]);
             }
             set_setting('return_ref_seq', (string) $n);
+        },
+        14 => function (Db $db) use ($engine) {
+            if (!table_exists($db, 'assistant_chats')) {
+                $db->exec('CREATE TABLE assistant_chats (id CHAR(36) NOT NULL PRIMARY KEY, user_id CHAR(36) NOT NULL, title VARCHAR(80) NOT NULL, created_at DATETIME(3) NOT NULL, updated_at DATETIME(3) NOT NULL)' . $engine($db));
+                $db->exec('CREATE INDEX assistant_chats_user_idx ON assistant_chats (user_id, updated_at)');
+            }
+            if (!column_exists($db, 'assistant_messages', 'chat_id')) $db->exec('ALTER TABLE assistant_messages ADD COLUMN chat_id CHAR(36) NULL');
+            // Earlier messages become one conversation per person.
+            foreach ($db->all('SELECT user_id, MIN(created_at) AS first_at, MAX(created_at) AS last_at FROM assistant_messages WHERE chat_id IS NULL GROUP BY user_id') as $r) {
+                $id = uuid();
+                $db->insert('assistant_chats', ['id' => $id, 'user_id' => $r['user_id'], 'title' => 'Earlier conversation', 'created_at' => $r['first_at'], 'updated_at' => $r['last_at']]);
+                $db->exec('UPDATE assistant_messages SET chat_id = ? WHERE user_id = ? AND chat_id IS NULL', [$id, $r['user_id']]);
+            }
         },
     ];
 }

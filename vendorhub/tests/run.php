@@ -590,6 +590,26 @@ proc_terminate($srv); proc_close($srv);
 foreach (['ai_api_key', 'ai_key_groq', 'ai_key_gemini', 'ai_provider'] as $k) set_setting($k, '');
 ok(!assistant_ready(), 'no key means built-in help only');
 eq(count(assistant_history($sid)), 6, 'history kept');
+// conversations
+$GLOBALS['vh_ai_stub'] = fn () => 'Reply';
+$a = assistant_ask($u, 'First topic here');
+ok($a['ok'] && $a['chat'] !== '' && $a['title'] === 'First topic here', 'a question starts a conversation titled after it');
+$b = assistant_ask($u, 'A different topic');
+ok($b['chat'] !== $a['chat'], 'no chat given means a new conversation');
+$a2 = assistant_ask($u, 'Follow up', $a['chat']);
+eq($a2['chat'], $a['chat'], 'asking inside a conversation keeps it');
+eq(count(assistant_history($sid, $a['chat'])), 4, 'a conversation holds only its own messages');
+eq(count(assistant_history($sid, $b['chat'])), 2, 'another conversation is separate');
+eq(assistant_chats($sid)[0]['id'], $a['chat'], 'latest activity is listed first');
+ok(!assistant_ask($u, 'x', 'no-such-chat')['ok'], 'unknown conversation refused');
+ok(!assistant_ask(['id' => 'someone-else'] + $u, 'x', $a['chat'])['ok'], 'cannot write into another person\'s conversation');
+ok(!assistant_chat_delete('someone-else', $a['chat']), 'cannot delete another person\'s conversation');
+ok(assistant_chat_delete($sid, $a['chat']) && assistant_chat($sid, $a['chat']) === null && count(assistant_history($sid, $a['chat'])) === 0, 'deleting removes the conversation and its messages');
+$GLOBALS['vh_ai_stub'] = fn () => null;
+// two-step setup code
+$svg = qr_svg('otpauth://totp/DDLX:a@b.c?secret=ABCDEFGHIJKLMNOP&issuer=DDLX');
+ok(str_starts_with($svg, '<svg') && str_contains($svg, '<path'), 'setup QR code is produced');
+ok(qr_svg(str_repeat('x', 400)) === '', 'too much text gives no code');
 db()->exec("DELETE FROM assistant_messages WHERE user_id = ?", [$sid]);
 ok(assistant_left_today($sid) === PHP_INT_MAX, 'no daily question limit by default');
 set_setting('ai_daily_limit', '40');

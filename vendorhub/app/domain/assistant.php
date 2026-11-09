@@ -299,10 +299,31 @@ function assistant_format(string $text): string
     return $out;
 }
 
-function assistant_history(string $userId): array
+function assistant_history(string $userId, ?string $chatId = null): array
 {
-    $rows = db()->all('SELECT role, body, created_at FROM assistant_messages WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ' . AI_HISTORY, [$userId]);
+    $rows = $chatId === null
+        ? db()->all('SELECT role, body, created_at FROM assistant_messages WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ' . AI_HISTORY, [$userId])
+        : db()->all('SELECT role, body, created_at FROM assistant_messages WHERE user_id = ? AND chat_id = ? ORDER BY created_at DESC, id DESC LIMIT ' . AI_HISTORY, [$userId, $chatId]);
     return array_reverse($rows);
+}
+
+/** A person's conversations, newest first. */
+function assistant_chats(string $userId): array
+{
+    return db()->all('SELECT id, title, updated_at FROM assistant_chats WHERE user_id = ? ORDER BY updated_at DESC, id DESC LIMIT 60', [$userId]);
+}
+
+function assistant_chat(string $userId, string $chatId): ?array
+{
+    return $chatId === '' ? null : db()->one('SELECT id, title, updated_at FROM assistant_chats WHERE id = ? AND user_id = ?', [$chatId, $userId]);
+}
+
+function assistant_chat_delete(string $userId, string $chatId): bool
+{
+    if (!assistant_chat($userId, $chatId)) return false;
+    db()->exec('DELETE FROM assistant_messages WHERE chat_id = ? AND user_id = ?', [$chatId, $userId]);
+    db()->exec('DELETE FROM assistant_chats WHERE id = ? AND user_id = ?', [$chatId, $userId]);
+    return true;
 }
 
 function assistant_left_today(string $userId): int
@@ -312,13 +333,15 @@ function assistant_left_today(string $userId): int
     return $limit <= 0 ? PHP_INT_MAX : max(0, $limit - $used);
 }
 
-function assistant_ask(array $u, string $question): array
+function assistant_ask(array $u, string $question, ?string $chatId = null): array
 {
     $question = trim(preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', str_replace("\r\n", "\n", $question)) ?? '');
     if ($question === '') return ['ok' => false, 'error' => 'Type your question.'];
     if (mb_strlen($question) > AI_MAX_QUESTION) return ['ok' => false, 'error' => 'Keep the question under ' . AI_MAX_QUESTION . ' characters.'];
     if (assistant_left_today($u['id']) <= 0) return ['ok' => false, 'error' => 'You have reached today\'s limit of ' . (int) setting('ai_daily_limit', '0') . ' questions. Write to the team from Messages, or try again tomorrow.'];
-    $hist = assistant_history($u['id']);
+    $chat = $chatId !== null && $chatId !== '' ? assistant_chat($u['id'], $chatId) : null;
+    if ($chatId !== null && $chatId !== '' && !$chat) return ['ok' => false, 'error' => 'That conversation is no longer there. Start a new chat.'];
+    $hist = $chat ? assistant_history($u['id'], $chat['id']) : [];
     $msgs = [];
     foreach ($hist as $h) $msgs[] = ['role' => $h['role'] === 'user' ? 'user' : 'assistant', 'content' => $h['body']];
     $msgs[] = ['role' => 'user', 'content' => $question];
@@ -340,8 +363,17 @@ function assistant_ask(array $u, string $question): array
         if (!empty($u['isAdmin']) && assistant_ready() && (string) setting('ai_last_error', '') !== '') $reply .= "\n\n(Admin note: the AI services did not answer. " . str_limit((string) setting('ai_last_error', ''), 420) . ')';
     }
     $now = now_db();
-    db()->insert('assistant_messages', ['id' => uuid(), 'user_id' => $u['id'], 'role' => 'user', 'body' => $question, 'created_at' => $now]);
-    db()->insert('assistant_messages', ['id' => uuid(), 'user_id' => $u['id'], 'role' => 'assistant', 'body' => str_limit($reply, 4000), 'created_at' => db_plus('+0 seconds')]);
-    if (random_int(1, 40) === 1) db()->exec('DELETE FROM assistant_messages WHERE created_at < ?', [db_plus('-30 days')]);
-    return ['ok' => true, 'reply' => $reply, 'ai' => $ai];
+    if (!$chat) {
+        $title = str_limit(trim(preg_replace('/\s+/', ' ', $question) ?? $question), 60);
+        $chat = ['id' => uuid(), 'title' => $title];
+        db()->insert('assistant_chats', ['id' => $chat['id'], 'user_id' => $u['id'], 'title' => $title, 'created_at' => $now, 'updated_at' => $now]);
+    }
+    db()->insert('assistant_messages', ['id' => uuid(), 'user_id' => $u['id'], 'chat_id' => $chat['id'], 'role' => 'user', 'body' => $question, 'created_at' => $now]);
+    db()->insert('assistant_messages', ['id' => uuid(), 'user_id' => $u['id'], 'chat_id' => $chat['id'], 'role' => 'assistant', 'body' => str_limit($reply, 4000), 'created_at' => db_plus('+0 seconds')]);
+    db()->exec('UPDATE assistant_chats SET updated_at = ? WHERE id = ?', [db_plus('+0 seconds'), $chat['id']]);
+    if (random_int(1, 40) === 1) {
+        db()->exec('DELETE FROM assistant_messages WHERE created_at < ?', [db_plus('-90 days')]);
+        db()->exec('DELETE FROM assistant_chats WHERE updated_at < ?', [db_plus('-90 days')]);
+    }
+    return ['ok' => true, 'reply' => $reply, 'ai' => $ai, 'chat' => $chat['id'], 'title' => $chat['title']];
 }

@@ -9,11 +9,17 @@
 <?php endif; ?>
 <h2>Two-step sign-in <?= pill($on ? 'OK' : 'Check', [], ['OK' => 'ok', 'Check' => 'warn']) ?> <?= help('Adds a 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator, Authy, 1Password) to signing in, so a stolen password is not enough.') ?></h2>
 <?php if (!$on): ?>
-  <ol style="max-width:560px">
-    <li>In your authenticator app choose <em>Add account</em> then <em>Enter a setup key</em>.</li>
-    <li>Type this key: <code style="font-size:1.05em;letter-spacing:.06em;word-break:break-all"><?= e(trim(chunk_split((string) $secret, 4, ' '))) ?></code><br><span class="muted small">Account name: <?= e($user['email']) ?>. Type of key: time based. On a phone you can also <a href="<?= e($uri) ?>">tap here to add it</a>.</span></li>
-    <li>Enter the code the app shows:</li>
-  </ol>
+  <div class="twofa-setup">
+    <div class="twofa-qr"><?= qr_svg((string) $uri, 'Two-step sign-in setup code') ?></div>
+    <ol>
+      <li>Open your authenticator app (Google Authenticator, Microsoft Authenticator, Authy or 1Password) and choose <em>Add account</em>, then <em>Scan a QR code</em>.</li>
+      <li>Scan the code on this page. On a phone, <a href="<?= e($uri) ?>">tap here to add it</a> instead.</li>
+      <li>Enter the 6-digit code the app shows below.</li>
+    </ol>
+  </div>
+  <details class="twofa-key"><summary>Can't scan? Enter the key by hand</summary>
+    <p style="margin:8px 0 4px"><code style="font-size:1.05em;letter-spacing:.06em;word-break:break-all"><?= e(trim(chunk_split((string) $secret, 4, ' '))) ?></code></p>
+    <p class="muted small" style="margin:0">Choose <em>Enter a setup key</em>. Account name: <?= e($user['email']) ?>. Type of key: time based.</p></details>
   <form method="post" action="/account/security" class="row" data-keep style="max-width:420px"><?= csrf_field() ?><input type="hidden" name="action" value="enable">
     <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456" required style="max-width:160px"><button class="btn" type="submit">Turn on</button></form>
 <?php else: ?>

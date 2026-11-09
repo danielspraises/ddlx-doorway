@@ -23,6 +23,34 @@
   // Show the newest message when the page opens.
   chat.scrollTop = chat.scrollHeight;
 
+  // The sidebar gets the new conversation straight away, at the top.
+  var list = document.querySelector('[data-chats]');
+  function addChat(id, title) {
+    if (!list) return;
+    var empty = list.querySelector('[data-empty]'); if (empty) empty.remove();
+    list.querySelectorAll('li.on').forEach(function (n) { n.classList.remove('on'); });
+    var li = document.createElement('li'); li.className = 'on'; li.setAttribute('data-id', id);
+    var a = document.createElement('a'); a.href = '/assistant?c=' + encodeURIComponent(id);
+    var sp = document.createElement('span'); sp.textContent = title || 'New chat';
+    var sm = document.createElement('small'); sm.textContent = 'Just now';
+    a.appendChild(sp); a.appendChild(sm); li.appendChild(a);
+    var tok = form.querySelector('input[name=_csrf]');
+    if (tok) {
+      var f = document.createElement('form'); f.method = 'post'; f.action = '/assistant/delete'; f.setAttribute('data-keep', ''); f.setAttribute('data-confirm', 'Delete this conversation?');
+      [['_csrf', tok.value], ['chat', id]].forEach(function (p) { var i = document.createElement('input'); i.type = 'hidden'; i.name = p[0]; i.value = p[1]; f.appendChild(i); });
+      var d = document.createElement('button'); d.type = 'submit'; d.className = 'chat-del'; d.setAttribute('aria-label', 'Delete conversation'); d.textContent = '\u00d7'; f.appendChild(d); li.appendChild(f);
+    }
+    list.insertBefore(li, list.firstChild);
+  }
+  function bump(id) {
+    if (!list) return;
+    var li = list.querySelector('li.on'); if (li && li !== list.firstChild) list.insertBefore(li, list.firstChild);
+    var sm = li && li.querySelector('small'); if (sm) sm.textContent = 'Just now';
+  }
+  // On a phone the list starts folded away.
+  var side = document.querySelector('details.chat-list');
+  if (side && window.matchMedia && window.matchMedia('(max-width: 800px)').matches) side.removeAttribute('open');
+
   function send() {
     var q = box.value.trim();
     if (!q || btn.disabled) return;
@@ -41,6 +69,11 @@
     xhr.onload = function () {
       var r = {}; try { r = JSON.parse(xhr.responseText); } catch (e) {}
       if (xhr.status === 200 && r.ok) {
+        if (r.chat) {
+          var hid = form.querySelector('input[name=chat]');
+          if (hid && !hid.value) { hid.value = r.chat; addChat(r.chat, r.title); try { history.replaceState(null, '', '/assistant?c=' + r.chat); } catch (e) {} }
+          else if (hid) bump(r.chat);
+        }
         var tx = wait.querySelector('.txt'); tx.style.whiteSpace = ''; tx.classList.add('rich'); if (r.html) tx.innerHTML = r.html; else tx.textContent = r.reply; wait.style.opacity = '';
         chat.scrollTop = chat.scrollHeight;
       } else {

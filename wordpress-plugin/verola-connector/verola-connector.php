@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.9.1
+ * Version: 1.9.2
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -466,7 +466,7 @@ final class Verola_Connector {
 				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
 			];
 		}
-		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.9.1'];
+		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.9.2'];
 	}
 
 	public static function rest_link($request) {
@@ -1643,8 +1643,10 @@ final class Verola_Connector {
 		// At checkout each vendor's package is priced on its own: note whose parcel it is just before the shipping methods run.
 		if (WC()->shipping()) {
 			foreach (array_keys(WC()->shipping()->get_shipping_method_class_names()) as $id) {
-				add_filter('woocommerce_shipping_' . $id . '_is_available', function ($available, $package) {
-					self::$pkg_vendor = self::package_vendor($package);
+				add_filter('woocommerce_shipping_' . $id . '_is_available', function ($available, $package = null) {
+					if (is_array($package)) {
+						self::$pkg_vendor = self::package_vendor($package);
+					}
 					return $available;
 				}, 5, 2);
 			}

@@ -34,16 +34,33 @@ function share_row(string $sellerId): array
 function share_url(string $code): string { return base_url() . '/s/' . $code; }
 function join_url(string $code): string { return base_url() . '/join/' . $code; }
 
-/** Where the QR code sends customers: the seller's store on the marketplace (or the admin's override). */
+/** The seller's store page as the marketplace itself reports it (cached for a day). Empty when it cannot be found. */
+function share_marketplace_url(string $sellerId): string
+{
+    $r = share_row($sellerId);
+    $fresh = $r['auto_at'] && strtotime((string) $r['auto_at'] . ' UTC') > time() - 86400;
+    if ($fresh && trim((string) ($r['auto_url'] ?? '')) !== '') return (string) $r['auto_url'];
+    $link = seller_link($sellerId);
+    $d = marketplace_call('/store-url?' . ($link ? 'user_id=' . $link['uid'] : 'seller_id=' . rawurlencode($sellerId)), 'GET', null, 5);
+    $url = trim((string) ($d['url'] ?? ''));
+    if ($url !== '' && preg_match('#^https?://#i', $url)) {
+        db()->exec('UPDATE seller_share SET auto_url = ?, auto_at = ? WHERE seller_id = ?', [str_limit($url, 500), now_db(), $sellerId]);
+        return $url;
+    }
+    return trim((string) ($r['auto_url'] ?? '')); // an older answer is better than none
+}
+
+/** Where the QR code sends customers: the seller's store page on the marketplace (or the admin's override). */
 function share_target(string $sellerId): string
 {
     $r = db()->one('SELECT store_url FROM seller_share WHERE seller_id = ?', [$sellerId]);
     $custom = trim((string) ($r['store_url'] ?? ''));
     if ($custom !== '' && preg_match('#^https?://#i', $custom)) return $custom;
+    $real = share_marketplace_url($sellerId);
+    if ($real !== '') return $real;
     $market = rtrim((string) setting('marketplace_url', cfg('marketplace_url', '')), '/');
     if ($market === '') return '';
-    $name = inbox_store_name($sellerId) ?: 'seller';
-    return $market . '/store/' . slugify($name) . '-' . substr($sellerId, 0, 6);
+    return $market . '/store/' . slugify(inbox_store_name($sellerId) ?: 'seller') . '-' . substr($sellerId, 0, 6);
 }
 
 /** A customer scanned a QR code: count it and say where to go (null when the code is unknown). */

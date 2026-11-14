@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 15;
+const SCHEMA_VERSION = 16;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -162,6 +162,10 @@ function migration_steps(): array
                 $db->exec('CREATE INDEX promo_downloads_asset_idx ON promo_downloads (asset_id, user_id)');
             }
             if (!column_exists($db, 'seller_applications', 'referred_by')) $db->exec('ALTER TABLE seller_applications ADD COLUMN referred_by CHAR(36) NULL');
+        },
+        16 => function (Db $db) use ($engine) {
+            if (!column_exists($db, 'seller_share', 'auto_url')) $db->exec('ALTER TABLE seller_share ADD COLUMN auto_url VARCHAR(500) NULL');
+            if (!column_exists($db, 'seller_share', 'auto_at')) $db->exec('ALTER TABLE seller_share ADD COLUMN auto_at DATETIME(3) NULL');
         },
     ];
 }

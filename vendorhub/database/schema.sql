@@ -539,6 +539,8 @@ CREATE TABLE seller_share (
   seller_id CHAR(36) NOT NULL PRIMARY KEY,
   code VARCHAR(12) NOT NULL,
   store_url VARCHAR(500) NULL,
+  auto_url VARCHAR(500) NULL,
+  auto_at DATETIME(3) NULL,
   scans INT NOT NULL DEFAULT 0,
   last_scan_at DATETIME(3) NULL,
   created_at DATETIME(3) NOT NULL

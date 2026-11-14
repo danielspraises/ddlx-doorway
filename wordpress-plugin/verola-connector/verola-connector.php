@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.9.2
+ * Version: 1.9.3
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -361,6 +361,7 @@ final class Verola_Connector {
 		register_rest_route('vendor-hub/v1', '/sku/next', ['methods' => 'GET', 'callback' => [__CLASS__, 'rest_sku_next'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
 		register_rest_route('vendor-hub/v1', '/sku/check', ['methods' => 'POST', 'callback' => [__CLASS__, 'rest_sku_check'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
 		// Matching Vendor Hub sellers to sellers that already exist in this store
+		register_rest_route('vendor-hub/v1', '/store-url', ['methods' => 'GET', 'callback' => [__CLASS__, 'rest_store_url'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
 		register_rest_route('vendor-hub/v1', '/vendors', ['methods' => 'GET', 'callback' => [__CLASS__, 'rest_vendors'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
 		register_rest_route('vendor-hub/v1', '/link', ['methods' => 'POST', 'callback' => [__CLASS__, 'rest_link'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
 		register_rest_route('vendor-hub/v1', '/unlink', ['methods' => 'POST', 'callback' => [__CLASS__, 'rest_unlink'], 'permission_callback' => [__CLASS__, 'rest_auth']]);
@@ -428,6 +429,22 @@ final class Verola_Connector {
 		return in_array($role, (array) $user->roles, true) || in_array('seller', (array) $user->roles, true);
 	}
 
+	// The real address of a seller's store page (Dokan decides it), found by the Vendor Hub seller id or the WordPress user id.
+	public static function rest_store_url($request) {
+		$uid = (int) $request->get_param('user_id');
+		$seller = sanitize_text_field((string) $request->get_param('seller_id'));
+		if (!$uid && $seller !== '') {
+			$users = get_users(['meta_key' => '_verola_seller_id', 'meta_value' => $seller, 'number' => 1, 'fields' => 'ID']);
+			$uid = $users ? (int) $users[0] : 0;
+		}
+		$user = $uid ? get_userdata($uid) : false;
+		if (!$user) {
+			return new WP_REST_Response(['error' => 'No store found for that seller.'], 404);
+		}
+		$url = function_exists('dokan_get_store_url') ? dokan_get_store_url($uid) : home_url('/store/' . $user->user_nicename . '/');
+		return ['url' => esc_url_raw($url), 'user_id' => $uid];
+	}
+
 	// Sellers already in this store, with a count of their products and whether they are linked.
 	public static function rest_vendors($request) {
 		$search = trim((string) $request->get_param('search'));
@@ -462,11 +479,12 @@ final class Verola_Connector {
 				'email' => $u->user_email,
 				'name' => $name,
 				'slug' => $u->user_nicename,
+				'store_url' => function_exists('dokan_get_store_url') ? esc_url_raw(dokan_get_store_url($id)) : '',
 				'product_count' => (int) count_user_posts($id, 'product', true),
 				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
 			];
 		}
-		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.9.2'];
+		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.9.3'];
 	}
 
 	public static function rest_link($request) {

@@ -988,6 +988,12 @@ eq(share_scan('nope1234'), null, 'unknown code goes nowhere');
 ok(share_set_target($adm, $q1, 'ftp://x') !== null, 'bad override refused');
 ok(share_set_target($adm, $q1, 'https://shop.test/vendor/zed') === null && share_target($q1) === 'https://shop.test/vendor/zed', 'admin can fix the destination');
 share_set_target($adm, $q1, ''); ok(str_contains(share_target($q1), '/store/zed-wear-'), 'override can be cleared');
+$GLOBALS['vh_market_stub'] = fn ($path, $m, $b) => str_starts_with($path, '/store-url') ? ['url' => 'https://shop.test/store/zedwear/'] : null;
+set_setting('marketplace_api_key', 'k'); db()->exec('UPDATE seller_share SET auto_at = NULL WHERE seller_id = ?', [$q1]);
+eq(share_target($q1), 'https://shop.test/store/zedwear/', 'QR uses the store address the marketplace reports');
+$GLOBALS['vh_market_stub'] = fn () => null; db()->exec('UPDATE seller_share SET auto_at = NULL WHERE seller_id = ?', [$q1]);
+eq(share_target($q1), 'https://shop.test/store/zedwear/', 'an earlier answer is kept when the marketplace is unreachable');
+db()->exec('UPDATE seller_share SET auto_url = NULL WHERE seller_id = ?', [$q1]); unset($GLOBALS['vh_market_stub']);
 
 // flyer
 $fl = flyer_for_seller($q1);

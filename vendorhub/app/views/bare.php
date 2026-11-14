@@ -27,7 +27,6 @@
   <div class="auth-panel"><div class="auth-box">
     <a class="brand" href="/"><span class="brand-name">Vendor Hub<i>/</i></span><span class="brand-sub">for DDLX</span></a>
     <?= $content ?>
-    <p class="legal-links"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/seller-terms">Seller Agreement</a><a href="/returns-policy">Returns</a></p>
   </div></div>
 </div>
 <div class="toasts" id="toasts" aria-live="polite"></div>

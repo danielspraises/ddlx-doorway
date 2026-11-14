@@ -657,3 +657,15 @@ div.clist{background:var(--card);border:1px solid var(--line);border-radius:14px
 .aud{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:10px 0 0;display:grid;gap:6px}.aud legend{padding:0 6px}
 .aud select[multiple]{width:100%}
 @media(max-width:800px){.promo-grid{grid-template-columns:1fr}.promo-flyer{max-width:320px}.asset{flex-wrap:wrap}}
+
+/* ---------- seller promo kit (clean) ---------- */
+.promo-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin-top:18px}
+.promo-card>h2{margin:0 0 16px;font-size:1.05rem}
+.promo-qr{display:grid;grid-template-columns:200px minmax(0,1fr);gap:28px;align-items:start}
+.promo-thumb{display:block;width:100%;height:auto;border-radius:12px;border:1px solid var(--line);background:var(--soft)}
+.promo-label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:6px}
+.promo-actions{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0}
+.promo-meta{margin:16px 0 0;font-size:.85rem;color:var(--muted)}.promo-meta strong{color:var(--ink)}
+.copyrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.copyrow input{flex:1;min-width:200px}
+.asset-flat{border:0;border-radius:0;background:none}.asset-flat .asset{padding:12px 0}.asset-flat .asset:first-child{padding-top:0}
+@media(max-width:640px){.promo-qr{grid-template-columns:1fr}.promo-thumb{max-width:200px}.promo-card{padding:18px}}

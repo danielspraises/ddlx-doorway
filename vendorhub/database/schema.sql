@@ -76,6 +76,7 @@ CREATE TABLE seller_applications (
   brand LONGTEXT NOT NULL,
   registration LONGTEXT NOT NULL,
   declaration LONGTEXT NOT NULL,
+  referred_by CHAR(36) NULL,
   applicant_email VARCHAR(255) NULL,
   admin_comment TEXT NULL,
   reviewed_by CHAR(36) NULL,
@@ -523,3 +524,44 @@ CREATE TABLE push_devices (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE UNIQUE INDEX push_devices_token_unique ON push_devices (token);
 CREATE INDEX push_devices_user_idx ON push_devices (user_id);
+
+CREATE TABLE terms_acceptances (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  doc VARCHAR(30) NOT NULL,
+  version INT NOT NULL,
+  ip VARCHAR(45) NOT NULL DEFAULT '',
+  created_at DATETIME(3) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX terms_user_idx ON terms_acceptances (user_id, doc);
+
+CREATE TABLE seller_share (
+  seller_id CHAR(36) NOT NULL PRIMARY KEY,
+  code VARCHAR(12) NOT NULL,
+  store_url VARCHAR(500) NULL,
+  scans INT NOT NULL DEFAULT 0,
+  last_scan_at DATETIME(3) NULL,
+  created_at DATETIME(3) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE UNIQUE INDEX seller_share_code_unique ON seller_share (code);
+
+CREATE TABLE promo_assets (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  title VARCHAR(120) NOT NULL,
+  description VARCHAR(500) NOT NULL DEFAULT '',
+  file VARCHAR(120) NOT NULL,
+  mime VARCHAR(40) NOT NULL,
+  bytes INT NOT NULL DEFAULT 0,
+  audience LONGTEXT NOT NULL,
+  active TINYINT NOT NULL DEFAULT 1,
+  created_by CHAR(36) NULL,
+  created_at DATETIME(3) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE promo_downloads (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  asset_id CHAR(36) NOT NULL,
+  user_id CHAR(36) NOT NULL,
+  created_at DATETIME(3) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX promo_downloads_asset_idx ON promo_downloads (asset_id, user_id);

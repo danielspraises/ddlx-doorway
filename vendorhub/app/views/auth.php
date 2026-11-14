@@ -35,6 +35,7 @@
     <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" value="<?= e($email ?? '') ?>" required></div>
     <div class="field"><label for="password">Password</label><div class="pw"><input id="password" name="password" type="password" <?= $register ? 'minlength="8" autocomplete="new-password"' : 'autocomplete="current-password"' ?> required><button type="button" data-pw="password">Show</button></div><?php if ($register): ?><span class="hint">At least 8 characters.</span><?php endif; ?></div>
     <?php if ($register): ?><div class="field"><label for="confirm">Confirm password</label><div class="pw"><input id="confirm" name="confirm" type="password" autocomplete="new-password" required><button type="button" data-pw="confirm">Show</button></div></div><?php endif; ?>
+    <?php if ($register): ?><p class="small muted" style="margin:0 0 12px">By creating an account you agree to the <a href="/terms" target="_blank" rel="noopener">Terms</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>. You will agree to the Seller Agreement when you apply.</p><?php endif; ?>
     <button class="btn" type="submit"><?= $register ? 'Create account' : 'Sign in' ?></button>
   </form>
   <p class="small muted" style="margin-top:18px">

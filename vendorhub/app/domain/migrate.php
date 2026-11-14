@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 14;
+const SCHEMA_VERSION = 15;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -144,6 +144,24 @@ function migration_steps(): array
                 $db->insert('assistant_chats', ['id' => $id, 'user_id' => $r['user_id'], 'title' => 'Earlier conversation', 'created_at' => $r['first_at'], 'updated_at' => $r['last_at']]);
                 $db->exec('UPDATE assistant_messages SET chat_id = ? WHERE user_id = ? AND chat_id IS NULL', [$id, $r['user_id']]);
             }
+        },
+        15 => function (Db $db) use ($engine) {
+            if (!table_exists($db, 'terms_acceptances')) {
+                $db->exec('CREATE TABLE terms_acceptances (id CHAR(36) NOT NULL PRIMARY KEY, user_id CHAR(36) NOT NULL, doc VARCHAR(30) NOT NULL, version INT NOT NULL, ip VARCHAR(45) NOT NULL DEFAULT \'\', created_at DATETIME(3) NOT NULL)' . $engine($db));
+                $db->exec('CREATE INDEX terms_user_idx ON terms_acceptances (user_id, doc)');
+            }
+            if (!table_exists($db, 'seller_share')) {
+                $db->exec('CREATE TABLE seller_share (seller_id CHAR(36) NOT NULL PRIMARY KEY, code VARCHAR(12) NOT NULL, store_url VARCHAR(500) NULL, scans INT NOT NULL DEFAULT 0, last_scan_at DATETIME(3) NULL, created_at DATETIME(3) NOT NULL)' . $engine($db));
+                $db->exec('CREATE UNIQUE INDEX seller_share_code_unique ON seller_share (code)');
+            }
+            if (!table_exists($db, 'promo_assets')) {
+                $db->exec('CREATE TABLE promo_assets (id CHAR(36) NOT NULL PRIMARY KEY, title VARCHAR(120) NOT NULL, description VARCHAR(500) NOT NULL DEFAULT \'\', file VARCHAR(120) NOT NULL, mime VARCHAR(40) NOT NULL, bytes INT NOT NULL DEFAULT 0, audience LONGTEXT NOT NULL, active TINYINT NOT NULL DEFAULT 1, created_by CHAR(36) NULL, created_at DATETIME(3) NOT NULL)' . $engine($db));
+            }
+            if (!table_exists($db, 'promo_downloads')) {
+                $db->exec('CREATE TABLE promo_downloads (id CHAR(36) NOT NULL PRIMARY KEY, asset_id CHAR(36) NOT NULL, user_id CHAR(36) NOT NULL, created_at DATETIME(3) NOT NULL)' . $engine($db));
+                $db->exec('CREATE INDEX promo_downloads_asset_idx ON promo_downloads (asset_id, user_id)');
+            }
+            if (!column_exists($db, 'seller_applications', 'referred_by')) $db->exec('ALTER TABLE seller_applications ADD COLUMN referred_by CHAR(36) NULL');
         },
     ];
 }

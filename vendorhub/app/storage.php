@@ -5,8 +5,10 @@ declare(strict_types=1);
 final class Storage
 {
     public const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-    public const EXT = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'application/pdf' => 'pdf'];
-    public const MIME = ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'pdf' => 'application/pdf'];
+    public const EXT = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'application/pdf' => 'pdf', 'video/mp4' => 'mp4'];
+    public const MIME = ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'pdf' => 'application/pdf', 'mp4' => 'video/mp4'];
+    // promos/<id>.<ext> and promos/flyer-<id>.<ext>
+    public static function promoRe(): string { return '#^(flyer-)?' . UUID_RE . '\.(jpg|png|webp|pdf|mp4)$#'; }
 
     public static function root(): string
     {
@@ -23,7 +25,7 @@ final class Storage
 
     private static function full(string $area, string $relative): string
     {
-        if (!in_array($area, ['verification', 'products', 'stores'], true) || str_contains($relative, '..') || str_contains($relative, "\0")) {
+        if (!in_array($area, ['verification', 'products', 'stores', 'promos'], true) || str_contains($relative, '..') || str_contains($relative, "\0")) {
             throw new RuntimeException('Invalid file path.');
         }
         return self::root() . '/' . $area . '/' . $relative;
@@ -67,6 +69,7 @@ final class Storage
         if (str_starts_with($bytes, "\x89PNG\r\n\x1a\n")) return 'image/png';
         if (substr($bytes, 0, 4) === 'RIFF' && substr($bytes, 8, 4) === 'WEBP') return 'image/webp';
         if (str_starts_with($bytes, '%PDF-')) return 'application/pdf';
+        if (substr($bytes, 4, 4) === 'ftyp') return 'video/mp4';
         return null;
     }
 

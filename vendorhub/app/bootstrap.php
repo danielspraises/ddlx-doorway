@@ -81,6 +81,8 @@ function vh_run(): void
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     $path = '/' . trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
     $match = $GLOBALS['vh_routes'][$method][$path] ?? null;
+    // Short links: /s/<code> (store QR) and /join/<code> (seller invite)
+    if (!$match && preg_match('#^/(s|join)/([A-Za-z0-9]{6,12})$#', $path, $sm)) { $_GET['c'] = $sm[2]; $path = '/' . $sm[1]; $match = $GLOBALS['vh_routes'][$method][$path] ?? null; }
 
     if (!$installed) {
         if (!str_starts_with($path, '/install')) {

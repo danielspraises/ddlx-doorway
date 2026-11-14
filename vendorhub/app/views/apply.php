@@ -109,6 +109,8 @@ $if = fn (string $field, string $value) => 'data-if="' . e($field . '=' . $value
       <?php endfor; ?>
       <hr class="sep">
       <?php foreach (APP_DECLARATIONS as $i => $text): ?><label class="check"><input type="checkbox" name="decl[<?= $i ?>]" value="yes" <?= ($decl[(string) $i] ?? '') === 'yes' ? 'checked' : '' ?>><span><?= e($text) ?></span></label><?php endforeach; ?>
+      <div class="agree-box"><label class="check"><input type="checkbox" name="agree" value="yes" required><span>I have read and agree to the <a href="/seller-terms" target="_blank" rel="noopener">Seller Agreement</a>, the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a> and the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>. I also accept the <a href="/returns-policy" target="_blank" rel="noopener">Returns and Refunds</a> policy and the <a href="/prohibited-items" target="_blank" rel="noopener">Prohibited Items</a> list.</span></label>
+      <p class="muted small" style="margin:6px 0 0 28px">Version <?= (int) legal_version() ?>. Your agreement is recorded with the date and time.</p></div>
     <?php endif; ?>
     <div class="row" style="margin-top:20px">
       <?php if ($step > 1): ?><button class="btn btn-ghost" name="action" value="back" type="submit">Back</button><?php endif; ?>

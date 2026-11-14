@@ -9,7 +9,7 @@ function admin_tabs(array $u): array
     if ($u['canReview']) $tabs['products'] = 'Products';
     if ($u['canMessages']) $tabs['messages'] = 'Messages';
     if ($u['canOrders']) { $tabs['orders'] = 'Orders'; $tabs['returns'] = 'Returns'; }
-    if ($u['isAdmin']) $tabs += ['sellers' => 'Sellers', 'codes' => 'Discount codes', 'payouts' => 'Payouts', 'refunds' => 'Customer refunds', 'categories' => 'Categories', 'staff' => 'Staff', 'activity' => 'Activity', 'settings' => 'Settings'];
+    if ($u['isAdmin']) $tabs += ['sellers' => 'Sellers', 'codes' => 'Discount codes', 'payouts' => 'Payouts', 'refunds' => 'Customer refunds', 'promo' => 'Promo & QR', 'legal' => 'Legal pages', 'categories' => 'Categories', 'staff' => 'Staff', 'activity' => 'Activity', 'settings' => 'Settings'];
     return $tabs;
 }
 
@@ -19,7 +19,7 @@ route('GET', '/admin', function () {
     $tabs = admin_tabs($u);
     $tab = array_key_exists(input('tab'), $tabs) ? input('tab') : array_key_first($tabs);
     if ($tab === 'messages') redirect('/messages');
-    $vars = ['title' => $tabs[$tab], 'tab' => $tab, 'tabs' => $tabs, 'user' => $u, 'sel' => input('id'), 'filter' => input('filter'), 'live_refresh' => !in_array($tab, ['categories', 'staff', 'settings', 'activity'], true)];
+    $vars = ['title' => $tabs[$tab], 'tab' => $tab, 'tabs' => $tabs, 'user' => $u, 'sel' => input('id'), 'filter' => input('filter'), 'live_refresh' => !in_array($tab, ['categories', 'staff', 'settings', 'activity', 'promo', 'legal'], true)];
     switch ($tab) {
         case 'applications': $vars['items'] = application_review_list(); break;
         case 'verifications': $vars['items'] = verification_review_list(); break;
@@ -34,6 +34,8 @@ route('GET', '/admin', function () {
         case 'codes': $vars['items'] = coupons_admin_list(); break;
         case 'sellers': $vars['items'] = levels_admin_list(input('q')); $vars['q'] = input('q'); $vars['links'] = seller_links_map(); break;
         case 'activity': $f = array_key_exists(input('filter'), AUDIT_LABEL) ? input('filter') : ''; $vars['items'] = audit_list(200, $f); $vars['filter'] = $f; break;
+        case 'promo': $vars['items'] = promo_admin_list(); $vars['options'] = promo_seller_options(); $vars['flyer'] = flyer_template(); $vars['q'] = input('q'); $vars['shares'] = share_admin_list(input('q')); $vars['leaders'] = referral_leaders(); $vars['scripts'] = ['promo.js']; break;
+        case 'legal': $vars['doc'] = isset(LEGAL_DOCS[input('doc')]) ? input('doc') : 'seller-terms'; break;
         case 'settings': break;
     }
     render('admin', $vars);

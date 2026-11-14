@@ -26,6 +26,11 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
   <?php endforeach; ?>
 <?php else: ?><p class="notice">No sales yet. When a customer buys one of your products on the marketplace, it shows up here.</p><?php endif; endif; ?>
 
+<?php if ($tab === 'overview' && !terms_current($user['id'])): ?>
+<form method="post" action="/seller-terms/accept" class="notice" style="margin:16px 0" data-keep><?= csrf_field() ?><strong>Please review the Seller Agreement.</strong> <a href="/seller-terms" target="_blank" rel="noopener">Read it</a>.
+  <label class="check" style="margin:8px 0"><input type="checkbox" name="agree" value="yes" required><span>I have read and agree to the Seller Agreement (version <?= (int) legal_version() ?>).</span></label>
+  <button class="btn btn-sm" type="submit">I agree</button></form>
+<?php endif; ?>
 <?php if ($tab === 'overview'):
     $live = count(array_filter($products, fn ($p) => $p['live']));
     $review = count(array_filter($products, fn ($p) => $p['status'] === 'pending_review'));
@@ -162,6 +167,8 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
         <?php endif; ?></td></tr>
   <?php endforeach; if (!$sales): ?><tr><td colspan="7" class="muted" style="text-align:center;padding:40px">Sales will be listed here.</td></tr><?php endif; ?></tbody></table></div>
 <?php endif; ?>
+
+<?php if ($tab === 'promo') require __DIR__ . '/seller_promo.php'; ?>
 
 <?php if ($tab === 'returns'): ?>
   <p class="muted small" style="margin:0 0 14px">Select a case to see the details, reply, and read the history.</p>

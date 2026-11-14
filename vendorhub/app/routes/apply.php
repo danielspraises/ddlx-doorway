@@ -26,8 +26,10 @@ route('POST', '/apply', function () {
         if ($action === 'back') redirect('/apply?step=4');
         $decl = [];
         foreach ([0, 1, 2, 3] as $i) $decl[(string) $i] = isset($_POST['decl'][$i]) ? 'yes' : 'no';
+        if ($action === 'submit' && empty($_POST['agree'])) { $again([], [], 'Please agree to the Seller Agreement, Terms and Privacy Policy to submit.'); return; }
         $r = save_application($u['id'], 5, [], $action === 'submit', $decl);
         if (!$r['ok']) { $again([], [], $r['error']); return; }
+        if ($action === 'submit') terms_record($u['id']);
         redirect('/apply', $action === 'submit' ? 'Application submitted. We will review it and get back to you.' : 'Progress saved.');
     }
 
@@ -40,5 +42,6 @@ route('POST', '/apply', function () {
     if ($errors) { $again($errors, $data); return; }
     $r = save_application($u['id'], $step, $data, false, [], $action === 'next' ? $step + 1 : $step);
     if (!$r['ok']) { $again([], $data, $r['error']); return; }
+    referral_attach($u['id']);
     redirect('/apply?step=' . ($action === 'next' ? $step + 1 : $step), $action === 'next' ? null : 'Progress saved.');
 });

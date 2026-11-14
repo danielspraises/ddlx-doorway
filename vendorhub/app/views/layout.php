@@ -58,7 +58,7 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
 <?php if ($flashMsg): ?><div class="wrap"><p class="flash <?= e($flashMsg['k'] === 'error' ? 'flash-error' : 'flash-ok') ?>" role="status"><?= e($flashMsg['m']) ?></p></div><?php endif; ?>
 <?php if (!empty($user) && empty($user['twofa']) && ($user['isAdmin'] || $user['canReview'] || $user['canOrders'] || $user['canMessages']) && ($_SERVER['REQUEST_URI'] ?? '') !== '/account/security'): ?><div class="wrap"><p class="flash flash-error" role="status">Your account can approve products and money. Protect it with <a href="/account/security">two-step sign-in</a>.</p></div><?php endif; ?>
 <main class="<?= !empty($full) ? '' : 'wrap main' ?>" id="main"><?= $content ?></main>
-<?php if (!empty($footer)): ?><footer class="site-footer"><div class="wrap"><strong>DDLX</strong><a href="https://ddlx.shop" target="blanc">Marketplace <?= icon('arrow-up-right') ?></a></div></footer><?php endif; ?>
+<footer class="site-footer"><div class="wrap"><strong>DDLX</strong><nav class="foot-links" aria-label="Legal"><?php foreach (LEGAL_DOCS as $k => $d): ?><a href="/<?= e($k) ?>"><?= e($d[0]) ?></a><?php endforeach; ?></nav><a href="https://ddlx.shop" target="_blank" rel="noopener">Marketplace <?= icon('arrow-up-right') ?></a></div></footer>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <dialog id="preview-dialog"><div class="dlg-head"><strong data-dlg-title>Document</strong><button class="btn btn-sm btn-outline" type="button" data-dlg-close>Close</button></div><div class="dlg-body"></div></dialog>
 <script src="/assets/app.js?v=<?= (int) @filemtime(__DIR__ . "/../../public/assets/app.js") ?>" defer></script>

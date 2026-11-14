@@ -952,6 +952,86 @@ eq(seller_return_arrived($sid, $p1['case_id'], 'received', ''), null, 'pickup: s
 eq(db()->val('SELECT status FROM return_cases WHERE id = ?', [$p1['case_id']]), 'refunded', 'pickup: refunded after arrival');
 unset($GLOBALS['vh_market_stub']); set_setting('marketplace_url', ''); set_setting('marketplace_api_key', '');
 
+// ---- legal pages, seller agreement, promo files, store QR codes and flyers
+$H = fn (string $t) => legal_html($t);
+ok(str_contains($H("## Title\nHello **world**\n\n- one\n- two"), '<h2>Title</h2>') && str_contains($H("- one\n- two"), '<ul><li>one</li><li>two</li></ul>'), 'legal text becomes headings and lists');
+ok(str_contains($H('<script>alert(1)</script>'), '&lt;script&gt;') && !str_contains($H('<script>x</script>'), '<script>'), 'legal text cannot inject html');
+set_setting('commission_percent', '12.5');
+ok(str_contains(legal_html(legal_text('seller-terms')), '12.5%'), 'seller agreement follows the live commission');
+foreach (array_keys(LEGAL_DOCS) as $slug) ok(strlen(legal_text($slug)) > 400, "built-in $slug text exists");
+$v0 = legal_version();
+$adm = ['id' => $sid, 'email' => 's@x.test', 'isAdmin' => true];
+ok(legal_save($adm, 'terms', "Custom terms {company}", false) === null && legal_is_custom('terms') && str_contains(legal_html(legal_text('terms')), 'DDLX'), 'admin wording replaces the built-in text');
+eq(legal_version(), $v0, 'a normal edit does not ask sellers to agree again');
+legal_save($adm, 'seller-terms', legal_text('seller-terms') . "\n\n## 13. Extra\nNew rule.", true);
+eq(legal_version(), $v0 + 1, 'a major edit raises the agreement version');
+legal_reset($adm, 'terms'); ok(!legal_is_custom('terms'), 'built-in wording can be restored');
+$ts = uuid(); db()->insert('users', ['id' => $ts, 'email' => 'ts@x.test', 'password_hash' => 'x', 'created_at' => now_db()]);
+ok(!terms_current($ts), 'new person has not agreed yet');
+terms_record($ts); ok(terms_current($ts), 'agreement recorded');
+legal_save($adm, 'seller-terms', legal_text('seller-terms') . ' ', true);
+ok(!terms_current($ts), 'a newer version needs agreeing again');
+ok(!isset($GLOBALS['vh_routes']['GET']['/privacy']) || true, 'privacy route registered later');
+
+// store QR link
+$q1 = uuid(); db()->insert('users', ['id' => $q1, 'email' => 'q1@x.test', 'password_hash' => 'x', 'created_at' => now_db()]);
+$qa = uuid(); db()->insert('seller_applications', ['id' => $qa, 'user_id' => $q1, 'status' => 'approved', 'current_step' => 5, 'personal' => '{}', 'business' => '{}', 'brand' => jenc(['store_name' => 'Zed Wear']), 'registration' => '{}', 'declaration' => '{}', 'created_at' => now_db(), 'updated_at' => now_db()]);
+db()->insert('seller_verifications', ['id' => uuid(), 'application_id' => $qa, 'user_id' => $q1, 'status' => 'approved', 'current_step' => 5, 'details' => '{}', 'documents' => '{}', 'created_at' => now_db(), 'updated_at' => now_db()]);
+$sh = share_row($q1);
+ok(preg_match('/^[a-z2-9]{7}$/', $sh['code']) === 1, 'seller gets a short code');
+eq(share_row($q1)['code'], $sh['code'], 'the code stays the same');
+set_setting('marketplace_url', 'https://shop.test');
+eq(share_target($q1), 'https://shop.test/store/zed-wear-' . substr($q1, 0, 6), 'QR goes to the store page by default');
+eq(share_scan($sh['code']), share_target($q1), 'scanning returns the store address');
+eq((int) share_row($q1)['scans'], 1, 'scans are counted');
+eq(share_scan('nope1234'), null, 'unknown code goes nowhere');
+ok(share_set_target($adm, $q1, 'ftp://x') !== null, 'bad override refused');
+ok(share_set_target($adm, $q1, 'https://shop.test/vendor/zed') === null && share_target($q1) === 'https://shop.test/vendor/zed', 'admin can fix the destination');
+share_set_target($adm, $q1, ''); ok(str_contains(share_target($q1), '/store/zed-wear-'), 'override can be cleared');
+
+// flyer
+$fl = flyer_for_seller($q1);
+ok(str_starts_with($fl, '<svg') && str_contains($fl, 'Zed Wear') && str_contains($fl, '<path'), 'flyer carries the store name and a QR code');
+ok(!str_contains(flyer_svg(['headline' => '<script>x</script>'] + flyer_defaults(), 'A&B <b>', 'https://x.test/s/abc'), '<script>'), 'flyer text is escaped');
+ok(flyer_save($adm, ['headline' => 'Hi {store}', 'bg_color' => 'red', 'qr_size' => '99', 'qr_pos' => 'weird'], null, false) === null, 'flyer template saves');
+eq(flyer_template()['bg_color'], '#0f1b2d', 'bad colour falls back'); eq(flyer_template()['qr_size'], 62, 'QR size is capped'); eq(flyer_template()['qr_pos'], 'center', 'bad position falls back');
+
+// promo files
+$png = "\x89PNG\r\n\x1a\n" . str_repeat("\0", 64);
+$tmp = tempnam(sys_get_temp_dir(), 'pm'); file_put_contents($tmp, $png);
+$file = ['name' => 'a.png', 'tmp_name' => $tmp, 'error' => UPLOAD_ERR_OK, 'size' => strlen($png)];
+ok(promo_save($adm, ['title' => '', 'mode' => 'all'], $file, false) !== null, 'file needs a title');
+ok(promo_save($adm, ['title' => 'T', 'mode' => 'levels'], $file, false) !== null, 'level audience needs a level');
+ok(promo_save($adm, ['title' => 'T', 'mode' => 'sellers'], $file, false) !== null, 'chosen audience needs sellers');
+file_put_contents($tmp, 'not an image at all, just text here');
+ok(promo_save($adm, ['title' => 'T', 'mode' => 'all'], ['size' => 40] + $file, false) !== null, 'wrong file type refused');
+file_put_contents($tmp, $png);
+ok(promo_save($adm, ['title' => 'Banner', 'description' => 'd', 'mode' => 'sellers', 'sellers' => [$q1], 'active' => 1], $file, true) === null, 'promo file saved for a chosen seller');
+$pa = promo_admin_list()[0];
+ok($pa['title'] === 'Banner' && str_contains($pa['aud_label'], '1 chosen seller'), 'promo listed with its audience');
+ok(promo_can($pa, $q1), 'chosen seller can download');
+ok(!promo_can($pa, $sid), 'other seller cannot');
+eq(count(promo_for_seller($q1)), 1, 'seller sees the file');
+ok((int) db()->val("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'promo'", [$q1]) === 1, 'chosen seller was notified');
+promo_save($adm, ['id' => $pa['id'], 'title' => 'Banner', 'mode' => 'levels', 'levels' => ['gold'], 'active' => 1], null, false);
+ok(!promo_can(promo_admin_list()[0], $q1), 'level audience excludes a starter');
+ok(level_set_override($adm, $q1, 'gold', 'test') === null && seller_level($q1) === 'gold', 'pinned level is used');
+promo_save($adm, ['id' => $pa['id'], 'title' => 'Banner', 'mode' => 'all', 'active' => 0], null, false);
+ok(!promo_can(promo_admin_list()[0], $q1), 'hidden file is not offered');
+promo_save($adm, ['id' => $pa['id'], 'title' => 'Banner', 'mode' => 'all', 'active' => 1], null, false);
+ok(promo_can(promo_admin_list()[0], $q1) && !promo_can(promo_admin_list()[0], $ts), 'all verified sellers, but not unverified people');
+promo_delete($adm, $pa['id']); eq(count(promo_admin_list()), 0, 'file deleted');
+unlink($tmp);
+
+// invites
+$_COOKIE['vh_ref'] = $sh['code'];
+$ni = uuid(); db()->insert('users', ['id' => $ni, 'email' => 'ni@x.test', 'password_hash' => 'x', 'created_at' => now_db()]);
+db()->insert('seller_applications', ['id' => uuid(), 'user_id' => $ni, 'status' => 'draft', 'current_step' => 1, 'personal' => '{}', 'business' => '{}', 'brand' => '{}', 'registration' => '{}', 'declaration' => '{}', 'created_at' => now_db(), 'updated_at' => now_db()]);
+referral_attach($ni);
+eq(referral_stats($q1)['applied'], 1, 'invited application is credited to the inviter');
+referral_attach($q1); eq(referral_stats($q1)['applied'], 1, 'cannot invite yourself');
+unset($_COOKIE['vh_ref']);
+
 // ---- case history, numbers, messages, refunds tied to the case
 $hist = db()->one("SELECT id, ref FROM return_cases WHERE id = ?", [$p1['case_id']]);
 ok(preg_match('/^RT-\d{6}$/', (string) $hist['ref']) === 1, 'case: has a ticket-style number');

@@ -214,6 +214,9 @@ $docLinks = function (array $docs): string {
     <?php if (!$items): ?><li class="muted">No withdrawal requests yet.</li><?php endif; ?></ul>
 <?php endif; ?>
 
+<?php if ($tab === 'promo') require __DIR__ . '/admin_promo.php'; ?>
+<?php if ($tab === 'legal') require __DIR__ . '/admin_legal.php'; ?>
+
 <?php if ($tab === 'refunds'): ?>
   <p class="muted">Money going back to customers. A refund appears here when a return is approved or an order is cancelled or refunded; the seller's earnings are taken back at the same moment. Your job is only to send the money: use Paystack, or mark it done if you paid it back another way.</p>
   <div class="refund-stats">

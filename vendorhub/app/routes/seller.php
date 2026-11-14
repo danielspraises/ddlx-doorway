@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SELLER_TABS = ['overview' => 'Overview', 'products' => 'Products', 'inventory' => 'Inventory', 'sales' => 'Sales', 'promotions' => 'Promotions', 'returns' => 'Returns', 'payouts' => 'Payouts', 'store' => 'Store'];
+const SELLER_TABS = ['overview' => 'Overview', 'products' => 'Products', 'inventory' => 'Inventory', 'sales' => 'Sales', 'promotions' => 'Promotions', 'returns' => 'Returns', 'payouts' => 'Payouts', 'promo' => 'Promo kit', 'store' => 'Store'];
 
 route('GET', '/seller', function () {
     $u = require_seller();
@@ -16,6 +16,7 @@ route('GET', '/seller', function () {
     if ($tab === 'returns') { $vars['cases'] = seller_returns($u['id']); $vars['events'] = return_events_map(array_column($vars['cases'], 'id')); }
     if ($tab === 'promotions') { $vars['coupons'] = coupons_for_seller($u['id']); $vars['all_products'] = array_values(array_filter(seller_products($u['id']), fn ($p) => $p['status'] !== 'draft' || $p['live'])); $vars['edit'] = null; foreach ($vars['coupons'] as $c) if ($c['id'] === input('edit')) $vars['edit'] = $c; $vars['err'] = null; }
     if ($tab === 'store') $vars['store'] = store_profile($u['id']);
+    if ($tab === 'promo') { $vars['share'] = share_row($u['id']); $vars['assets'] = promo_for_seller($u['id']); $vars['ref'] = referral_stats($u['id']); $vars['scripts'] = ['promo.js']; }
     render('seller', $vars);
 });
 

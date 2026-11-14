@@ -669,3 +669,7 @@ div.clist{background:var(--card);border:1px solid var(--line);border-radius:14px
 .copyrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.copyrow input{flex:1;min-width:200px}
 .asset-flat{border:0;border-radius:0;background:none}.asset-flat .asset{padding:12px 0}.asset-flat .asset:first-child{padding-top:0}
 @media(max-width:640px){.promo-qr{grid-template-columns:1fr}.promo-thumb{max-width:200px}.promo-card{padding:18px}}
+.promo-card .card{border:0;padding:0;box-shadow:none;background:none}
+.promo-card .asset-actions{flex-wrap:wrap}
+.promo-card .table-wrap{margin-top:0}
+.promo-card .case-filters{margin:0 0 12px}

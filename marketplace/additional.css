@@ -285,3 +285,15 @@ form.woocommerce-checkout{clear:both}
   .woocommerce-checkout table.shop_table td,.woocommerce-checkout table.shop_table tfoot th{padding:12px 8px!important}
   .woocommerce-checkout #place_order{padding:15px 20px!important}
 }
+
+/* ---------- Dokan store page: no empty sidebar, products use the full width ---------- */
+.dokan-store-wrap #dokan-secondary,
+.dokan-store-wrap .dokan-store-sidebar,
+.dokan-store .sidebar-container,
+.dokan-store aside.sidebar-container,
+body.dokan-store .area-sidebar-shop,
+body.dokan-store .site-content > aside {display:none !important}
+.dokan-store-wrap #dokan-primary,
+.dokan-store-wrap .dokan-store-products-filter-area,
+body.dokan-store .site-content > .content-area,
+body.dokan-store .main-page-wrapper .site-content{width:100% !important;max-width:100% !important;flex:0 0 100% !important;float:none !important;margin-left:0 !important;margin-right:0 !important}

@@ -12,7 +12,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 <h1><?= e(SELLER_TABS[$tab]) ?><?= isset($tabHelp[$tab]) ? ' ' . help($tabHelp[$tab]) : '' ?></h1>
 <?= tabs_nav(SELLER_TABS, $tab, '/seller', ['returns' => $user['pending']['returns'] ?? 0]) ?>
 
-<?php if (in_array($tab, ['overview', 'sales', 'payouts'], true)):
+<?php if (in_array($tab, ['sales', 'payouts'], true)):
     $currencies = array_values(array_unique(array_merge(array_column($balances, 'currency'), array_column($month, 'currency'))));
     if ($currencies): ?>
   <?php foreach ($currencies as $c):
@@ -31,29 +31,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
   <label class="check" style="margin:8px 0"><input type="checkbox" name="agree" value="yes" required><span>I have read and agree to the Seller Agreement (version <?= (int) legal_version() ?>).</span></label>
   <button class="btn btn-sm" type="submit">I agree</button></form>
 <?php endif; ?>
-<?php if ($tab === 'overview'):
-    $live = count(array_filter($products, fn ($p) => $p['live']));
-    $review = count(array_filter($products, fn ($p) => $p['status'] === 'pending_review'));
-    $low = array_filter($products, fn ($p) => in_array(stock_state($p), ['low', 'out'], true));
-    $changes = array_filter($products, fn ($p) => in_array($p['status'], ['changes_requested', 'rejected'], true));
-    $attention = array_slice(array_unique(array_merge(array_values($changes), array_values($low)), SORT_REGULAR), 0, 6); ?>
-<?php $curLv = $level['override_level'] ?: $level['auto_level'];
-    if (!empty($level['below_since']) && !$level['override_level']): $pol = level_policy(); ?>
-  <p class="notice" style="margin-top:24px"><strong>Your <?= e(LEVEL_LABEL[$curLv]) ?> level is at risk.</strong> <?= $pol['mode'] === 'grace' ? 'Meet its requirements again by ' . e(human_date(db_plus('+' . $pol['grace_days'] . ' days', $level['below_since']), false)) . ' to keep it.' : 'You no longer meet its requirements.' ?></p>
-<?php endif; ?>
-  <div class="grid g4" style="margin-top:24px">
-    <div class="stat"><p class="muted small">Products</p><p class="n"><?= count($products) ?></p></div>
-    <div class="stat"><p class="muted small">Live on marketplace</p><p class="n"><?= $live ?></p></div>
-    <div class="stat"><p class="muted small">In review</p><p class="n"><?= $review ?></p></div>
-    <div class="stat"><p class="muted small">Low or out of stock</p><p class="n"><?= count($low) ?></p></div>
-  </div>
-  <?php if (!empty($to_process)): ?><p class="notice" style="margin-top:20px"><strong><?= (int) $to_process ?> order<?= $to_process === 1 ? '' : 's' ?> to pack.</strong> <a href="/seller?tab=sales">Open Sales</a> to start processing and mark them ready for shipping.</p><?php endif; ?>
-  <h2>Your earnings, last 30 days</h2>
-  <div class="card"><?= bar_chart($chart['series'], $chart['currency'], 'Your earnings per day') ?></div>
-  <div class="row" style="margin-top:24px"><a class="btn" href="/products/edit"><?= $products ? 'Add product' : 'Add your first product' ?></a><a class="btn btn-outline" href="/seller?tab=inventory">Manage inventory</a></div>
-  <?php if ($attention): ?><h2>Needs your attention</h2><ul class="list">
-    <?php foreach ($attention as $p): [$k, $l] = product_visibility($p); ?><li class="row between"><a href="/products/edit?id=<?= e($p['id']) ?>"><strong><?= e($p['name']) ?></strong></a><span><?= pill($k, [], ['live' => 'ok', 'hidden' => 'warn']) ?> <?= stock_state($p) !== 'ok' ? pill(stock_state($p)) : '' ?></span></li><?php endforeach; ?></ul><?php endif; ?>
-<?php endif; ?>
+<?php if ($tab === 'overview') include __DIR__ . '/seller_dash.php'; ?>
 
 <?php if ($tab === 'products'): ?>
   <div class="row between" style="margin:18px 0"><span class="muted"><?= count($products) ?> product<?= count($products) === 1 ? '' : 's' ?> · <a href="/seller/export?kind=products">Download CSV</a></span><span class="row"><a class="btn btn-outline" href="/products/import">Import CSV</a><a class="btn" href="/products/edit">Add product</a></span></div>

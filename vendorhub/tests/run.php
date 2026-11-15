@@ -217,6 +217,33 @@ eq(count($ch['series']), 30, '30 days charted');
 ok(array_sum($ch['series']) > 0, 'earnings charted');
 ok(str_contains(bar_chart($ch['series'], $ch['currency']), '<svg'), 'chart renders');
 ok(str_contains(bar_chart(array_fill_keys(array_keys($ch['series']), 0.0)), 'No sales'), 'empty chart message');
+// ---- sales dashboard
+foreach (array_keys(DASH_RANGES) as $rg) {
+    $dd = dash_data($sid, $rg);
+    eq(count($dd['series']), count($dd['labels']), "dashboard $rg: one label per bar");
+    eq(count($dd['previous']), count($dd['series']), "dashboard $rg: previous period lines up");
+    ok(abs(array_sum(dash_data($sid, $rg, '', 'net')['series']) - $dd['now']['net']) < 0.01, "dashboard $rg: bars add up to the earnings total");
+    ok(str_contains(dash_chart($dd), '<svg') && str_contains(dash_gauge($dd['categories'], '1', 'x'), '<svg'), "dashboard $rg: drawings render");
+}
+$d30 = dash_data($sid, '30d');
+eq(count($d30['series']), 30, 'dashboard: 30 daily bars');
+eq(count(dash_data($sid, '7d')['series']), 7, 'dashboard: 7 daily bars');
+eq(count(dash_data($sid, '90d')['series']), 13, 'dashboard: 90 days in weeks');
+eq(count(dash_data($sid, '12m')['series']), 12, 'dashboard: 12 months');
+eq(dash_data($sid, 'nonsense', 'XXX', 'bad')['range'], '30d', 'dashboard: bad range falls back');
+ok($d30['now']['gross'] >= $d30['now']['net'], 'dashboard: sales are at least earnings');
+eq(dash_data($other, '30d')['now']['orders'], 0, 'dashboard: another seller sees none of these sales');
+eq(dash_delta(150.0, 100.0), ['dir' => 'up', 'pct' => 50.0], 'delta up');
+eq(dash_delta(50.0, 100.0)['dir'], 'down', 'delta down');
+eq(dash_delta(5.0, 0.0)['dir'], 'new', 'delta new');
+eq(dash_delta(0.0, 0.0)['dir'], 'flat', 'delta flat');
+eq(dash_scale(0.0), [1.0, 4], 'axis for no data');
+[$st, $stn] = dash_scale(437000.0);
+ok($st * $stn >= 437000 && $stn <= 6, 'axis covers the biggest bar with few lines');
+eq(dash_short(1250000), '1.3M', 'short millions');
+eq(dash_short(4500, 'NGN'), '₦4.5K', 'short thousands');
+ok(str_contains(dash_gauge([], '0', 'units sold'), 'track') && !str_contains(dash_gauge([], '0', 'x'), 'class="seg'), 'empty gauge draws only the track');
+
 $ov = admin_overview();
 ok(count($ov['sales']) >= 1 && $ov['sales'][0]['gross'] > 0, 'overview sales');
 eq(admin_overview()['live_products'] >= 1, true, 'overview live products');

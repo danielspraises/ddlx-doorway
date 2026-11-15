@@ -8,7 +8,7 @@ route('GET', '/seller', function () {
     $tab = array_key_exists(input('tab'), SELLER_TABS) ? input('tab') : 'overview';
     $vars = ['title' => SELLER_TABS[$tab], 'tab' => $tab, 'user' => $u, 'live_refresh' => in_array($tab, ['overview', 'sales', 'payouts', 'products', 'inventory', 'returns'], true)];
     if (in_array($tab, ['overview', 'products', 'inventory'], true)) $vars['products'] = seller_products($u['id']);
-    if ($tab === 'overview') { $vars['level'] = level_refresh($u['id']); $vars['lm'] = jdec((string) $vars['level']['metrics'], []); $vars['rating'] = seller_rating_summary($u['id']); $vars['chart'] = seller_daily_earnings($u['id']); $vars['to_process'] = seller_to_process($u['id']); }
+    if ($tab === 'overview') { $vars['level'] = level_refresh($u['id']); $vars['lm'] = jdec((string) $vars['level']['metrics'], []); $vars['rating'] = seller_rating_summary($u['id']); $vars['dash'] = dash_data($u['id'], input('range') ?: '30d', input('cur'), input('m') ?: 'net'); $vars['to_process'] = seller_to_process($u['id']); }
     if (in_array($tab, ['overview', 'sales', 'payouts'], true)) { $vars['balances'] = wallet_balances($u['id']); $vars['month'] = sales_last_30d($u['id']); }
     if ($tab === 'sales') { $vars['sales'] = seller_sales($u['id']); $vars['history'] = item_history(array_column($vars['sales'], 'id')); }
     if ($tab === 'store') $vars['scripts'] = ['upload.js'];

@@ -2,14 +2,14 @@
 /** @var string $tab @var array $user */
 $m = fn ($x, $c = 'NGN') => money($x, $c);
 ?>
-<p class="eyebrow">Seller Center</p>
+<?php if ($tab !== 'overview'): ?><p class="eyebrow">Seller Center</p><?php endif; ?>
 <?php $tabHelp = [
   'inventory' => 'Stock changes apply straight away, even on live products. To change many at once, download your stock, edit the stock numbers in Excel and upload it back. Prices are not changed here because price changes go through review.',
   'promotions' => 'Discount codes for your own products. You fund the discount: customers pay less and your earnings are worked out on the lower price. Codes appear on the DDLX marketplace within a minute or two. Money off applies to each item, so two items get it twice. Set an end date and a use limit so a code cannot run forever.',
   'returns' => 'When a customer complains, DDLX opens a case here. Accept it, or explain why you disagree. DDLX makes the final decision.',
   'payouts' => 'Withdrawals go to your saved bank account. Sales become available to withdraw after the payout hold, and the smallest withdrawal and any fee are shown on the form.',
 ]; ?>
-<h1><?= e(SELLER_TABS[$tab]) ?><?= isset($tabHelp[$tab]) ? ' ' . help($tabHelp[$tab]) : '' ?></h1>
+<?php if ($tab !== 'overview'): ?><h1><?= e(SELLER_TABS[$tab]) ?><?= isset($tabHelp[$tab]) ? ' ' . help($tabHelp[$tab]) : '' ?></h1><?php endif; ?>
 <?= tabs_nav(SELLER_TABS, $tab, '/seller', ['returns' => $user['pending']['returns'] ?? 0]) ?>
 
 <?php if (in_array($tab, ['sales', 'payouts'], true)):

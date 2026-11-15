@@ -21,14 +21,14 @@ $docLinks = function (array $docs): string {
     return $out;
 };
 ?>
-<p class="eyebrow"><?= $user['isAdmin'] ? 'Admin' : 'Staff desk' ?></p>
+<?php if ($tab !== 'overview'): ?><p class="eyebrow"><?= $user['isAdmin'] ? 'Admin' : 'Staff desk' ?></p><?php endif; ?>
 <?php $tabHelp = [
   'orders' => 'Move orders from here or from WooCommerce; both places stay in step. Sellers pack their items in Vendor Hub, you collect, ship and close the order.',
   'payouts' => $ps ?? false ? 'Press Send with Paystack to pay a seller\'s bank account automatically. The request shows as sending until the bank confirms.' : 'Pay the seller from your bank or Paystack dashboard, then enter the transfer reference here. Add your Paystack key in Settings to pay with one click.',
   'refunds' => 'When an order is refunded or cancelled the seller\'s earnings are taken back automatically. The customer\'s money is returned here: press Refund with Paystack, or mark it done if you refunded it elsewhere. Never refund the same order twice.',
   'categories' => 'Sellers pick the most specific category. Up to ' . MAX_CATEGORY_DEPTH . ' levels.',
 ]; ?>
-<h1><?= e($tabs[$tab]) ?><?= isset($tabHelp[$tab]) ? ' ' . help($tabHelp[$tab]) : '' ?></h1>
+<?php if ($tab !== 'overview'): ?><h1><?= e($tabs[$tab]) ?><?= isset($tabHelp[$tab]) ? ' ' . help($tabHelp[$tab]) : '' ?></h1><?php endif; ?>
 <?= tabs_nav($nav, $tab, '/admin', ['applications' => $badges['applications'], 'verifications' => $badges['verifications'], 'products' => $badges['products'], 'payouts' => $badges['payouts'], 'orders' => $badges['orders'] ?? 0, 'returns' => $badges['returns'] ?? 0]) ?>
 
 <?php if ($tab === 'overview') include __DIR__ . '/admin_dash.php'; ?>

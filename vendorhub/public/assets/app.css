@@ -676,6 +676,7 @@ div.clist{background:var(--card);border:1px solid var(--line);border-radius:14px
 
 /* ---------- Seller sales dashboard ---------- */
 .dtop{display:flex;justify-content:space-between;align-items:flex-end;gap:14px 20px;flex-wrap:wrap;margin:22px 0 16px}
+.tabs+.dtop{margin-top:26px}
 .dhello{margin:0;font-family:var(--font-display);font-size:clamp(1.25rem,2.4vw,1.7rem);letter-spacing:-.02em;line-height:1.15}
 .dtop .muted{margin:4px 0 0}
 .dtools{gap:10px}

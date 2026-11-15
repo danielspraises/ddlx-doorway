@@ -27,7 +27,7 @@ $pipe = $dash['pipeline'];
 <?php if (!empty($to_process)): ?><p class="notice" style="margin-top:18px"><strong><?= (int) $to_process ?> order<?= $to_process === 1 ? '' : 's' ?> to pack.</strong> <a href="/seller?tab=sales">Open Sales</a> to start processing and mark them ready for shipping.</p><?php endif; ?>
 
 <div class="dtop">
-  <div><p class="dhello"><?= e(dash_greeting()) ?>, <strong><?= e($store) ?></strong></p>
+  <div><p class="dhello">Howdy, <strong><?= e($store) ?></strong></p>
     <p class="muted small"><?= e($dash['start']->format('j M Y')) ?> to <?= e($dash['end']->modify('-1 day')->format('j M Y')) ?></p></div>
   <div class="row dtools">
     <nav class="tabs" aria-label="Period" style="margin:0"><?php foreach (DASH_RANGES as $k => $l): ?><a href="<?= e($q(['range' => $k])) ?>" class="<?= $k === $dash['range'] ? 'active' : '' ?>"><?= e($l) ?></a><?php endforeach; ?></nav>

@@ -21,8 +21,8 @@ $queue = [
 $open = array_sum(array_column($queue, 1));
 ?>
 <div class="dtop">
-  <div><p class="dhello"><?= e(dash_greeting()) ?>, <strong>team</strong></p>
-    <p class="muted small"><?= e($dash['start']->format('j M Y')) ?> to <?= e($dash['end']->modify('-1 day')->format('j M Y')) ?> · whole marketplace</p></div>
+  <div><p class="dhello">Howdy, <strong>boss</strong></p>
+    <p class="muted small"><?= e($dash['start']->format('j M Y')) ?> to <?= e($dash['end']->modify('-1 day')->format('j M Y')) ?></p></div>
   <div class="row dtools">
     <nav class="tabs" aria-label="Period" style="margin:0"><?php foreach (DASH_RANGES as $k => $l): ?><a href="<?= e($q(['range' => $k])) ?>" class="<?= $k === $dash['range'] ? 'active' : '' ?>"><?= e($l) ?></a><?php endforeach; ?></nav>
     <?php if (count($dash['currencies']) > 1): ?><nav class="tabs" aria-label="Currency" style="margin:0"><?php foreach ($dash['currencies'] as $c): ?><a href="<?= e($q(['cur' => $c])) ?>" class="<?= $c === $cur ? 'active' : '' ?>"><?= e($c) ?></a><?php endforeach; ?></nav><?php endif; ?>

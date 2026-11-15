@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 const DASH_RANGES = ['7d' => 'Last 7 days', '30d' => 'Last 30 days', '90d' => 'Last 90 days', '12m' => 'Last 12 months'];
 const DASH_METRICS = ['net' => 'Earnings', 'gross' => 'Sales', 'orders' => 'Orders'];
+const DASH_ADMIN_METRICS = ['commission' => 'Commission', 'gross' => 'Sales', 'orders' => 'Orders'];
 const DASH_DAYS = ['7d' => 7, '30d' => 30, '90d' => 90];
 
 function dash_tz(): DateTimeZone
@@ -45,7 +46,7 @@ function dash_utc(DateTimeImmutable $d): string
 
 function dash_blank(int $n): array
 {
-    return ['gross' => array_fill(0, $n, 0.0), 'net' => array_fill(0, $n, 0.0), 'orders' => array_fill(0, $n, []), 'units' => 0, 'commission' => 0.0, 'refunded' => 0, 'items' => 0, 'order_ids' => []];
+    return ['comm' => array_fill(0, $n, 0.0), 'gross' => array_fill(0, $n, 0.0), 'net' => array_fill(0, $n, 0.0), 'orders' => array_fill(0, $n, []), 'units' => 0, 'commission' => 0.0, 'refunded' => 0, 'items' => 0, 'order_ids' => []];
 }
 
 /** Percent change and its direction. "new" when there was nothing before. */
@@ -71,30 +72,35 @@ function dash_short(float $n, string $cur = ''): string
     return $s . (string) (int) round($n);
 }
 
-function dash_data(string $sellerId, string $range = '30d', string $cur = '', string $metric = 'net'): array
+/** One seller's dashboard, or the whole marketplace's when $sellerId is null. */
+function dash_data(?string $sellerId, string $range = '30d', string $cur = '', string $metric = 'net'): array
 {
+    $platform = $sellerId === null;
+    $metrics = $platform ? DASH_ADMIN_METRICS : DASH_METRICS;
     $range = isset(DASH_RANGES[$range]) ? $range : '30d';
-    $metric = isset(DASH_METRICS[$metric]) ? $metric : 'net';
+    $metric = isset($metrics[$metric]) ? $metric : ($platform ? 'commission' : 'net');
+    $who = $platform ? '' : 'i.seller_id = ? AND ';
+    $whoP = $platform ? [] : [$sellerId];
     $w = dash_window($range);
     $tz = dash_tz();
     $unit = $w['unit'];
     $n = dash_idx($w['end']->modify('-1 day'), $w['start'], $unit) + 1;
 
-    $rows = db()->all("SELECT o.id AS order_id, o.currency, o.placed_at, o.ship_state, i.product_id, i.name, i.quantity, i.line_total, i.net, i.commission, i.status, p.category_id, p.featured_image
+    $rows = db()->all("SELECT o.id AS order_id, i.seller_id, o.currency, o.placed_at, o.ship_state, i.product_id, i.name, i.quantity, i.line_total, i.net, i.commission, i.status, p.category_id, p.featured_image
         FROM order_items i JOIN orders o ON o.id = i.order_id LEFT JOIN products p ON p.id = i.product_id
-        WHERE i.seller_id = ? AND o.placed_at >= ? AND o.placed_at < ?", [$sellerId, dash_utc($w['prev']), dash_utc($w['end'])]);
+        WHERE {$who}o.placed_at >= ? AND o.placed_at < ?", array_merge($whoP, [dash_utc($w['prev']), dash_utc($w['end'])]));
 
     // Which currency to show: the one asked for, else the one with the most sales.
     $weight = [];
     foreach ($rows as $r) $weight[$r['currency']] = ($weight[$r['currency']] ?? 0) + (float) $r['line_total'];
     arsort($weight);
     $currencies = array_keys($weight);
-    $earlier = db()->all('SELECT DISTINCT o.currency FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.seller_id = ?', [$sellerId]);
+    $earlier = db()->all('SELECT DISTINCT o.currency FROM order_items i JOIN orders o ON o.id = i.order_id' . ($platform ? '' : ' WHERE i.seller_id = ?'), $whoP);
     foreach ($earlier as $e) if (!in_array($e['currency'], $currencies, true)) $currencies[] = $e['currency'];
     if (!in_array($cur, $currencies, true)) $cur = $currencies[0] ?? 'NGN';
 
     $P = ['now' => dash_blank($n), 'before' => dash_blank($n)];
-    $cats = []; $prods = []; $days = array_fill(1, 7, []); $states = [];
+    $cats = []; $prods = []; $bySeller = []; $days = array_fill(1, 7, []); $states = [];
     $all = categories_all();
 
     foreach ($rows as $r) {
@@ -112,6 +118,7 @@ function dash_data(string $sellerId, string $range = '30d', string $cur = '', st
         if ($i >= 0 && $i < $n) {
             $P[$k]['gross'][$i] += (float) $r['line_total'];
             $P[$k]['net'][$i] += (float) $r['net'];
+            $P[$k]['comm'][$i] += (float) $r['commission'];
             $P[$k]['orders'][$i][$r['order_id']] = true;
         }
         if (!$isNow) continue;
@@ -122,6 +129,10 @@ function dash_data(string $sellerId, string $range = '30d', string $cur = '', st
         $prods[$pk] ??= ['name' => $r['name'], 'image' => $r['featured_image'], 'units' => 0, 'gross' => 0.0, 'product_id' => $r['product_id']];
         $prods[$pk]['units'] += (int) $r['quantity'];
         $prods[$pk]['gross'] += (float) $r['line_total'];
+        $bySeller[$r['seller_id']] ??= ['gross' => 0.0, 'commission' => 0.0, 'orders' => []];
+        $bySeller[$r['seller_id']]['gross'] += (float) $r['line_total'];
+        $bySeller[$r['seller_id']]['commission'] += (float) $r['commission'];
+        $bySeller[$r['seller_id']]['orders'][$r['order_id']] = true;
         $days[(int) $t->format('N')][$r['order_id']] = true;
         $st = trim((string) $r['ship_state']);
         if ($st !== '') $states[$st][$r['order_id']] = true;
@@ -142,15 +153,31 @@ function dash_data(string $sellerId, string $range = '30d', string $cur = '', st
         $d = $unit === 'month' ? $w['start']->modify('+' . $i . ' months') : $w['start']->modify('+' . ($unit === 'week' ? $i * 7 : $i) . ' days');
         $labels[] = $unit === 'month' ? $d->format('M') : $d->format('j M');
     }
-    $series = fn (array $p) => $metric === 'orders' ? array_map('count', $p['orders']) : array_map('round2', $p[$metric]);
+    $series = fn (array $p) => $metric === 'orders' ? array_map('count', $p['orders']) : array_map('round2', $p[$metric === 'commission' ? 'comm' : $metric]);
 
     $totalNow = ['gross' => round2(array_sum($now['gross'])), 'net' => round2(array_sum($now['net'])), 'orders' => count($now['order_ids']), 'units' => $now['units'], 'commission' => round2($now['commission']), 'refunded' => $now['refunded'], 'items' => $now['items']];
-    $totalBefore = ['gross' => round2(array_sum($before['gross'])), 'net' => round2(array_sum($before['net'])), 'orders' => count($before['order_ids']), 'units' => $before['units']];
+    $totalBefore = ['gross' => round2(array_sum($before['gross'])), 'net' => round2(array_sum($before['net'])), 'orders' => count($before['order_ids']), 'units' => $before['units'], 'commission' => round2($before['commission'])];
 
     $pipeline = ['placed' => 0, 'processing' => 0, 'ready_for_shipping' => 0, 'shipped' => 0];
-    foreach (db()->all("SELECT fulfilment, COUNT(DISTINCT order_id) AS n FROM order_items WHERE seller_id = ? AND status = 'paid' AND fulfilment IN ('placed', 'processing', 'ready_for_shipping', 'shipped') GROUP BY fulfilment", [$sellerId]) as $r) $pipeline[$r['fulfilment']] = (int) $r['n'];
+    foreach (db()->all("SELECT fulfilment, COUNT(DISTINCT order_id) AS n FROM order_items WHERE " . ($platform ? '' : 'seller_id = ? AND ') . "status = 'paid' AND fulfilment IN ('placed', 'processing', 'ready_for_shipping', 'shipped') GROUP BY fulfilment", $whoP) as $r) $pipeline[$r['fulfilment']] = (int) $r['n'];
 
-    $paidOut = (float) db()->val("SELECT COALESCE(SUM(amount), 0) FROM withdrawals WHERE seller_id = ? AND currency = ? AND status = 'paid'", [$sellerId, $cur]);
+    $paidOut = (float) db()->val("SELECT COALESCE(SUM(amount), 0) FROM withdrawals WHERE " . ($platform ? '' : 'seller_id = ? AND ') . "currency = ? AND status = 'paid'", array_merge($whoP, [$cur]));
+
+    $extra = [];
+    if ($platform) {
+        uasort($bySeller, fn ($a, $b) => $b['gross'] <=> $a['gross']);
+        $topIds = array_slice(array_keys($bySeller), 0, 5);
+        $emails = [];
+        foreach ($topIds as $id) $emails[$id] = (string) db()->val('SELECT email FROM users WHERE id = ?', [$id]);
+        $topSellers = [];
+        foreach ($topIds as $id) $topSellers[] = ['id' => $id, 'name' => store_label($id, $emails), 'gross' => round2($bySeller[$id]['gross']), 'commission' => round2($bySeller[$id]['commission']), 'orders' => count($bySeller[$id]['orders'])];
+        $newNow = (int) db()->val("SELECT COUNT(*) FROM seller_verifications WHERE status = 'approved' AND reviewed_at >= ? AND reviewed_at < ?", [dash_utc($w['start']), dash_utc($w['end'])]);
+        $newBefore = (int) db()->val("SELECT COUNT(*) FROM seller_verifications WHERE status = 'approved' AND reviewed_at >= ? AND reviewed_at < ?", [dash_utc($w['prev']), dash_utc($w['start'])]);
+        $owed = (float) db()->val('SELECT COALESCE(SUM(amount), 0) FROM wallet_entries WHERE currency = ?', [$cur]);
+        $waiting = (float) db()->val("SELECT COALESCE(SUM(amount), 0) FROM withdrawals WHERE currency = ? AND status IN ('requested', 'processing')", [$cur]);
+        $extra = ['top_sellers' => $topSellers, 'active_sellers' => count($bySeller), 'new_sellers' => $newNow, 'new_before' => $newBefore, 'owed' => round2($owed), 'waiting' => round2($waiting),
+            'verified_sellers' => (int) db()->val("SELECT COUNT(*) FROM seller_verifications WHERE status = 'approved'"), 'live_products' => (int) db()->val('SELECT COUNT(*) FROM products WHERE live = 1')];
+    }
 
     return [
         'range' => $range, 'metric' => $metric, 'currency' => $cur, 'currencies' => $currencies, 'unit' => $unit,
@@ -162,8 +189,8 @@ function dash_data(string $sellerId, string $range = '30d', string $cur = '', st
         'return_rate' => ($totalNow['items'] + $totalNow['refunded']) > 0 ? round($totalNow['refunded'] / ($totalNow['items'] + $totalNow['refunded']) * 100, 1) : 0.0,
         'categories' => $catParts, 'top' => array_slice($prods, 0, 5),
         'weekdays' => array_map('count', array_values($days)), 'states' => array_slice($stateRows, 0, 5),
-        'pipeline' => $pipeline, 'paid_out' => round2($paidOut),
-    ];
+        'pipeline' => $pipeline, 'paid_out' => round2($paidOut), 'platform' => $platform,
+    ] + $extra;
 }
 
 // ---------------------------------------------------------------- drawing
@@ -190,7 +217,7 @@ function dash_chart(array $d): string
     [$step, $steps] = dash_scale(max(max($series ?: [0]), max($prev ?: [0])));
     $top = $step * $steps;
     $fmt = fn (float $v) => $isMoney ? dash_short($v, $cur) : (string) (int) $v;
-    $svg = '<svg class="dchart" viewBox="0 0 ' . $W . ' ' . $H . '" role="img" aria-label="' . e(DASH_METRICS[$d['metric']] . ' over time') . '"><defs><linearGradient id="dgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fb1f0"/><stop offset="1" stop-color="#2f6db5"/></linearGradient></defs>';
+    $svg = '<svg class="dchart" viewBox="0 0 ' . $W . ' ' . $H . '" role="img" aria-label="' . e((DASH_METRICS + DASH_ADMIN_METRICS)[$d['metric']] . ' over time') . '"><defs><linearGradient id="dgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fb1f0"/><stop offset="1" stop-color="#2f6db5"/></linearGradient></defs>';
     for ($g = 0; $g <= $steps; $g++) {
         $y = round($T + $ph - $g / $steps * $ph, 1);
         $svg .= '<line x1="' . $L . '" x2="' . ($W - $R) . '" y1="' . $y . '" y2="' . $y . '" class="grid"/><text x="' . ($L - 8) . '" y="' . ($y + 4) . '" text-anchor="end" class="axis">' . e($fmt($g * $step)) . '</text>';

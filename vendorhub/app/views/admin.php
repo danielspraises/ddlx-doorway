@@ -31,32 +31,7 @@ $docLinks = function (array $docs): string {
 <h1><?= e($tabs[$tab]) ?><?= isset($tabHelp[$tab]) ? ' ' . help($tabHelp[$tab]) : '' ?></h1>
 <?= tabs_nav($nav, $tab, '/admin', ['applications' => $badges['applications'], 'verifications' => $badges['verifications'], 'products' => $badges['products'], 'payouts' => $badges['payouts'], 'orders' => $badges['orders'] ?? 0, 'returns' => $badges['returns'] ?? 0]) ?>
 
-<?php if ($tab === 'overview'): $top = $o['sales'][0] ?? null; $cur = $top['currency'] ?? 'NGN'; ?>
-  <p class="muted">The last 30 days across the whole marketplace.</p>
-  <div class="grid g4" style="margin-top:16px">
-    <div class="stat"><p class="muted small">Sales (<?= e($cur) ?>)</p><p class="n"><?= e($m($top['gross'] ?? 0, $cur)) ?></p></div>
-    <div class="stat"><p class="muted small">Your commission</p><p class="n"><?= e($m($top['commission'] ?? 0, $cur)) ?></p></div>
-    <div class="stat"><p class="muted small">Orders</p><p class="n"><?= (int) ($top['orders'] ?? 0) ?></p></div>
-    <div class="stat"><p class="muted small">Verified sellers</p><p class="n"><?= (int) $o['sellers'] ?></p></div>
-  </div>
-  <h2>Sales per day</h2>
-  <div class="card"><?= bar_chart($o['chart']['series'], $o['chart']['currency']) ?></div>
-  <h2>Needs you</h2>
-  <div class="grid g4">
-    <a class="stat" href="/admin?tab=applications"><p class="muted small">Applications</p><p class="n"><?= (int) $badges['applications'] ?></p></a>
-    <a class="stat" href="/admin?tab=verifications"><p class="muted small">Verifications</p><p class="n"><?= (int) $badges['verifications'] ?></p></a>
-    <a class="stat" href="/admin?tab=products"><p class="muted small">Products to review</p><p class="n"><?= (int) $badges['products'] ?></p></a>
-    <a class="stat" href="/admin?tab=orders&filter=ready"><p class="muted small">Orders to pick up</p><p class="n"><?= (int) $badges['orders'] ?></p></a>
-    <a class="stat" href="/admin?tab=orders"><p class="muted small">New, not yet processed</p><p class="n"><?= (int) $o['new_orders'] ?></p></a>
-    <a class="stat" href="/admin?tab=payouts"><p class="muted small">Withdrawals waiting</p><p class="n"><?= (int) $badges['payouts'] ?></p></a>
-    <div class="stat"><p class="muted small">Owed to sellers</p><p class="n"><?= e($m($o['owed'][$cur] ?? 0, $cur)) ?></p></div>
-    <div class="stat"><p class="muted small">Live products</p><p class="n"><?= (int) $o['live_products'] ?></p></div>
-  </div>
-  <?php if ($o['by_category']): ?><h2>Commission by category <a class="small" href="/admin/export?kind=commission&from=<?= e(gmdate('Y-m-d', strtotime('-30 days'))) ?>&to=<?= e(gmdate('Y-m-d')) ?>">Download CSV</a></h2><div class="table-wrap"><table><thead><tr><th>Category</th><th class="t-right">Units</th><th class="t-right">Sales</th><th class="t-right">Commission</th></tr></thead><tbody>
-    <?php foreach ($o['by_category'] as $t): ?><tr><td><?= e($t['category']) ?></td><td class="t-right"><?= (int) $t['units'] ?></td><td class="t-right"><?= e($m($t['gross'], $t['currency'])) ?></td><td class="t-right"><?= e($m($t['commission'], $t['currency'])) ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
-  <?php if ($o['top']): ?><h2>Best sellers</h2><div class="table-wrap"><table><thead><tr><th>Product</th><th class="t-right">Units</th><th class="t-right">Revenue</th></tr></thead><tbody>
-    <?php foreach ($o['top'] as $t): ?><tr><td><?= e($t['name']) ?></td><td class="t-right"><?= (int) $t['units'] ?></td><td class="t-right"><?= e($m($t['revenue'], $t['currency'])) ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
-<?php endif; ?>
+<?php if ($tab === 'overview') include __DIR__ . '/admin_dash.php'; ?>
 
 <?php if ($tab === 'applications'):
     $filters = ['pending' => 'Under review', 'all' => 'All'];

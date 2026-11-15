@@ -24,7 +24,7 @@ route('GET', '/admin', function () {
         case 'applications': $vars['items'] = application_review_list(); break;
         case 'verifications': $vars['items'] = verification_review_list(); break;
         case 'products': $vars['items'] = review_queue(); break;
-        case 'overview': $vars['o'] = admin_overview(); $vars['live_refresh'] = true; break;
+        case 'overview': $vars['dash'] = dash_data(null, input('range') ?: '30d', input('cur'), input('m') ?: 'commission'); $vars['live_refresh'] = true; break;
         case 'returns': $f = array_key_exists(input('filter'), ['open' => 1, 'done' => 1, 'all' => 1]) ? input('filter') : 'open'; $vars['sellerFilter'] = input('seller'); $vars['q'] = input('q'); $vars['items'] = admin_returns($f, $vars['sellerFilter'], $vars['q']); $vars['events'] = return_events_map(array_column($vars['items'], 'id')); $vars['sellers'] = return_sellers(); $vars['filter'] = $f; break;
         case 'orders': $f = array_key_exists(input('filter'), ADMIN_ORDER_FILTERS) ? input('filter') : 'open'; $vars['items'] = admin_orders($f); $vars['filter'] = $f; $vars['history'] = []; break;
         case 'categories': $vars['all'] = categories_all(true); break;

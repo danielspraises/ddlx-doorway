@@ -107,11 +107,14 @@ function marketplace_catalogue(?string $sinceDb, int $limit): array
     $profiles = [];
     $levels = [];
     $sellerCache = [];
+    $saleCache = [];
     $products = [];
     foreach ($rows as $r) {
         $s = jdec($r['published_snapshot'], []);
         if (!$s) continue;
         $sid = $r['seller_id'];
+        $saleCache[$sid] ??= sale_feed_campaigns($sid);
+        if ($saleCache[$sid]) $s = sale_overlay($s, $saleCache[$sid], $r);
         if (!isset($apps[$sid])) {
             $a = $db->one('SELECT applicant_email, brand, business FROM seller_applications WHERE user_id = ?', [$sid]) ?: [];
             $apps[$sid] = ['brand' => jdec($a['brand'] ?? '', []), 'business' => jdec($a['business'] ?? '', []), 'email' => $a['applicant_email'] ?? null];

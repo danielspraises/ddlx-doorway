@@ -79,7 +79,12 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
   <?php endforeach; endforeach; ?><tr data-fempty hidden><td colspan="4" class="muted">No stock matches your search.</td></tr></tbody></table></div>
 <?php endif; ?>
 
-<?php if ($tab === 'promotions'):
+<?php if ($tab === 'promotions'): $pv = ($pview ?? '') ?: ((!empty($edit) || !empty($err)) ? 'codes' : 'sales'); ?>
+<nav class="tabs" aria-label="Promotion type" style="margin-top:0"><a href="/seller?tab=promotions&amp;v=sales" class="<?= $pv === 'sales' ? 'active' : '' ?>">Sales</a><a href="/seller?tab=promotions&amp;v=codes" class="<?= $pv === 'codes' ? 'active' : '' ?>">Discount codes</a></nav>
+<?php if ($pv === 'sales') include __DIR__ . '/seller_sales.php'; ?>
+<?php endif; ?>
+
+<?php if ($tab === 'promotions' && $pv === 'codes'):
     $e = $edit ?? null; $isEdit = $e && empty($e['form_only']) || ($e && !empty($e['id']));
     $ev = fn (string $k, $d = '') => $e[$k] ?? $d; ?>
   <?php if (!empty($err)): ?><p class="flash flash-error" role="alert"><?= e($err) ?></p><?php endif; ?>
@@ -105,7 +110,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
     <div class="field" style="margin-top:12px"><label for="scope">Works on</label><select id="scope" name="scope"><option value="all"<?= $ev('scope', 'all') === 'all' ? ' selected' : '' ?>>All my products</option><option value="products"<?= $ev('scope', 'all') === 'products' ? ' selected' : '' ?>>Only the products I choose</option></select></div>
     <details<?= $ev('scope', 'all') === 'products' ? ' open' : '' ?>><summary>Choose products</summary>
       <div style="max-height:220px;overflow:auto;margin-top:8px"><?php $sel = (array) $ev('product_list', []); foreach ($all_products as $p): ?><label class="check"><input type="checkbox" name="product_ids[]" value="<?= e($p['id']) ?>" <?= in_array($p['id'], $sel, true) ? 'checked' : '' ?>><span><?= e($p['name']) ?></span></label><?php endforeach; if (!$all_products) echo '<p class="muted">Products appear here once submitted.</p>'; ?></div></details>
-    <p class="row" style="margin-top:16px"><button class="btn" type="submit"><?= $isEdit ? 'Save changes' : 'Create code' ?></button><?php if ($isEdit): ?><a class="btn btn-ghost" href="/seller?tab=promotions">Cancel</a><?php endif; ?></p>
+    <p class="row" style="margin-top:16px"><button class="btn" type="submit"><?= $isEdit ? 'Save changes' : 'Create code' ?></button><?php if ($isEdit): ?><a class="btn btn-ghost" href="/seller?tab=promotions&amp;v=codes">Cancel</a><?php endif; ?></p>
   </form>
   </div>
   </div>
@@ -117,7 +122,7 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
       <td><?= $c['kind'] === 'percent' ? e((string) $c['amount']) . '%' : e($c['currency'] . ' ' . number_format($c['amount'], 2)) . ' each' ?></td>
       <td><?= e(COUPON_STATE_LABEL[$c['state']] ?? $c['state']) ?></td><td class="t-right"><?= (int) $c['used_count'] ?><?= $c['usage_limit'] !== null ? ' / ' . (int) $c['usage_limit'] : '' ?></td><td class="t-right"><?= e(number_format($c['discount_total'], 2)) ?></td>
       <td><form method="post" action="/promotions/action" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>">
-        <a class="btn btn-sm btn-outline" href="/seller?tab=promotions&amp;edit=<?= e($c['id']) ?>">Edit</a>
+        <a class="btn btn-sm btn-outline" href="/seller?tab=promotions&amp;v=codes&amp;edit=<?= e($c['id']) ?>">Edit</a>
         <?php if (!$c['admin_disabled']): ?><button class="btn btn-sm btn-outline" name="action" value="<?= $c['active'] ? 'pause' : 'resume' ?>"><?= $c['active'] ? 'Pause' : 'Resume' ?></button><?php endif; ?>
         <button class="btn btn-sm btn-ghost" name="action" value="delete" data-confirm="Delete this code?">Delete</button></form></td></tr>
   <?php endforeach; ?></tbody></table></div><?php endif; ?>

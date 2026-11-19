@@ -14,7 +14,7 @@ route('GET', '/seller', function () {
     if ($tab === 'store') $vars['scripts'] = ['upload.js'];
     if ($tab === 'payouts') { $vars['scripts'] = ['bank.js']; $vars['banks'] = bank_options(); $vars['verify'] = paystack_on(); $vars['accounts'] = bank_accounts($u['id']); $vars['withdrawals'] = seller_withdrawals($u['id']); }
     if ($tab === 'returns') { $vars['cases'] = seller_returns($u['id']); $vars['events'] = return_events_map(array_column($vars['cases'], 'id')); }
-    if ($tab === 'promotions') { $vars['coupons'] = coupons_for_seller($u['id']); $vars['all_products'] = array_values(array_filter(seller_products($u['id']), fn ($p) => $p['status'] !== 'draft' || $p['live'])); $vars['edit'] = null; foreach ($vars['coupons'] as $c) if ($c['id'] === input('edit')) $vars['edit'] = $c; $vars['err'] = null; }
+    if ($tab === 'promotions') { $vars['coupons'] = coupons_for_seller($u['id']); $vars['all_products'] = array_values(array_filter(seller_products($u['id']), fn ($p) => $p['status'] !== 'draft' || $p['live'])); $vars['pview'] = in_array(input('v'), ['sales', 'codes'], true) ? input('v') : (input('edit') !== '' ? 'codes' : 'sales'); $vars['edit'] = null; foreach ($vars['coupons'] as $c) if ($c['id'] === input('edit')) $vars['edit'] = $c; $vars['err'] = null; }
     if ($tab === 'store') $vars['store'] = store_profile($u['id']);
     if ($tab === 'promo') { $vars['share'] = share_row($u['id']); $vars['assets'] = promo_for_seller($u['id']); $vars['ref'] = referral_stats($u['id']); $vars['scripts'] = ['promo.js']; }
     render('seller', $vars);
@@ -130,12 +130,12 @@ route('POST', '/promotions/save', function () {
         render('seller', ['title' => 'Promotions', 'tab' => 'promotions', 'user' => $u, 'live_refresh' => false, 'coupons' => $coupons, 'all_products' => array_values(array_filter(seller_products($u['id']), fn ($p) => $p['status'] !== 'draft' || $p['live'])), 'edit' => $edit, 'err' => $r['error']]);
         return;
     }
-    redirect('/seller?tab=promotions', 'Code saved. It appears on the marketplace within a minute or two.');
+    redirect('/seller?tab=promotions&v=codes', 'Code saved. It appears on the marketplace within a minute or two.');
 });
 
 route('POST', '/promotions/action', function () {
     $u = require_seller();
     $id = input('id');
     $err = match (input('action')) { 'pause' => coupon_toggle($u['id'], $id, false), 'resume' => coupon_toggle($u['id'], $id, true), 'delete' => coupon_delete($u['id'], $id), default => 'Unknown action.' };
-    redirect('/seller?tab=promotions', $err ?? 'Done.', $err ? 'error' : 'ok');
+    redirect('/seller?tab=promotions&v=codes', $err ?? 'Done.', $err ? 'error' : 'ok');
 });

@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 16;
+const SCHEMA_VERSION = 17;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -166,6 +166,13 @@ function migration_steps(): array
         16 => function (Db $db) use ($engine) {
             if (!column_exists($db, 'seller_share', 'auto_url')) $db->exec('ALTER TABLE seller_share ADD COLUMN auto_url VARCHAR(500) NULL');
             if (!column_exists($db, 'seller_share', 'auto_at')) $db->exec('ALTER TABLE seller_share ADD COLUMN auto_at DATETIME(3) NULL');
+        },
+        17 => function (Db $db) use ($engine) {
+            if (!table_exists($db, 'sale_campaigns')) {
+                $db->exec("CREATE TABLE sale_campaigns (id CHAR(36) NOT NULL PRIMARY KEY, seller_id CHAR(36) NULL, parent_id CHAR(36) NULL, name VARCHAR(80) NOT NULL, note VARCHAR(300) NOT NULL DEFAULT '', starts_on CHAR(10) NOT NULL, ends_on CHAR(10) NOT NULL, rule VARCHAR(10) NOT NULL DEFAULT 'percent', value DECIMAL(12,2) NOT NULL DEFAULT 0, currency CHAR(3) NOT NULL DEFAULT 'NGN', scope VARCHAR(10) NOT NULL DEFAULT 'all', product_ids TEXT NULL, prices TEXT NULL, min_discount DECIMAL(5,2) NULL, state VARCHAR(10) NOT NULL DEFAULT 'active', admin_blocked TINYINT NOT NULL DEFAULT 0, reminded_start TINYINT NOT NULL DEFAULT 0, notified_end TINYINT NOT NULL DEFAULT 0, created_at DATETIME(3) NOT NULL, updated_at DATETIME(3) NOT NULL)" . $engine($db));
+                $db->exec('CREATE INDEX sale_campaigns_seller_idx ON sale_campaigns (seller_id, starts_on)');
+                $db->exec('CREATE INDEX sale_campaigns_parent_idx ON sale_campaigns (parent_id)');
+            }
         },
     ];
 }

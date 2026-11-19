@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Vendor Hub Connector
  * Description: Connects WooCommerce and Dokan to Vendor Hub (vendor.ddlx.shop). Pulls products approved in Vendor Hub into this store under each seller, keeps stock and prices in step, and reports every sale and refund back to Vendor Hub.
- * Version: 1.9.3
+ * Version: 1.9.4
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -484,7 +484,7 @@ final class Verola_Connector {
 				'linked' => (string) get_user_meta($id, '_verola_seller_id', true) !== '',
 			];
 		}
-		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.9.3'];
+		return ['vendors' => $out, 'has_more' => $total > $page * 20, 'total' => $total, 'version' => '1.9.4'];
 	}
 
 	public static function rest_link($request) {
@@ -948,7 +948,8 @@ final class Verola_Connector {
 		$coupon->set_amount($c['amount']);
 		$coupon->set_product_ids($ids);
 		$coupon->set_individual_use(true);
-		$coupon->set_exclude_sale_items(false);
+		// A code never stacks on a price that is already reduced.
+		$coupon->set_exclude_sale_items(!isset($c['exclude_sale_items']) || !empty($c['exclude_sale_items']));
 		$coupon->set_minimum_amount($c['min_spend'] !== null ? $c['min_spend'] : '');
 		$coupon->set_usage_limit($c['usage_limit'] !== null ? (int) $c['usage_limit'] : 0);
 		$coupon->set_usage_limit_per_user(!empty($c['one_per_customer']) ? 1 : 0);

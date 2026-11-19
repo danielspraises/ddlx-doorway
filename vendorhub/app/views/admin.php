@@ -32,6 +32,7 @@ $docLinks = function (array $docs): string {
 <?= tabs_nav($nav, $tab, '/admin', ['applications' => $badges['applications'], 'verifications' => $badges['verifications'], 'products' => $badges['products'], 'payouts' => $badges['payouts'], 'orders' => $badges['orders'] ?? 0, 'returns' => $badges['returns'] ?? 0]) ?>
 
 <?php if ($tab === 'overview') include __DIR__ . '/admin_dash.php'; ?>
+<?php if ($tab === 'sales') include __DIR__ . '/admin_sales.php'; ?>
 
 <?php if ($tab === 'applications'):
     $filters = ['pending' => 'Under review', 'all' => 'All'];

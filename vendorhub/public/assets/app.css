@@ -739,3 +739,53 @@ div.clist{background:var(--card);border:1px solid var(--line);border-radius:14px
 .dmini{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .dmini>div{padding:12px 14px;border-radius:14px;background:var(--bg);border:1px solid var(--soft);display:flex;flex-direction:column;align-items:flex-start;gap:4px}
 .dmini .k{font-size:.78rem;color:var(--muted)}.dmini strong{font-family:var(--font-display);font-size:1.5rem;font-weight:600;line-height:1}
+
+/* ---------- Scheduled sales ---------- */
+.scard{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px 22px;box-shadow:var(--shadow);margin-bottom:14px}
+.scard h3{margin:0 0 14px;font-size:1rem;font-weight:600;letter-spacing:-.01em}
+.scard .dhead h3{margin:0}
+.sform,.sform~.scard{max-width:760px}
+.sform input[type=date]{min-height:40px}
+.sactions{margin:6px 0 4px;gap:10px}
+.segr{display:inline-flex;flex-wrap:wrap;gap:6px;padding:4px;background:var(--soft);border-radius:99px}
+.segr label{margin:0;cursor:pointer}
+.segr input{position:absolute;opacity:0;pointer-events:none}
+.segr span{display:block;padding:7px 16px;border-radius:99px;font-size:.84rem;font-weight:600;color:var(--muted);transition:background .15s,color .15s}
+.segr label:hover span{color:var(--ink)}
+.segr input:checked+span{background:var(--ink);color:#fff}
+.segr input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.unit{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden}
+.unit:focus-within{border-color:var(--accent)}
+.unit input{border:0;outline:0;flex:1;min-width:0;background:transparent;box-shadow:none;margin:0}
+.unit .pre,.unit .post{padding:0 12px;color:var(--muted);font-weight:600;font-size:.9rem}
+.u-percent,.u-amount,.u-fixed,.u-money{display:none}
+.sform:has(input[name=rule][value=percent]:checked) .u-percent,
+.sform:has(input[name=rule][value=amount]:checked) .u-amount,
+.sform:has(input[name=rule][value=fixed]:checked) .u-fixed,
+.sform:has(input[name=rule][value=amount]:checked) .u-money,
+.sform:has(input[name=rule][value=fixed]:checked) .u-money{display:inline}
+.sform:has(input[name=rule][value=custom]:checked) .only-notcustom,
+.sform:has(input[name=rule][value=custom]:checked) .only-all,
+.sform:has(input[name=rule][value=custom]:checked) .only-chosen,
+.sform:not(:has(input[name=rule][value=custom]:checked)) .only-custom,
+.sform:has(input[name=scope][value=all]:checked) .only-chosen,
+.sform:not(:has(input[name=scope][value=all]:checked)) .only-all{display:none}
+.slist{max-height:340px;overflow:auto;border:1px solid var(--soft);border-radius:14px;margin-top:4px}
+.srow{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--soft);cursor:pointer;margin:0}
+.srow:last-child{border-bottom:0}.srow:hover{background:var(--bg)}
+.srow input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);flex-shrink:0}
+.srow .grow{display:flex;flex-direction:column;gap:2px}
+.srow input.sp{width:130px;flex-shrink:0;margin:0}
+.srows{list-style:none;margin:0;padding:0}
+.srows li{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--soft)}
+.srows li:first-child{padding-top:0}.srows li:last-child{border-bottom:0;padding-bottom:0}
+.srows li.off{opacity:.6}.srows li .rt s{color:var(--muted)}
+.sinvite{display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,#eef5fd,#fff);border-color:#cfe1f6}
+.sempty{border:1px dashed var(--line);border-radius:18px;padding:28px;text-align:center;background:var(--card)}
+.slist2{list-style:none;margin:0;padding:0;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:var(--shadow)}
+.slist2>li{border-bottom:1px solid var(--soft)}.slist2>li:last-child{border-bottom:0}
+.slist2>li>a{display:flex;align-items:center;gap:16px;padding:14px 18px;text-decoration:none;color:inherit}
+.slist2>li>a:hover{background:var(--bg)}
+.slist2.flat{box-shadow:none;border:0;border-radius:0;background:none;overflow:visible}
+.slist2.flat>li{display:flex;align-items:center;gap:14px;padding:12px 0;flex-wrap:wrap}
+@media (max-width:560px){.slist2>li>a,.sinvite{flex-wrap:wrap}.srow input.sp{width:104px}}

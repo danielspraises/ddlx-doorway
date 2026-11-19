@@ -567,3 +567,28 @@ CREATE TABLE promo_downloads (
   created_at DATETIME(3) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE INDEX promo_downloads_asset_idx ON promo_downloads (asset_id, user_id);
+
+CREATE TABLE sale_campaigns (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  seller_id CHAR(36) NULL,
+  parent_id CHAR(36) NULL,
+  name VARCHAR(80) NOT NULL,
+  note VARCHAR(300) NOT NULL DEFAULT '',
+  starts_on CHAR(10) NOT NULL,
+  ends_on CHAR(10) NOT NULL,
+  rule VARCHAR(10) NOT NULL DEFAULT 'percent',
+  value DECIMAL(12,2) NOT NULL DEFAULT 0,
+  currency CHAR(3) NOT NULL DEFAULT 'NGN',
+  scope VARCHAR(10) NOT NULL DEFAULT 'all',
+  product_ids TEXT NULL,
+  prices TEXT NULL,
+  min_discount DECIMAL(5,2) NULL,
+  state VARCHAR(10) NOT NULL DEFAULT 'active',
+  admin_blocked TINYINT NOT NULL DEFAULT 0,
+  reminded_start TINYINT NOT NULL DEFAULT 0,
+  notified_end TINYINT NOT NULL DEFAULT 0,
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX sale_campaigns_seller_idx ON sale_campaigns (seller_id, starts_on);
+CREATE INDEX sale_campaigns_parent_idx ON sale_campaigns (parent_id);

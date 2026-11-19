@@ -137,7 +137,7 @@ function coupons_feed(): array
         unset($r['brand_json']);
         $c = coupon_hydrate($r);
         $out[] = ['id' => $c['id'], 'seller_id' => $c['seller_id'], 'store_name' => $store, 'code' => $c['code'], 'kind' => $c['kind'], 'amount' => $c['amount'], 'currency' => $c['currency'], 'scope' => $c['scope'],
-            'product_ids' => $c['product_list'], 'min_spend' => $c['min_spend'], 'usage_limit' => $c['usage_limit'], 'one_per_customer' => (bool) $c['one_per_customer'],
+            'product_ids' => $c['product_list'], 'min_spend' => $c['min_spend'], 'usage_limit' => $c['usage_limit'], 'one_per_customer' => (bool) $c['one_per_customer'], 'exclude_sale_items' => true,
             'starts_at' => iso($c['starts_at']), 'ends_at' => iso($c['ends_at']), 'enabled' => in_array($c['state'], ['live', 'scheduled'], true) && !vacation_on($c['seller_id'])];
     }
     return $out;

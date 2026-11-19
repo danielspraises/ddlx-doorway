@@ -9,7 +9,7 @@ function admin_tabs(array $u): array
     if ($u['canReview']) $tabs['products'] = 'Products';
     if ($u['canMessages']) $tabs['messages'] = 'Messages';
     if ($u['canOrders']) { $tabs['orders'] = 'Orders'; $tabs['returns'] = 'Returns'; }
-    if ($u['isAdmin']) $tabs += ['sellers' => 'Sellers', 'codes' => 'Discount codes', 'payouts' => 'Payouts', 'refunds' => 'Customer refunds', 'promo' => 'Promo & QR', 'legal' => 'Legal pages', 'categories' => 'Categories', 'staff' => 'Staff', 'activity' => 'Activity', 'settings' => 'Settings'];
+    if ($u['isAdmin']) $tabs += ['sellers' => 'Sellers', 'codes' => 'Discount codes', 'sales' => 'Sales', 'payouts' => 'Payouts', 'refunds' => 'Customer refunds', 'promo' => 'Promo & QR', 'legal' => 'Legal pages', 'categories' => 'Categories', 'staff' => 'Staff', 'activity' => 'Activity', 'settings' => 'Settings'];
     return $tabs;
 }
 
@@ -32,6 +32,7 @@ route('GET', '/admin', function () {
         case 'refunds': $f = in_array(input('filter'), ['open', 'done', 'all'], true) ? input('filter') : 'open'; $vars['items'] = customer_refunds_list($f); $vars['summary'] = customer_refund_summary(); $vars['ps'] = paystack_on(); $vars['filter'] = $f; break;
         case 'payouts': $vars['items'] = withdrawal_review_list(); $vars['ps'] = paystack_on(); break;
         case 'codes': $vars['items'] = coupons_admin_list(); break;
+        case 'sales': $vars['market'] = sale_market_list(); $vars['items'] = sale_admin_list(); $vars['edit'] = null; foreach ($vars['market'] as $m) if ($m['id'] === input('edit')) $vars['edit'] = $m; break;
         case 'sellers': $vars['items'] = levels_admin_list(input('q')); $vars['q'] = input('q'); $vars['links'] = seller_links_map(); break;
         case 'activity': $f = array_key_exists(input('filter'), AUDIT_LABEL) ? input('filter') : ''; $vars['items'] = audit_list(200, $f); $vars['filter'] = $f; break;
         case 'promo': $vars['items'] = promo_admin_list(); $vars['options'] = promo_seller_options(); $vars['flyer'] = flyer_template(); $vars['q'] = input('q'); $vars['shares'] = share_admin_list(input('q')); $vars['leaders'] = referral_leaders(); $vars['scripts'] = ['promo.js']; break;

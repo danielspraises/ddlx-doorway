@@ -7,6 +7,26 @@
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
 
+  // ---------- product details open in a sheet ----------
+  document.addEventListener('click', function (e) {
+    var r = e.target.closest ? e.target.closest('[data-pd]') : null;
+    if (!r) return;
+    var src = document.querySelector('[data-pd-src="' + r.getAttribute('data-pd') + '"]'), sh = document.getElementById('prod-sheet');
+    if (!src || !sh) return;
+    sh.querySelector('[data-pd-title]').textContent = r.getAttribute('data-pd-title') || '';
+    sh.querySelector('[data-pd-body]').innerHTML = src.innerHTML;
+    openSheet('prod-sheet');
+  });
+
+  // ---------- messages from the server show as a toast ----------
+  function flash() {
+    var f = $('#flash-src');
+    if (!f) return;
+    var m = f.getAttribute('data-m'); f.remove();
+    if (m && window.VH.toast) window.VH.toast(m);
+  }
+  flash();
+
   // ---------- bottom sheets ----------
   function openSheet(id) {
     var d = document.getElementById(id);
@@ -39,6 +59,7 @@
   }
   function setHidden(v) { hidden = v; try { localStorage.setItem(HK, v ? '1' : '0'); } catch (x) {} paintBal(); }
   paintBal();
+  window.VH.paint = function () { paintBal(); if (typeof paintState === 'function') paintState(); flash(); };
   document.addEventListener('click', function (e) { var b = e.target.closest ? e.target.closest('[data-hide-bal]') : null; if (b) setHidden(!hidden); });
   document.addEventListener('change', function (e) { if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-hide-toggle')) setHidden(e.target.checked); });
 
@@ -59,21 +80,141 @@
     var main = document.getElementById('main');
     if (main) { main.classList.remove('loading'); var s = main.querySelector('.skel'); if (s) s.remove(); }
   }
+
+  // ---------- instant navigation: pages swap in place, like screens in an app ----------
+  var BASE = ['app.js', 'pwa.js', 'help.js', 'native.js', 'appfeel.js'];
+  var cache = {}, inflight = {}, seq = 0;
+  var MAXAGE = 5 * 60 * 1000;
+  var keyOf = function (u) { var x = new URL(u, location.href); return x.pathname + x.search; };
+  function eligible(a) {
+    if (!a || !a.href || a.target === '_blank' || a.hasAttribute('download') || a.hasAttribute('data-back') || a.hasAttribute('data-nonav')) return null;
+    var u;
+    try { u = new URL(a.href, location.href); } catch (x) { return null; }
+    if (u.origin !== location.origin) return null;
+    if (/^\/(files|logout|admin|api|install|health)/.test(u.pathname) || /\/(export|download)/.test(u.pathname) || /[?&]export=/.test(u.search)) return null;
+    if (u.pathname === location.pathname && u.search === location.search && u.hash) return null;
+    return u;
+  }
+  function fetchPage(url, force) {
+    var k = keyOf(url);
+    if (!force && inflight[k]) return inflight[k];
+    var pr = fetch(url, { credentials: 'same-origin', headers: { 'X-VH-Nav': '1' } }).then(function (r) {
+      if (!r.ok) throw new Error('status ' + r.status);
+      var ct = r.headers.get('content-type') || '';
+      if (ct.indexOf('text/html') === -1) throw new Error('not a page');
+      return r.text().then(function (html) { return { html: html, url: r.url, t: Date.now() }; });
+    }).then(function (res) {
+      cache[k] = res; cache[keyOf(res.url)] = res; delete inflight[k]; return res;
+    }, function (err) { delete inflight[k]; throw err; });
+    inflight[k] = pr;
+    return pr;
+  }
+  window.VH.bust = function () { cache = {}; };
+  document.addEventListener('submit', function () { cache = {}; }, true);
+
+  function hard(url) { location.href = url; }
+  // Puts a fetched page into the current screen. Returns false when this page must load the normal way.
+  function swap(res, opts) {
+    opts = opts || {};
+    var doc = new DOMParser().parseFromString(res.html, 'text/html');
+    if (!doc.body || !doc.body.classList.contains('app')) return false;
+    var extra = Array.prototype.some.call(doc.querySelectorAll('script[src]'), function (sc) { return BASE.indexOf((sc.getAttribute('src') || '').split('?')[0].split('/').pop()) === -1; });
+    if (extra) return false;
+    var col = $('.app-col'), ncol = doc.querySelector('.app-col');
+    if (!col || !ncol) return false;
+    if (opts.quiet) {
+      var m = $('#main'), nm = doc.getElementById('main');
+      if (!m || !nm || m.innerHTML === nm.innerHTML) return true;
+      var a = document.activeElement;
+      if ((a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) || document.querySelector('dialog[open]')) return true;
+      m.innerHTML = nm.innerHTML; if (window.VH.init) window.VH.init(m);
+      return true;
+    }
+    document.title = doc.title;
+    var keep = ['locked', 'bal-off'].filter(function (c) { return body.classList.contains(c); });
+    body.className = doc.body.className + (keep.length ? ' ' + keep.join(' ') : '');
+    if (doc.body.hasAttribute('data-refresh')) body.setAttribute('data-refresh', '1'); else body.removeAttribute('data-refresh');
+    col.innerHTML = ncol.innerHTML;
+    var tabs = $('.app-tabs'), ntabs = doc.querySelector('.app-tabs');
+    if (tabs && ntabs) tabs.innerHTML = ntabs.innerHTML;
+    var sn = $('.app-nav'), nsn = doc.querySelector('.app-nav');
+    if (sn && nsn) sn.innerHTML = nsn.innerHTML;
+    var tc = $('meta[name=theme-color]'), ntc = doc.querySelector('meta[name=theme-color]');
+    if (tc && ntc) tc.setAttribute('content', ntc.getAttribute('content'));
+    var mm = $('#main');
+    if (window.VH.init) window.VH.init(mm || document);
+    if (mm) { mm.classList.remove('swap'); void mm.offsetWidth; mm.classList.add('swap'); }
+    if (window.VH.paint) window.VH.paint();
+    window.scrollTo(0, opts.y || 0);
+    return true;
+  }
+  function go(url, opts) {
+    opts = opts || {};
+    var k = keyOf(url), my = ++seq;
+    var done = function (res) {
+      if (my !== seq) return;
+      clearSkeleton();
+      if (!opts.pop && !opts.replace) { try { history.replaceState({ vh: 1, y: window.scrollY }, ''); } catch (x) {} }
+      if (!swap(res, { y: opts.y })) return hard(url);
+      var final = new URL(res.url, location.href);
+      var path = final.pathname + final.search;
+      if (opts.pop) return;
+      try { history[opts.replace ? 'replaceState' : 'pushState']({ vh: 1, y: 0 }, '', path + final.hash); } catch (x) { hard(url); }
+    };
+    var hit = cache[k];
+    if (hit && !opts.force && Date.now() - hit.t < MAXAGE) {
+      done(hit);
+      // Show what we have now, then quietly bring it up to date.
+      fetchPage(url, true).then(function (fresh) { if (my === seq && keyOf(location.href) === keyOf(fresh.url)) swap(fresh, { quiet: true }); }).catch(function () {});
+      return;
+    }
+    clearTimeout(skelTimer);
+    skelTimer = setTimeout(skeleton, 120);
+    fetchPage(url, true).then(done).catch(function () { if (my === seq) hard(url); });
+  }
+  window.VH.go = go;
+
   document.addEventListener('click', function (e) {
     if (e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     var a = e.target.closest ? e.target.closest('a[href]') : null;
-    if (!a || a.target === '_blank' || a.hasAttribute('download') || a.hasAttribute('data-back')) return;
-    var u;
-    try { u = new URL(a.href, location.href); } catch (x) { return; }
-    if (u.origin !== location.origin || (u.pathname === location.pathname && u.search === location.search)) return;
-    if (/^\/(files|logout|export)/.test(u.pathname) || /[?&]export=/.test(u.search)) return;
-    clearTimeout(skelTimer);
-    skelTimer = setTimeout(skeleton, 140);
+    var u = eligible(a);
+    if (!u) return;
+    e.preventDefault();
+    if (u.pathname === location.pathname && u.search === location.search) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    go(u.href);
   });
+  window.addEventListener('popstate', function (e) {
+    var st = e.state;
+    if (!st || !st.vh) return;
+    go(location.href, { pop: true, y: st.y || 0 });
+  });
+  try { history.replaceState({ vh: 1, y: 0 }, ''); } catch (x) {}
+
+  // Start loading a page the moment a finger or pointer lands on its link.
+  var warm = function (e) {
+    var a = e.target.closest ? e.target.closest('a[href]') : null;
+    var u = eligible(a);
+    if (!u) return;
+    var k = keyOf(u.href), hit = cache[k];
+    if (hit && Date.now() - hit.t < 20000) return;
+    fetchPage(u.href).catch(function () {});
+  };
+  document.addEventListener('touchstart', warm, { passive: true });
+  document.addEventListener('mouseover', warm, { passive: true });
+  // After the first screen is up, quietly load the other tabs so switching is instant.
+  var saver = navigator.connection && navigator.connection.saveData;
+  if (!saver) setTimeout(function () {
+    var list = $$('.app-tabs a').map(function (a) { return a.href; }).filter(function (h) { return keyOf(h) !== keyOf(location.href); });
+    (function next() {
+      var h = list.shift();
+      if (!h || document.hidden) return;
+      fetchPage(h).catch(function () {}).then(function () { setTimeout(next, 500); });
+    })();
+  }, 1500);
   window.addEventListener('pageshow', clearSkeleton);
 
   // ---------- pull to refresh ----------
-  if ('ontouchstart' in window && body.classList.contains('app-root')) {
+  if ('ontouchstart' in window) {
     var ind = document.createElement('div');
     ind.className = 'ptr';
     ind.innerHTML = '<span></span>';
@@ -82,7 +223,7 @@
     var TH = 74;
     var reset = function () { ind.style.transform = ''; ind.classList.remove('go', 'spin'); pull = 0; y0 = null; };
     document.addEventListener('touchstart', function (e) {
-      if (busy || window.scrollY > 0 || e.touches.length !== 1 || document.querySelector('dialog[open]')) { y0 = null; return; }
+      if (busy || !body.classList.contains('app-root') || window.scrollY > 0 || e.touches.length !== 1 || document.querySelector('dialog[open]')) { y0 = null; return; }
       y0 = e.touches[0].clientY;
     }, { passive: true });
     document.addEventListener('touchmove', function (e) {
@@ -100,7 +241,7 @@
         ind.classList.add('spin');
         ind.style.transform = 'translate(-50%,16px)';
         if (navigator.vibrate) try { navigator.vibrate(8); } catch (x) {}
-        location.reload();
+        if (window.VH.go) { cache = {}; window.VH.go(location.href, { force: true, replace: true }); setTimeout(function () { busy = false; reset(); }, 600); } else location.reload();
       } else reset();
     });
   }
@@ -121,7 +262,7 @@
   var hasBio = !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create);
 
   function paintState() {
-    $$('[data-lock-state]').forEach(function (el) { el.textContent = cfg ? 'On' + (cfg.bio ? ' · PIN and biometrics' : ' · PIN') : 'Ask for a PIN when the app opens'; });
+    $$('[data-lock-state]').forEach(function (el) { el.textContent = cfg ? 'On' : 'Off'; });
   }
   paintState();
 

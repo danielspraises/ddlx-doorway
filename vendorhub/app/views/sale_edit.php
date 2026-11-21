@@ -35,7 +35,6 @@ $price = fn (array $p) => $p['type'] === 'variable'
       <div class="field"><label for="f-start">Starts</label><input id="f-start" type="date" name="starts_on" value="<?= e($f['starts_on']) ?>" min="<?= e(sale_today()) ?>" <?= $started ? 'readonly' : 'required' ?>></div>
       <div class="field"><label for="f-end">Ends</label><input id="f-end" type="date" name="ends_on" value="<?= e($f['ends_on']) ?>" min="<?= e(sale_today()) ?>" required></div>
     </div>
-    <p class="muted small" style="margin:0">Prices switch on at the start of the first day and off at the end of the last day, Lagos time.</p>
     <?php endif; ?>
   </section>
 
@@ -48,18 +47,16 @@ $price = fn (array $p) => $p['type'] === 'variable'
       <div class="field" style="margin:0"><label for="f-value"><span class="u-percent">Percent off</span><span class="u-amount">Amount off each item</span><span class="u-fixed">Sale price for every product</span></label>
         <div class="unit"><span class="pre u-money"><?= e(CURRENCY_SYMBOLS[$cur] ?? $cur) ?></span><input id="f-value" name="value" value="<?= e($f['value']) ?>" inputmode="decimal" placeholder="20"><span class="post u-percent">%</span></div></div>
     </div>
-    <p class="muted small only-custom" style="margin:12px 0 0">Type a sale price next to each product below. Leave it empty to keep a product out.</p>
   </section>
 
   <section class="scard">
     <h3>Products</h3>
-    <?php if (!$eligible): ?><p class="muted" style="margin:0">Products appear here once they are approved and on the marketplace.</p><?php else: ?>
+    <?php if (!$eligible): ?><p class="muted" style="margin:0">No live products yet</p><?php else: ?>
     <div class="segr only-notcustom" role="radiogroup" aria-label="Products">
       <label><input type="radio" name="scope" value="all" <?= $f['scope'] === 'all' ? 'checked' : '' ?>><span>All products</span></label>
       <label><input type="radio" name="scope" value="selected" <?= $f['scope'] === 'selected' ? 'checked' : '' ?>><span>Only chosen</span></label>
       <label><input type="radio" name="scope" value="except" <?= $f['scope'] === 'except' ? 'checked' : '' ?>><span>All except</span></label>
     </div>
-    <p class="muted small only-all" style="margin:10px 0 0">Every product on the marketplace, including ones approved later.</p>
     <div class="only-chosen">
       <div class="filterbar" data-fbar="sp"><input type="search" data-fq placeholder="Search products" aria-label="Search products"><span class="muted small" data-fcount></span></div>
       <div class="slist" data-fbox="sp">

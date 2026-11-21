@@ -14,55 +14,72 @@
   }
   window.VH.toast = toast;
 
-  // Mobile menu
-  var toggle = document.querySelector('[data-menu]');
-  var nav = document.querySelector('[data-nav]');
-  if (toggle && nav) {
-    toggle.addEventListener('click', function () {
-      var open = nav.classList.toggle('open');
-      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    });
-  }
-
-  // Switching the product type reloads the editor so the variations section appears or disappears.
-  var typeSel = document.getElementById('f-product_type');
-  if (typeSel) {
-    typeSel.addEventListener('change', function () {
-      var form = typeSel.form;
-      var h = document.createElement('input');
-      h.type = 'hidden'; h.name = 'action'; h.value = 'rebuild';
-      form.appendChild(h);
-      form.submit();
-    });
-  }
-
-  // Message composer: show the seller list only for "chosen sellers", and filter it as you type.
-  document.querySelectorAll('[data-audience]').forEach(function (r) {
-    r.addEventListener('change', function () {
-      var box = document.getElementById('seller-pick');
-      var sel = document.querySelector('[data-audience]:checked');
-      if (box && sel) box.hidden = sel.value !== 'selected';
-    });
-  });
-  document.querySelectorAll('[data-filter-list]').forEach(function (inp) {
-    inp.addEventListener('input', function () {
-      var q = inp.value.toLowerCase();
-      document.querySelectorAll('#' + inp.getAttribute('data-filter-list') + ' [data-filter-item]').forEach(function (el) {
-        el.hidden = q !== '' && el.textContent.toLowerCase().indexOf(q) === -1;
+  // Page pieces that bind to elements: run once at load and again after the app swaps a page in (VH.init).
+  function bind(el, key) { if (el.__vh && el.__vh[key]) return false; (el.__vh = el.__vh || {})[key] = 1; return true; }
+  function init(root) {
+    root = root || document;
+    var q = function (sel) { return root.querySelectorAll(sel); };
+    var toggle = document.querySelector('[data-menu]');
+    var nav = document.querySelector('[data-nav]');
+    if (toggle && nav && bind(toggle, 'menu')) {
+      toggle.addEventListener('click', function () {
+        var open = nav.classList.toggle('open');
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    }
+    // Switching the product type reloads the editor so the variations section appears or disappears.
+    var typeSel = root.querySelector ? root.querySelector('#f-product_type') : null;
+    if (typeSel && bind(typeSel, 'type')) {
+      typeSel.addEventListener('change', function () {
+        var form = typeSel.form;
+        var h = document.createElement('input');
+        h.type = 'hidden'; h.name = 'action'; h.value = 'rebuild';
+        form.appendChild(h);
+        form.submit();
+      });
+    }
+    // Message composer: show the seller list only for "chosen sellers", and filter it as you type.
+    q('[data-audience]').forEach(function (r) {
+      if (!bind(r, 'aud')) return;
+      r.addEventListener('change', function () {
+        var box = document.getElementById('seller-pick');
+        var sel = document.querySelector('[data-audience]:checked');
+        if (box && sel) box.hidden = sel.value !== 'selected';
       });
     });
-  });
-
-  // Show / hide password
-  document.querySelectorAll('[data-pw]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var input = document.getElementById(btn.getAttribute('data-pw'));
-      if (!input) return;
-      var show = input.type === 'password';
-      input.type = show ? 'text' : 'password';
-      btn.textContent = show ? 'Hide' : 'Show';
+    q('[data-filter-list]').forEach(function (inp) {
+      if (!bind(inp, 'fl')) return;
+      inp.addEventListener('input', function () {
+        var qv = inp.value.toLowerCase();
+        document.querySelectorAll('#' + inp.getAttribute('data-filter-list') + ' [data-filter-item]').forEach(function (el) {
+          el.hidden = qv !== '' && el.textContent.toLowerCase().indexOf(qv) === -1;
+        });
+      });
     });
-  });
+    // Show / hide password
+    q('[data-pw]').forEach(function (btn) {
+      if (!bind(btn, 'pw')) return;
+      btn.addEventListener('click', function () {
+        var input = document.getElementById(btn.getAttribute('data-pw'));
+        if (!input) return;
+        var show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        btn.textContent = show ? 'Hide' : 'Show';
+      });
+    });
+    refreshConds();
+    if (window.VH.initFilters) window.VH.initFilters(root);
+  }
+  function refreshConds() {
+    document.querySelectorAll('[data-if]').forEach(function (el) {
+      var p = el.getAttribute('data-if').split('=');
+      var ctl = document.querySelector('[name="' + p[0] + '"]');
+      var on = ctl && ctl.value === p.slice(1).join('=');
+      if (on) el.removeAttribute('hidden'); else el.setAttribute('hidden', '');
+    });
+  }
+  window.VH.init = init;
+  document.addEventListener('change', function (e) { if (e.target && e.target.name) refreshConds(); });
 
   // Confirm dialogs and double-submit protection
   document.addEventListener('submit', function (ev) {
@@ -132,6 +149,7 @@
               if (d.counts[key] !== undefined) { el.textContent = d.counts[key]; el.classList.toggle('hidden', !(d.counts[key] > 0)); }
             });
           }
+          if (changed && window.VH.bust) window.VH.bust();
           if (changed && document.body.hasAttribute('data-refresh')) softRefresh();
         })
         .catch(function () {})
@@ -144,7 +162,7 @@
         var doc = new DOMParser().parseFromString(html, 'text/html');
         var fresh = doc.getElementById('main');
         var cur = document.getElementById('main');
-        if (fresh && cur) cur.innerHTML = fresh.innerHTML;
+        if (fresh && cur) { cur.innerHTML = fresh.innerHTML; init(cur); }
       }).catch(function () {});
     };
     tick();
@@ -152,20 +170,7 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden) tick(); });
   }
 
-  // Questions that only appear for a certain answer: <div data-if="owns_brand=yes">
-  var conds = document.querySelectorAll('[data-if]');
-  if (conds.length) {
-    var refresh = function () {
-      conds.forEach(function (el) {
-        var p = el.getAttribute('data-if').split('=');
-        var ctl = document.querySelector('[name="' + p[0] + '"]');
-        var on = ctl && ctl.value === p.slice(1).join('=');
-        if (on) el.removeAttribute('hidden'); else el.setAttribute('hidden', '');
-      });
-    };
-    document.addEventListener('change', function (e) { if (e.target && e.target.name) refresh(); });
-    refresh();
-  }
+  init(document);
 
   // Landing page: the five application steps
   var cards = document.querySelectorAll('[data-step]');
@@ -218,7 +223,9 @@
 
 // Live search and filters: a bar [data-fbar=x] controls the items inside [data-fbox=x].
 (function () {
-  document.querySelectorAll('[data-fbar]').forEach(function (bar) {
+  window.VH.initFilters = function (root) {
+  (root || document).querySelectorAll('[data-fbar]').forEach(function (bar) {
+    if (bar.__vhf) return; bar.__vhf = 1;
     var box = document.querySelector('[data-fbox="' + bar.getAttribute('data-fbar') + '"]');
     if (!box) return;
     var q = bar.querySelector('[data-fq]'), sel = bar.querySelector('[data-fs]'), count = bar.querySelector('[data-fcount]');
@@ -242,4 +249,6 @@
     chips.forEach(function (c) { c.addEventListener('click', function () { chip = c.getAttribute('data-fchip'); apply(); }); });
     apply();
   });
+  };
+  window.VH.initFilters(document);
 })();

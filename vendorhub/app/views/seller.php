@@ -10,10 +10,10 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 ]; $pendRet = (int) ($user['pending']['returns'] ?? 0);
 $grp = ['sales' => 'orders', 'returns' => 'orders', 'products' => 'products', 'inventory' => 'products', 'promotions' => 'products'][$tab] ?? '';
 ?>
-<?php if ($grp !== ''): ?><div class="h1-row"><h1 class="app-h1"><?= $grp === 'orders' ? 'Orders' : 'Products' ?><?= isset($tabHelp[$tab]) ? ' ' . help($tabHelp[$tab]) : '' ?></h1>
+<?php if ($grp !== ''): ?><div class="h1-row"><h1 class="app-h1"><?= $grp === 'orders' ? 'Orders' : 'Products' ?></h1>
   <?php if ($grp === 'orders' && isset($store)): ?><form method="post" action="/store/open" class="open-sw" data-keep><?= csrf_field() ?><label><span class="open-t"><?= $store['vacation'] ? 'Closed' : 'Open' ?></span><input type="checkbox" name="open" value="1" role="switch" data-autosubmit<?= $store['vacation'] ? '' : ' checked' ?>><i class="sw" aria-hidden="true"></i></label></form><?php endif; ?></div>
   <?= $grp === 'orders' ? app_pills(['sales' => ['Orders', '/seller?tab=sales', 0], 'returns' => ['Returns', '/seller?tab=returns', $pendRet]], $tab) : app_pills(['products' => ['Items', '/seller?tab=products', 0], 'inventory' => ['Stock', '/seller?tab=inventory', 0], 'promotions' => ['Promotions', '/seller?tab=promotions', 0]], $tab) ?>
-<?php elseif ($tab === 'payouts'): ?><p class="app-note"><?= e($tabHelp['payouts']) ?></p><?php endif; ?>
+<?php endif; ?>
 
 <?php if ($tab === 'payouts'):
     $currencies = array_values(array_unique(array_merge(array_column($balances, 'currency'), array_column($month, 'currency'))));
@@ -23,48 +23,65 @@ $grp = ['sales' => 'orders', 'returns' => 'orders', 'products' => 'products', 'i
       $mo = current(array_filter($month, fn ($x) => $x['currency'] === $c)) ?: ['net' => 0, 'units' => 0, 'gross' => 0]; ?>
     <div class="grid g3" style="margin-top:20px">
       <div class="stat"><p class="muted small">Available to withdraw</p><p class="n"><?= e($m($b['available'], $c)) ?></p></div>
-      <div class="stat"><p class="muted small">Pending (<?= hold_days() ?>-day hold) <?= help('Your earnings are each sale minus the ' . rtrim(rtrim(number_format(commission_percent(), 2), '0'), '.') . '% marketplace commission. Sales become available to withdraw after ' . hold_days() . ' days.') ?></p><p class="n"><?= e($m($b['pending'], $c)) ?></p></div>
+      <div class="stat"><p class="muted small">Pending</p><p class="n"><?= e($m($b['pending'], $c)) ?></p></div>
       <div class="stat"><p class="muted small">Last 30 days</p><p class="n"><?= e($m($mo['net'], $c)) ?></p><p class="muted small"><?= (int) $mo['units'] ?> units · <?= e($m($mo['gross'], $c)) ?> sold</p></div>
     </div>
   <?php endforeach; ?>
-<?php else: ?><p class="notice">No sales yet. When a customer buys one of your products on the marketplace, it shows up here.</p><?php endif; endif; ?>
+<?php else: ?><p class="muted">No sales yet</p><?php endif; endif; ?>
 
-<?php if ($tab === 'overview' && !terms_current($user['id'])): ?>
-<form method="post" action="/seller-terms/accept" class="notice" style="margin:16px 0" data-keep><?= csrf_field() ?><strong>Please review the Seller Agreement.</strong> <a href="/seller-terms" target="_blank" rel="noopener">Read it</a>.
-  <label class="check" style="margin:8px 0"><input type="checkbox" name="agree" value="yes" required><span>I have read and agree to the Seller Agreement (version <?= (int) legal_version() ?>).</span></label>
-  <button class="btn btn-sm" type="submit">I agree</button></form>
-<?php endif; ?>
+
 <?php if ($tab === 'overview') include __DIR__ . '/seller_home.php'; ?>
 <?php if ($tab === 'insights') include __DIR__ . '/seller_dash.php'; ?>
 <?php if ($tab === 'settings') include __DIR__ . '/seller_settings.php'; ?>
 
-<?php if ($tab === 'products'): ?>
-  <div class="row between" style="margin:18px 0"><span class="muted"><?= count($products) ?> product<?= count($products) === 1 ? '' : 's' ?> · <a href="/seller/export?kind=products">Download CSV</a></span><span class="row"><a class="btn btn-outline" href="/products/import">Import CSV</a><a class="btn" href="/products/edit">Add product</a></span></div>
-  <?php if (!$products): ?><p class="notice">You have no products yet. Add one, then submit it for review. Approved products appear on the DDLX marketplace.</p><?php endif; ?>
-  <?php if ($products): ?><div class="filterbar" data-fbar="products">
-    <input type="search" data-fq placeholder="Search by name, SKU or category" aria-label="Search products">
-    <select data-fs aria-label="Filter products"><option value="">All products</option><option value="live">Live</option><option value="hidden">Off the marketplace</option><option value="draft">Drafts</option><option value="pending_review">In review</option><option value="attention">Needs changes</option><option value="low">Low stock</option><option value="out">Out of stock</option></select>
-    <span class="muted small" data-fcount></span></div><?php endif; ?>
-  <ul class="list" data-fbox="products">
-  <?php foreach ($products as $p): [$k, $l] = product_visibility($p); $tags = [$k, $p['status'], stock_state($p)]; if (in_array($p['status'], ['changes_requested', 'rejected'], true)) $tags[] = 'attention'; ?>
-    <li data-fitem data-tags="<?= e(implode(' ', array_unique($tags))) ?>" data-text="<?= e(mb_strtolower($p['name'] . ' ' . $p['sku'] . ' ' . category_label($p) . ' ' . $p['brand'])) ?>"><div class="row between">
-      <div class="row" style="flex-wrap:nowrap"><?php if ($p['featured_image']): ?><img class="thumb" src="<?= e(product_image_url($p['featured_image'])) ?>" alt=""><?php else: ?><span class="thumb"></span><?php endif; ?>
-        <div><a href="/products/edit?id=<?= e($p['id']) ?>"><strong><?= e($p['name'] ?: 'Untitled') ?></strong></a>
-          <div class="muted small"><?= e($p['sku']) ?> · <?= e(category_label($p)) ?> · <?= e(price_label($p)) ?><?= $p['product_type'] === 'variable' ? ' · ' . count($p['variations']) . ' variations' : '' ?></div>
-          <div style="margin-top:6px"><?= pill($k, [], ['live' => 'ok', 'hidden' => 'warn']) ?> <span class="muted small"><?= e($l) ?></span> <?= stock_state($p) !== 'ok' ? pill(stock_state($p)) : '' ?></div></div></div>
-      <div class="row">
-        <a class="btn btn-outline btn-sm" href="/products/edit?id=<?= e($p['id']) ?>">Edit</a>
-        <?php if (in_array($p['status'], ['draft', 'changes_requested', 'rejected'], true)): ?><form method="post" action="/products/action"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><button class="btn btn-sm" name="action" value="submit">Submit</button></form><?php endif; ?>
-        <?php if (!$p['live'] && $p['status'] === 'approved' && !empty($p['has_snapshot'])): ?><form method="post" action="/products/action"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><button class="btn btn-sm" name="action" value="live">Put back live</button></form><?php endif; ?>
-        <?php if ($p['status'] === 'pending_review'): ?><form method="post" action="/products/action"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><button class="btn btn-outline btn-sm" name="action" value="withdraw">Withdraw</button></form><?php endif; ?>
-      </div></div></li>
-  <?php endforeach; ?><li class="muted" data-fempty hidden>No products match your search.</li></ul>
+<?php if ($tab === 'products'):
+    $tagsOf = function (array $p): array { [$k] = product_visibility($p); $t = [$k, $p['status'], stock_state($p)]; if (in_array($p['status'], ['changes_requested', 'rejected'], true)) $t[] = 'attention'; return array_unique($t); };
+    $cnt = []; foreach ($products as $p) foreach ($tagsOf($p) as $t) $cnt[$t] = ($cnt[$t] ?? 0) + 1;
+    $pchips = ['all' => ['All', count($products)], 'live' => ['Live', $cnt['live'] ?? 0], 'draft' => ['Drafts', $cnt['draft'] ?? 0], 'pending_review' => ['In review', $cnt['pending_review'] ?? 0], 'attention' => ['Needs changes', $cnt['attention'] ?? 0], 'hidden' => ['Hidden', $cnt['hidden'] ?? 0], 'low' => ['Low stock', $cnt['low'] ?? 0], 'out' => ['Out of stock', $cnt['out'] ?? 0]]; ?>
+  <div data-fbar="products">
+    <div class="pbar"><input type="search" data-fq placeholder="Search products" aria-label="Search products"<?= $products ? '' : ' disabled' ?>>
+      <button type="button" class="icon-btn" data-sheet="prod-more" aria-label="More"><?= icon('more') ?></button>
+      <a class="icon-btn solid" href="/products/edit" aria-label="Add product"><?= icon('plus') ?></a></div>
+    <?php if (count($products) > 3): ?><div class="chips" role="tablist" aria-label="Filter"><?php foreach ($pchips as $k => [$l, $n]): if ($k !== 'all' && $n === 0) continue; ?><button type="button" class="chip<?= $k === 'all' ? ' on' : '' ?>" data-fchip="<?= e($k) ?>"><?= e($l) ?><span><?= (int) $n ?></span></button><?php endforeach; ?></div><?php endif; ?>
+  </div>
+  <ul class="plist" data-fbox="products">
+  <?php foreach ($products as $p): [$k, $l] = product_visibility($p); $ss = stock_state($p);
+      $statusChip = $p['status'] === 'draft' ? ['Draft', ''] : ($p['status'] === 'pending_review' ? ['In review', 'warn'] : (in_array($p['status'], ['changes_requested', 'rejected'], true) ? ['Needs changes', 'bad'] : ($k === 'hidden' ? ['Hidden', 'warn'] : null))); ?>
+    <li data-fitem data-tags="<?= e(implode(' ', $tagsOf($p))) ?>" data-text="<?= e(mb_strtolower($p['name'] . ' ' . $p['sku'] . ' ' . category_label($p) . ' ' . $p['brand'])) ?>">
+      <button type="button" class="prow" data-pd="<?= e($p['id']) ?>" data-pd-title="<?= e($p['name'] ?: 'Untitled') ?>">
+        <?php if ($p['featured_image']): ?><img class="pthumb" src="<?= e(product_image_url($p['featured_image'])) ?>" alt="" loading="lazy"><?php else: ?><span class="pthumb"></span><?php endif; ?>
+        <span class="grow"><strong><?= e($p['name'] ?: 'Untitled') ?></strong><span class="muted small"><?= e(price_label($p)) ?><?= $ss === 'out' ? ' · <b class="t-bad">Out of stock</b>' : ($ss === 'low' ? ' · <b class="t-warn">Low stock</b>' : '') ?></span></span>
+        <?php if ($statusChip): ?><span class="schip <?= e($statusChip[1]) ?>"><?= e($statusChip[0]) ?></span><?php else: ?><span class="sdot ok" title="Live"></span><?php endif; ?>
+      </button>
+      <div hidden data-pd-src="<?= e($p['id']) ?>">
+        <dl class="pd-facts">
+          <div><dt>Status</dt><dd><?= e($l) ?></dd></div>
+          <div><dt>Price</dt><dd><?= e(price_label($p)) ?></dd></div>
+          <div><dt>Stock</dt><dd><?= !$p['manage_stock'] && $p['product_type'] === 'simple' ? 'Not tracked' : ($p['product_type'] === 'variable' ? array_sum(array_column($p['variations'], 'stock')) : (int) $p['stock']) ?><?= $ss !== 'ok' ? ' · ' . e(ucfirst($ss)) : '' ?></dd></div>
+          <?php if ($p['sku']): ?><div><dt>SKU</dt><dd><?= e($p['sku']) ?></dd></div><?php endif; ?>
+          <?php if (category_label($p) !== ''): ?><div><dt>Category</dt><dd><?= e(category_label($p)) ?></dd></div><?php endif; ?>
+          <?php if ($p['product_type'] === 'variable'): ?><div><dt>Variations</dt><dd><?= count($p['variations']) ?></dd></div><?php endif; ?>
+        </dl>
+        <div class="pd-act">
+          <a class="btn" href="/products/edit?id=<?= e($p['id']) ?>">Edit</a>
+          <?php if (in_array($p['status'], ['draft', 'changes_requested', 'rejected'], true)): ?><form method="post" action="/products/action"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><button class="btn btn-outline" name="action" value="submit">Submit for review</button></form><?php endif; ?>
+          <?php if (!$p['live'] && $p['status'] === 'approved' && !empty($p['has_snapshot'])): ?><form method="post" action="/products/action"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><button class="btn btn-outline" name="action" value="live">Put back live</button></form><?php endif; ?>
+          <?php if ($p['status'] === 'pending_review'): ?><form method="post" action="/products/action"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><button class="btn btn-outline" name="action" value="withdraw">Withdraw</button></form><?php endif; ?>
+        </div>
+      </div>
+    </li>
+  <?php endforeach; ?>
+  <li class="empty" data-fempty<?= $products ? ' hidden' : '' ?>><span class="empty-ic"><?= icon('package') ?></span><strong><?= $products ? 'No matches' : 'No products yet' ?></strong><?php if (!$products): ?><a class="btn" href="/products/edit">Add product</a><?php endif; ?></li></ul>
+  <dialog class="sheet" id="prod-sheet" aria-label="Product"><div class="sheet-h"><strong data-pd-title></strong><button type="button" class="icon-btn" data-sheet-close aria-label="Close"><?= icon('close') ?></button></div><div class="sheet-b" data-pd-body></div></dialog>
+  <dialog class="sheet" id="prod-more" aria-label="More"><div class="sheet-h"><strong>Products</strong><button type="button" class="icon-btn" data-sheet-close aria-label="Close"><?= icon('close') ?></button></div><div class="sheet-b">
+    <a class="srow" href="/products/import" data-nonav><span class="sr-ic"><?= icon('upload') ?></span><span class="grow"><strong>Import CSV</strong></span><span class="sr-go"><?= icon('chev') ?></span></a>
+    <a class="srow" href="/seller/export?kind=products" data-nonav><span class="sr-ic"><?= icon('download') ?></span><span class="grow"><strong>Download CSV</strong></span><span class="sr-go"><?= icon('chev') ?></span></a></div></dialog>
 <?php endif; ?>
 
 <?php if ($tab === 'inventory'): ?>
   <?php if ($products): ?><details class="card" style="margin:12px 0"><summary><strong>Update many at once (CSV)</strong></summary>
     <form method="post" action="/inventory/import" enctype="multipart/form-data" class="row" data-keep><?= csrf_field() ?><a class="btn btn-outline btn-sm" href="/inventory/export">Download stock list</a><input type="file" name="file" accept=".csv,text/csv" required style="max-width:240px"><button class="btn btn-sm" type="submit">Upload</button></form></details><?php endif; ?>
-  <?php if (!$products): ?><p class="notice">Add a product first.</p><?php endif; ?>
+  <?php if (!$products): ?><p class="muted">No products yet</p><?php endif; ?>
   <?php if ($products): ?><div class="filterbar" data-fbar="stock">
     <input type="search" data-fq placeholder="Search by product, option or SKU" aria-label="Search stock">
     <select data-fs aria-label="Filter stock"><option value="">All stock</option><option value="low">Low stock</option><option value="out">Out of stock</option><option value="ok">In stock</option></select>
@@ -120,7 +137,7 @@ $grp = ['sales' => 'orders', 'returns' => 'orders', 'products' => 'products', 'i
   </div>
   </div>
   <h2>Your codes</h2>
-  <?php if (!$coupons): ?><p class="notice">No codes yet.</p><?php else: ?>
+  <?php if (!$coupons): ?><p class="muted">No codes yet</p><?php else: ?>
   <div class="table-wrap"><table class="rtable"><thead><tr><th>Code</th><th>Discount</th><th>Status</th><th class="t-right">Used</th><th class="t-right">You gave away</th><th></th></tr></thead><tbody>
   <?php foreach ($coupons as $c): if (str_starts_with($c['code'], 'DEL-')) continue; ?>
     <tr><td><strong><?= e($c['code']) ?></strong><br><span class="muted small"><?= $c['scope'] === 'all' ? 'All products' : count($c['product_list']) . ' product' . (count($c['product_list']) === 1 ? '' : 's') ?><?= $c['ends_at'] ? ' · ends ' . e(human_date($c['ends_at'], true)) : '' ?></span></td>
@@ -159,7 +176,7 @@ $grp = ['sales' => 'orders', 'returns' => 'orders', 'products' => 'products', 'i
       <?php if (!empty($history[$s['id']])): ?><details class="oc-hist small"><summary class="muted">History</summary><ul class="list"><?php foreach ($history[$s['id']] as $h): ?><li><?= e(LOG_LABEL[$h['status']] ?? $h['status']) ?> <span class="muted">· <?= e($h['source'] === 'seller' ? 'you' : 'DDLX') ?> · <?= e(human_date($h['created_at'])) ?><?= $h['note'] ? ' · ' . e($h['note']) : '' ?></span></li><?php endforeach; ?></ul></details><?php endif; ?>
     </li>
   <?php endforeach; ?>
-  <li class="empty" data-fempty<?= $sales ? ' hidden' : '' ?>><span class="empty-ic"><?= icon('bag') ?></span><strong>Nothing here yet</strong><span class="muted small"><?= $sales ? 'No orders match.' : 'Orders show up here as customers buy from you on the marketplace.' ?></span></li></ul>
+  <li class="empty" data-fempty<?= $sales ? ' hidden' : '' ?>><span class="empty-ic"><?= icon('bag') ?></span><strong>Nothing here yet</strong><?php if ($sales): ?><span class="muted small">No orders match</span><?php endif; ?></li></ul>
   <?php if ($sales): ?><details class="app-export"><summary><?= icon('download') ?> Download orders</summary>
     <form method="get" action="/seller/export" class="row" data-keep><input type="hidden" name="kind" value="sales"><label class="small muted" for="se-from">From</label><input id="se-from" type="date" name="from" style="width:auto"><label class="small muted" for="se-to">to</label><input id="se-to" type="date" name="to" style="width:auto"><button class="btn btn-outline btn-sm" type="submit">Download CSV</button></form></details><?php endif; ?>
 <?php endif; ?>
@@ -168,7 +185,7 @@ $grp = ['sales' => 'orders', 'returns' => 'orders', 'products' => 'products', 'i
 <?php if ($tab === 'support') require __DIR__ . '/seller_support.php'; ?>
 
 <?php if ($tab === 'returns'): ?>
-  <p class="muted small" style="margin:0 0 14px">Select a case to see the details, reply, and read the history.</p>
+  
   <?php if ($cases): ?><ul class="clist"><?php foreach ($cases as $c): ?><li><?= case_row($c, 'seller') ?></li><?php endforeach; ?></ul>
   <?php foreach ($cases as $c): $ev = $events[$c['id']] ?? [];
     ob_start(); ?>
@@ -185,7 +202,7 @@ $grp = ['sales' => 'orders', 'returns' => 'orders', 'products' => 'products', 'i
     ob_start(); ?><?= case_history_html($ev) ?>
       <form method="post" action="/returns/message" class="case-msg" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($c['id']) ?>"><input name="message" maxlength="1000" placeholder="Write to DDLX about this case" aria-label="Message to DDLX" required><button class="btn btn-sm" type="submit">Send</button></form>
     <?php $hist = ob_get_clean(); ?><?= case_modal($c, 'seller', $act, $hist) ?>
-  <?php endforeach; else: ?><p class="muted">No return cases. Good.</p><?php endif; ?>
+  <?php endforeach; else: ?><p class="muted">No returns</p><?php endif; ?>
 <?php endif; ?>
 
 <?php if ($tab === 'payouts'): $cur = $balances[0]['currency'] ?? 'NGN'; ?>
@@ -193,7 +210,7 @@ $grp = ['sales' => 'orders', 'returns' => 'orders', 'products' => 'products', 'i
   <div class="pay-grid">
     <section>
       <h2>Withdraw money</h2>
-      <?php if (!$accounts): ?><div class="card"><p class="muted" style="margin:0">Add a bank account first, then you can request a withdrawal.</p></div><?php else: ?>
+      <?php if (!$accounts): ?><div class="card"><p class="muted" style="margin:0">Add a bank account to withdraw.</p></div><?php else: ?>
       <form method="post" action="/payouts/request" class="card pay-card" data-keep><?= csrf_field() ?>
         <p class="muted small" style="margin-top:0">Smallest withdrawal <?= e($m(min_withdrawal(), $cur)) ?><?= withdrawal_fee() > 0 ? ' · fee ' . e($m(withdrawal_fee(), $cur)) . ' per withdrawal' : '' ?>.</p>
         <div class="grid g2">
@@ -211,7 +228,7 @@ $grp = ['sales' => 'orders', 'returns' => 'orders', 'products' => 'products', 'i
         <?php if (!$accounts): ?><li class="muted">No bank accounts yet.</li><?php endif; ?></ul>
       <?php if (count($accounts) < MAX_BANK_ACCOUNTS): ?>
       <form method="post" action="/payouts/bank" class="card pay-card" style="margin-top:14px" data-keep data-bank-form data-verify="<?= $verify ? '1' : '0' ?>"><?= csrf_field() ?><h3 style="margin-top:0">Add a bank account</h3>
-        <div class="field"><label for="f-bank_name">Bank <?= help('Pick your bank. Once you enter your 10-digit account number we fetch the account name from the bank, so there is nothing to type.') ?></label>
+        <div class="field"><label for="f-bank_name">Bank</label>
           <select id="f-bank_name" name="bank_name" required><option value="">Choose your bank…</option><?php foreach ($banks as $code => $bn): ?><option value="<?= e((string) $code) ?>"><?= e($bn) ?></option><?php endforeach; ?></select></div>
         <?= f_text('account_number', 'Account number', '', null, ['required' => 1, 'inputmode' => 'numeric', 'maxlength' => 10, 'autocomplete' => 'off', 'placeholder' => '10 digits']) ?>
         <div class="field"><label for="f-account_name">Account name</label><input id="f-account_name" name="account_name" maxlength="120" <?= $verify ? 'readonly placeholder="Fetched from your bank"' : 'placeholder="Name on the account" required' ?>><p class="small bk-status" data-bkstatus role="status"><?= $verify ? '' : 'Enter the name exactly as it appears on the account.' ?></p></div>

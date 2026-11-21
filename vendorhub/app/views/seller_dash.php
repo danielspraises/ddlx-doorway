@@ -34,7 +34,7 @@ $pipe = $dash['pipeline'];
   <section class="dcard dfeat c4">
     <div class="dhead"><h3>Net earnings</h3><?= dash_chip(dash_delta($n['net'], $b['net'])) ?></div>
     <p class="dbig"><?= e(dash_money($n['net'], $cur)) ?></p>
-    <p class="dfoot">From <?= e(dash_money($n['gross'], $cur)) ?> in sales, after <?= e(rtrim(rtrim(number_format(commission_percent(), 2), '0'), '.')) ?>% commission</p>
+    
   </section>
   <section class="dcard c4">
     <div class="dhead"><h3>Orders</h3><?= dash_chip(dash_delta((float) $n['orders'], (float) $b['orders'])) ?></div>
@@ -53,13 +53,13 @@ $pipe = $dash['pipeline'];
       <nav class="tabs" aria-label="Measure" style="margin:0"><?php foreach (DASH_METRICS as $k => $l): ?><a href="<?= e($q(['m' => $k])) ?>" class="<?= $k === $dash['metric'] ? 'active' : '' ?>"><?= e($l) ?></a><?php endforeach; ?></nav></div>
     <p class="dkey" style="margin:0 0 6px"><span class="a">This period</span><span class="dash">Period before</span></p>
     <?= dash_chart($dash) ?>
-    <?php if ($empty): ?><p class="muted small" style="text-align:center;margin:4px 0 0">No sales in this period yet. When a customer buys one of your products, it shows up here.</p><?php endif; ?>
+    <?php if ($empty): ?><p class="muted small" style="text-align:center;margin:4px 0 0">No sales yet</p><?php endif; ?>
   </section>
   <section class="dcard c4">
     <div class="dhead"><h3>Sales by category</h3></div>
     <?= dash_gauge($dash['categories'], number_format($n['units']), 'units sold') ?>
     <?php if ($dash['categories']): ?><ul class="dlegend"><?php foreach ($dash['categories'] as $i => $c): ?><li><span class="sw s<?= $i ?>"></span><span class="nm"><?= e($c['name']) ?></span><span class="pc"><?= $catTotal > 0 ? round($c['value'] / $catTotal * 100) : 0 ?>%</span></li><?php endforeach; ?></ul>
-    <?php else: ?><p class="muted small" style="text-align:center">Nothing to split yet.</p><?php endif; ?>
+    <?php else: ?><p class="muted small" style="text-align:center">Nothing yet</p><?php endif; ?>
   </section>
 
   <section class="dcard c5">
@@ -70,7 +70,7 @@ $pipe = $dash['pipeline'];
       <div class="grow"><p class="nm"><?= $p['product_id'] ? '<a href="/products/edit?id=' . e($p['product_id']) . '">' . e($p['name']) . '</a>' : e($p['name']) ?></p>
         <div class="meter"><span style="width:<?= $tmax > 0 ? round($p['gross'] / $tmax * 100) : 0 ?>%"></span></div></div>
       <div class="rt"><strong><?= e(dash_money($p['gross'], $cur)) ?></strong><span class="muted small"><?= (int) $p['units'] ?> sold</span></div></li><?php endforeach; ?></ol>
-    <?php else: ?><p class="muted small">Your best sellers appear here once you make sales.</p><?php endif; ?>
+    <?php else: ?><p class="muted small">Nothing yet</p><?php endif; ?>
   </section>
   <section class="dcard c7">
     <div class="dhead"><h3>Recent orders</h3><a class="dlink" href="/seller?tab=sales">All sales</a></div>
@@ -100,7 +100,7 @@ $pipe = $dash['pipeline'];
     <div class="dhead"><h3>Where customers are</h3></div>
     <?php if ($dash['states']): $smax = max(array_column($dash['states'], 'orders')); ?>
     <ul class="dstates"><?php foreach ($dash['states'] as $s): ?><li><span class="nm"><?= e($s['name']) ?></span><div class="meter"><span style="width:<?= round($s['orders'] / $smax * 100) ?>%"></span></div><span class="ct"><?= (int) $s['orders'] ?></span></li><?php endforeach; ?></ul>
-    <?php else: ?><p class="muted small">Delivery locations appear here once you have orders.</p><?php endif; ?>
+    <?php else: ?><p class="muted small">Nothing yet</p><?php endif; ?>
   </section>
 
   <section class="dcard c12">

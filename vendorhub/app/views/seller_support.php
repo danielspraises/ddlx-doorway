@@ -7,11 +7,10 @@ $row = function (string $ic, string $title, string $sub, string $href, string $e
 };
 ?>
 <h1 class="app-h1">Support</h1>
-<p class="muted">Something wrong? Talk to the DDLX team.</p>
-<a class="sup-card" href="/messages"><span class="sr-ic"><?= icon('mail') ?></span><span class="grow"><strong>Message support</strong><span class="muted small">The DDLX team replies here</span></span><?= $msg > 0 ? '<span class="badge-count">' . $msg . '</span>' : '' ?><span class="sr-go"><?= icon('chev') ?></span></a>
+<a class="sup-card" href="/messages"><span class="sr-ic"><?= icon('mail') ?></span><span class="grow"><strong>Message support</strong></span><?= $msg > 0 ? '<span class="badge-count">' . $msg . '</span>' : '' ?><span class="sr-go"><?= icon('chev') ?></span></a>
 <div class="sgroup">
-  <?= $row('undo', 'Returns', 'Customer cases that need your reply', '/seller?tab=returns', $ret > 0 ? '<span class="badge-count">' . $ret . '</span>' : '') ?>
-  <?= $row('spark', 'Ask DDLX', 'Quick answers about selling', '/assistant') ?>
+  <?= $row('undo', 'Returns', '', '/seller?tab=returns', $ret > 0 ? '<span class="badge-count">' . $ret . '</span>' : '') ?>
+  <?= $row('spark', 'Ask DDLX', '', '/assistant') ?>
 </div>
 <p class="grp">Handbook and policies</p>
 <div class="sgroup">

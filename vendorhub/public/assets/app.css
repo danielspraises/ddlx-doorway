@@ -1114,3 +1114,38 @@ body.bal-off [data-bal]{filter:blur(9px);user-select:none;transition:filter .15s
 .app-desk svg{width:20px;height:20px}
 .app-desk:hover{background:var(--soft);color:var(--ink)}
 @media (min-width:900px){body.app .biz-chip{display:none}}
+
+/* no gap between the dark header and the wallet card */
+body.app.app-home .app-main{padding-top:0}
+body.app.app-home .app-top{padding-bottom:4px}
+body.app.app-home .hero-wallet{margin-top:0}
+#main.swap{animation:vh-swap .16s ease both}
+@keyframes vh-swap{from{opacity:.4;transform:translateY(5px)}}
+@media (prefers-reduced-motion:reduce){#main.swap{animation:none}}
+
+/* products: a clean list, details in a sheet */
+.pbar{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
+.pbar input[type=search]{flex:1;min-width:0;height:44px;border-radius:99px;padding:0 18px;border:1px solid var(--line);background:var(--card)}
+.pbar .icon-btn{flex:none;width:44px;height:44px}
+.icon-btn.solid{background:var(--ink);color:#fff}
+.plist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.plist>li[hidden]{display:none}
+.prow{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border:0;border-radius:18px;background:var(--card);text-align:left;font:inherit;color:inherit;cursor:pointer;box-shadow:0 1px 0 var(--line)}
+.prow:active{background:var(--soft)}
+.prow .grow{min-width:0;display:grid;gap:2px}
+.prow strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}
+.pthumb{width:52px;height:52px;border-radius:14px;object-fit:cover;background:var(--soft);flex:none;display:block}
+.schip{flex:none;padding:3px 10px;border-radius:99px;background:var(--soft);color:var(--muted);font-size:.72rem;font-weight:700}
+.schip.warn{background:#fdecd3;color:#8a5200}
+.schip.bad{background:#fde3e1;color:#a3231b}
+.sdot{flex:none;width:9px;height:9px;border-radius:50%;background:#cfd7e3;margin-right:4px}
+.sdot.ok{background:#25a15a}
+.t-bad{color:#b3261e;font-weight:650}
+.t-warn{color:#a66100;font-weight:650}
+.pd-facts{margin:0;display:grid;gap:2px}
+.pd-facts div{display:flex;justify-content:space-between;gap:16px;padding:11px 2px;border-bottom:1px solid var(--line)}
+.pd-facts dt{color:var(--muted)}
+.pd-facts dd{margin:0;font-weight:650;text-align:right}
+.pd-act{display:grid;gap:8px;margin-top:12px}
+.pd-act form{margin:0}
+.pd-act .btn{width:100%;justify-content:center;text-align:center}

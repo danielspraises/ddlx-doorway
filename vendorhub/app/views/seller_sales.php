@@ -17,7 +17,7 @@ $kinds = ['live' => 'ok', 'scheduled' => 'warn', 'paused' => 'warn', 'ended' => 
 <div class="row between" style="margin:22px 0 12px"><h2 style="margin:0">Your sales</h2><a class="btn btn-sm" href="/sales/edit">New sale</a></div>
 <?php if (!$sales): ?>
 <div class="sempty"><p style="margin:0 0 4px"><strong>Plan a sale ahead of time</strong></p>
-  <p class="muted small" style="margin:0 0 14px">Pick the dates, the products and how much off. It switches on and off by itself, so December can be ready in November.</p>
+  
   <a class="btn btn-sm" href="/sales/edit">Create a sale</a></div>
 <?php else: ?>
 <ul class="slist2">
@@ -30,4 +30,4 @@ $kinds = ['live' => 'ok', 'scheduled' => 'warn', 'paused' => 'warn', 'ended' => 
 <?php endforeach; ?>
 </ul>
 <?php endif; ?>
-<p class="muted small" style="margin-top:16px">Want customers to type a code instead? Use <a href="/seller?tab=promotions&amp;v=codes">Discount codes</a>. A code does not apply on top of a sale price.</p>
+

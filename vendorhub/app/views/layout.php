@@ -84,8 +84,9 @@ $lockOn = $app && ($_COOKIE['vh_lock'] ?? '') === '1' && ($_COOKIE['vh_open'] ??
 <div class="viewas" role="status"><div class="wrap"><span><?= icon('eye') ?> Viewing <strong><?= e(inbox_store_name($user['id']) ?: $user['email']) ?></strong> as the seller sees it. Read-only.</span>
   <form method="post" action="/view-as/exit"><?= csrf_field() ?><button class="btn btn-sm" type="submit">Exit view</button></form></div></div>
 <?php endif; ?>
-<?php if ($flashMsg): ?><div class="wrap"><p class="flash <?= e($flashMsg['k'] === 'error' ? 'flash-error' : 'flash-ok') ?>" role="status"><?= e($flashMsg['m']) ?></p></div><?php endif; ?>
-<?php if (!empty($user) && empty($user['twofa']) && ($user['isAdmin'] || $user['canReview'] || $user['canOrders'] || $user['canMessages']) && ($_SERVER['REQUEST_URI'] ?? '') !== '/account/security'): ?><div class="wrap"><p class="flash flash-error" role="status">Your account can approve products and money. Protect it with <a href="/account/security">two-step sign-in</a>.</p></div><?php endif; ?>
+<?php if ($flashMsg && $app): ?><div id="flash-src" hidden data-m="<?= e($flashMsg['m']) ?>"></div>
+<?php elseif ($flashMsg): ?><div class="wrap"><p class="flash <?= e($flashMsg['k'] === 'error' ? 'flash-error' : 'flash-ok') ?>" role="status"><?= e($flashMsg['m']) ?></p></div><?php endif; ?>
+<?php if (!$app && !empty($user) && empty($user['twofa']) && ($user['isAdmin'] || $user['canReview'] || $user['canOrders'] || $user['canMessages']) && ($_SERVER['REQUEST_URI'] ?? '') !== '/account/security'): ?><div class="wrap"><p class="flash flash-error" role="status">Your account can approve products and money. Protect it with <a href="/account/security">two-step sign-in</a>.</p></div><?php endif; ?>
 <main class="<?= !empty($full) ? '' : ($app ? 'app-main' : 'wrap main') ?>" id="main"><?= $content ?></main>
 <?php if ($app): ?>
 </div>
@@ -93,20 +94,19 @@ $lockOn = $app && ($_COOKIE['vh_lock'] ?? '') === '1' && ($_COOKIE['vh_open'] ??
 <dialog class="sheet" id="biz-sheet" aria-label="Your business">
   <div class="sheet-h"><strong>Your business</strong><button type="button" class="icon-btn" data-sheet-close aria-label="Close"><?= icon('close') ?></button></div>
   <div class="sheet-b">
-    <div class="biz-row on"><span class="avatar"><?= e(strtoupper(substr($myStore, 0, 1))) ?></span><span class="grow"><strong><?= e($myStore) ?></strong><span class="muted small">Selling on DDLX</span></span><span class="chip-s ok">Verified</span></div>
-    <div class="biz-row off"><span class="avatar"><?= icon('plus') ?></span><span class="grow"><strong>Add another business</strong><span class="muted small">More outlets are coming</span></span><span class="chip-s">Soon</span></div>
+    <div class="biz-row on"><span class="avatar"><?= e(strtoupper(substr($myStore, 0, 1))) ?></span><span class="grow"><strong><?= e($myStore) ?></strong></span><span class="chip-s ok">Verified</span></div>
+    <div class="biz-row off"><span class="avatar"><?= icon('plus') ?></span><span class="grow"><strong>Add another business</strong></span><span class="chip-s">Soon</span></div>
     <?php if (app_desk_link($user) !== ''): ?><a class="srow" href="<?= e(app_desk_link($user)) ?>"><span class="sr-ic"><?= icon('cog') ?></span><span class="grow"><strong>Admin desk</strong></span><span class="sr-go"><?= icon('chev') ?></span></a><?php endif; ?>
     <a class="srow" href="/seller?tab=store"><span class="sr-ic"><?= icon('store') ?></span><span class="grow"><strong>Store profile</strong></span><span class="sr-go"><?= icon('chev') ?></span></a>
     <a class="srow" href="/account/security"><span class="sr-ic"><?= icon('shield') ?></span><span class="grow"><strong>Security</strong></span><span class="sr-go"><?= icon('chev') ?></span></a>
-    <button type="button" class="srow" data-lock-setup><span class="sr-ic"><?= icon('lock') ?></span><span class="grow"><strong>App lock</strong><span class="muted small" data-lock-state>Ask for a PIN when the app opens</span></span><span class="sr-go"><?= icon('chev') ?></span></button>
+    <button type="button" class="srow" data-lock-setup><span class="sr-ic"><?= icon('lock') ?></span><span class="grow"><strong>App lock</strong><span class="muted small" data-lock-state></span></span><span class="sr-go"><?= icon('chev') ?></span></button>
     <form method="post" action="/logout"><?= csrf_field() ?><button type="submit" class="srow danger"><span class="sr-ic"><?= icon('logout') ?></span><span class="grow"><strong>Log out</strong></span></button></form>
   </div>
 </dialog>
 <dialog class="sheet" id="lock-sheet" aria-label="App lock">
   <div class="sheet-h"><strong>App lock</strong><button type="button" class="icon-btn" data-sheet-close aria-label="Close"><?= icon('close') ?></button></div>
   <div class="sheet-b">
-    <p class="muted small">Asks for a 4-digit PIN each time the app opens or comes back after a minute away. It protects this phone only. Your password still signs you in.</p>
-    <label class="lk-f"><span>New PIN</span><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" data-lk-pin></label>
+        <label class="lk-f"><span>New PIN</span><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" data-lk-pin></label>
     <label class="lk-f"><span>Repeat PIN</span><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" data-lk-pin2></label>
     <label class="lk-bio hidden" data-lk-biorow><input type="checkbox" data-lk-bio> <span>Also unlock with fingerprint or face</span></label>
     <p class="lk-err hidden" data-lk-err></p>

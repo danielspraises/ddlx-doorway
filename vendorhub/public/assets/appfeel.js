@@ -22,6 +22,26 @@
     if (e.target.classList && e.target.classList.contains('sheet')) e.target.close();
   });
 
+  // ---------- switches that save by themselves ----------
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t && t.hasAttribute && t.hasAttribute('data-autosubmit') && t.form) { if (t.form.requestSubmit) t.form.requestSubmit(); else t.form.submit(); }
+  });
+
+  // ---------- hide balances ----------
+  var HK = 'vh_hide_bal';
+  var hidden = false;
+  try { hidden = localStorage.getItem(HK) === '1'; } catch (x) {}
+  function paintBal() {
+    body.classList.toggle('bal-off', hidden);
+    $$('[data-hide-bal]').forEach(function (b) { b.setAttribute('aria-pressed', hidden ? 'true' : 'false'); b.setAttribute('aria-label', hidden ? 'Show balances' : 'Hide balances'); });
+    $$('[data-hide-toggle]').forEach(function (c) { c.checked = hidden; });
+  }
+  function setHidden(v) { hidden = v; try { localStorage.setItem(HK, v ? '1' : '0'); } catch (x) {} paintBal(); }
+  paintBal();
+  document.addEventListener('click', function (e) { var b = e.target.closest ? e.target.closest('[data-hide-bal]') : null; if (b) setHidden(!hidden); });
+  document.addEventListener('change', function (e) { if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-hide-toggle')) setHidden(e.target.checked); });
+
   // ---------- loading placeholders between pages ----------
   var skelTimer = null;
   function skeleton() {

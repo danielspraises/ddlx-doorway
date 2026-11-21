@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SELLER_TABS = ['overview' => 'Home', 'sales' => 'Orders', 'returns' => 'Returns', 'products' => 'Products', 'inventory' => 'Stock', 'promotions' => 'Promotions', 'insights' => 'Insights', 'payouts' => 'Wallet', 'promo' => 'Promo kit', 'store' => 'Store profile', 'settings' => 'Settings'];
+const SELLER_TABS = ['overview' => 'Home', 'sales' => 'Orders', 'returns' => 'Returns', 'products' => 'Products', 'inventory' => 'Stock', 'promotions' => 'Promotions', 'insights' => 'Insights', 'payouts' => 'Wallet', 'promo' => 'Promo kit', 'store' => 'Store profile', 'settings' => 'Settings', 'support' => 'Support'];
 
 route('GET', '/seller', function () {
     $u = require_seller();
@@ -15,7 +15,7 @@ route('GET', '/seller', function () {
     if ($tab === 'payouts') { $vars['scripts'] = ['bank.js']; $vars['banks'] = bank_options(); $vars['verify'] = paystack_on(); $vars['accounts'] = bank_accounts($u['id']); $vars['withdrawals'] = seller_withdrawals($u['id']); }
     if ($tab === 'returns') { $vars['cases'] = seller_returns($u['id']); $vars['events'] = return_events_map(array_column($vars['cases'], 'id')); }
     if ($tab === 'promotions') { $vars['coupons'] = coupons_for_seller($u['id']); $vars['all_products'] = array_values(array_filter(seller_products($u['id']), fn ($p) => $p['status'] !== 'draft' || $p['live'])); $vars['pview'] = in_array(input('v'), ['sales', 'codes'], true) ? input('v') : (input('edit') !== '' ? 'codes' : 'sales'); $vars['edit'] = null; foreach ($vars['coupons'] as $c) if ($c['id'] === input('edit')) $vars['edit'] = $c; $vars['err'] = null; }
-    if (in_array($tab, ['store', 'settings'], true)) $vars['store'] = store_profile($u['id']);
+    if (in_array($tab, ['store', 'settings', 'sales', 'returns'], true)) $vars['store'] = store_profile($u['id']);
     if ($tab === 'settings') { $vars['rating'] = seller_rating_summary($u['id']); $vars['level'] = level_refresh($u['id']); }
     if ($tab === 'promo') { $vars['share'] = share_row($u['id']); $vars['assets'] = promo_for_seller($u['id']); $vars['ref'] = referral_stats($u['id']); $vars['scripts'] = ['promo.js']; }
     render('seller', $vars);
@@ -110,6 +110,18 @@ route('POST', '/store/save', function () {
         'return_policy' => input_raw('return_policy'), 'shipping_policy' => input_raw('shipping_policy'), 'vacation' => !empty($_POST['vacation']), 'vacation_message' => input('vacation_message'),
     ]);
     redirect('/seller?tab=store', $err ?? 'Store saved.', $err ? 'error' : 'ok');
+});
+
+// Open / Closed switch on the Orders screen: closed is the same as vacation mode (products hidden from the marketplace).
+route('POST', '/store/open', function () {
+    $u = require_seller();
+    $st = store_profile($u['id']);
+    $open = !empty($_POST['open']);
+    $err = save_store_profile($u['id'], [
+        'tagline' => $st['tagline'], 'description' => $st['description'], 'phone' => $st['phone'], 'support_email' => $st['support_email'],
+        'return_policy' => $st['return_policy'], 'shipping_policy' => $st['shipping_policy'], 'vacation' => !$open, 'vacation_message' => $st['vacation_message'],
+    ]);
+    redirect(input('back') === 'home' ? '/seller?tab=overview' : '/seller?tab=sales', $err ?? ($open ? 'Your store is open.' : 'Your store is closed. Products are hidden until you open it again.'), $err ? 'error' : 'ok');
 });
 
 route('POST', '/store/image', function () {

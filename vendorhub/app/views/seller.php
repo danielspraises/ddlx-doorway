@@ -10,7 +10,8 @@ $m = fn ($x, $c = 'NGN') => money($x, $c);
 ]; $pendRet = (int) ($user['pending']['returns'] ?? 0);
 $grp = ['sales' => 'orders', 'returns' => 'orders', 'products' => 'products', 'inventory' => 'products', 'promotions' => 'products'][$tab] ?? '';
 ?>
-<?php if ($grp !== ''): ?><h1 class="app-h1"><?= $grp === 'orders' ? 'Orders' : 'Products' ?><?= isset($tabHelp[$tab]) ? ' ' . help($tabHelp[$tab]) : '' ?></h1>
+<?php if ($grp !== ''): ?><div class="h1-row"><h1 class="app-h1"><?= $grp === 'orders' ? 'Orders' : 'Products' ?><?= isset($tabHelp[$tab]) ? ' ' . help($tabHelp[$tab]) : '' ?></h1>
+  <?php if ($grp === 'orders' && isset($store)): ?><form method="post" action="/store/open" class="open-sw" data-keep><?= csrf_field() ?><label><span class="open-t"><?= $store['vacation'] ? 'Closed' : 'Open' ?></span><input type="checkbox" name="open" value="1" role="switch" data-autosubmit<?= $store['vacation'] ? '' : ' checked' ?>><i class="sw" aria-hidden="true"></i></label></form><?php endif; ?></div>
   <?= $grp === 'orders' ? app_pills(['sales' => ['Orders', '/seller?tab=sales', 0], 'returns' => ['Returns', '/seller?tab=returns', $pendRet]], $tab) : app_pills(['products' => ['Items', '/seller?tab=products', 0], 'inventory' => ['Stock', '/seller?tab=inventory', 0], 'promotions' => ['Promotions', '/seller?tab=promotions', 0]], $tab) ?>
 <?php elseif ($tab === 'payouts'): ?><p class="app-note"><?= e($tabHelp['payouts']) ?></p><?php endif; ?>
 
@@ -164,6 +165,7 @@ $grp = ['sales' => 'orders', 'returns' => 'orders', 'products' => 'products', 'i
 <?php endif; ?>
 
 <?php if ($tab === 'promo') require __DIR__ . '/seller_promo.php'; ?>
+<?php if ($tab === 'support') require __DIR__ . '/seller_support.php'; ?>
 
 <?php if ($tab === 'returns'): ?>
   <p class="muted small" style="margin:0 0 14px">Select a case to see the details, reply, and read the history.</p>

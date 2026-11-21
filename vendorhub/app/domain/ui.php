@@ -306,7 +306,7 @@ function app_state(string $path, string $tab = ''): array
     $tab = $tab !== '' ? $tab : 'overview';
     if ($path === '/seller' || $path === '/') {
         $map = ['overview' => ['home', true, ''], 'insights' => ['insights', true, ''], 'sales' => ['orders', true, ''], 'returns' => ['orders', true, ''], 'products' => ['products', true, ''], 'inventory' => ['products', true, ''], 'promotions' => ['products', true, ''],
-            'settings' => ['settings', true, ''], 'payouts' => ['home', false, '/seller?tab=overview'], 'store' => ['settings', false, '/seller?tab=settings'], 'promo' => ['settings', false, '/seller?tab=settings']];
+            'settings' => ['settings', true, ''], 'payouts' => ['home', false, '/seller?tab=overview'], 'store' => ['settings', false, '/seller?tab=settings'], 'promo' => ['settings', false, '/seller?tab=settings'], 'support' => ['settings', false, '/seller?tab=settings']];
         [$a, $root, $back] = $map[$tab] ?? ['home', true, ''];
         return ['active' => $a, 'root' => $root, 'back' => $back];
     }

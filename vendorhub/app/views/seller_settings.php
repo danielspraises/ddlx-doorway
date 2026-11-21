@@ -30,11 +30,13 @@ $row = function (string $ic, string $title, string $sub, string $href, string $e
   <?= $row('mail', 'Messages', 'Talk to the DDLX team', '/messages', ($user['pending']['messages'] ?? 0) > 0 ? '<span class="badge-count">' . (int) $user['pending']['messages'] . '</span>' : '') ?>
   <?= $row('bell', 'Notifications', 'Orders, payouts and reviews', '/notifications', ($user['pending']['notifications'] ?? 0) > 0 ? '<span class="badge-count">' . (int) $user['pending']['notifications'] . '</span>' : '') ?>
   <?= $row('shield', 'Security', 'Password and two-step sign-in', '/account/security') ?>
+  <label class="srow" for="hide-bal"><span class="sr-ic"><?= icon('eye') ?></span><span class="grow"><strong>Hide balances</strong><span class="muted small">Blur amounts on Home</span></span><input type="checkbox" id="hide-bal" role="switch" data-hide-toggle><i class="sw" aria-hidden="true"></i></label>
   <button type="button" class="srow" data-lock-setup><span class="sr-ic"><?= icon('lock') ?></span><span class="grow"><strong>App lock</strong><span class="muted small" data-lock-state>Ask for a PIN when the app opens</span></span><span class="sr-go"><?= icon('chev') ?></span></button>
 </div>
 
 <p class="grp">Help</p>
 <div class="sgroup">
+  <?= $row('help', 'Support', 'Messages, returns and policies', '/seller?tab=support') ?>
   <?= $row('spark', 'Ask DDLX', 'Quick answers about selling', '/assistant') ?>
   <details class="sdet"><summary class="srow"><span class="sr-ic"><?= icon('doc') ?></span><span class="grow"><strong>Policies</strong><span class="muted small">Seller agreement, returns, prohibited items</span></span><span class="sr-go"><?= icon('chev') ?></span></summary>
     <div class="sdet-in"><?php foreach (LEGAL_DOCS as $k => $d) echo '<a class="srow sub" href="/' . e($k) . '"><span class="grow"><strong>' . e($d[0]) . '</strong></span><span class="sr-go">' . icon('chev') . '</span></a>'; ?></div></details>

@@ -13,10 +13,10 @@ $recent = array_slice(seller_sales($user['id'], 5), 0, 5);
 $oc = (int) ($user['pending']['returns'] ?? 0);
 ?>
 <section class="hero-wallet">
-  <div class="hw-top"><p class="hw-hello">Howdy, <strong><?= e($store) ?></strong><?= verified_tick($user['id']) ?></p><span class="hw-lv"><?= e(LEVEL_LABEL[$curLv]) ?></span></div>
+  <div class="hw-top"><p class="hw-hello">Howdy, <strong><?= e($store) ?></strong><?= verified_tick($user['id']) ?></p><span class="hw-lv"><?= e(LEVEL_LABEL[$curLv]) ?></span><button type="button" class="hw-eye" data-hide-bal aria-label="Hide balances" aria-pressed="false"><?= icon('eye') ?></button></div>
   <p class="hw-lab">Available balance</p>
-  <p class="hw-amt"><?= e(dash_money($bal['available'], $cur)) ?></p>
-  <p class="hw-sub">On hold <?= e(dash_money($bal['pending'], $cur)) ?> · Paid out <?= e(dash_money($dash['paid_out'], $cur)) ?></p>
+  <p class="hw-amt" data-bal><?= e(dash_money($bal['available'], $cur)) ?></p>
+  <p class="hw-sub" data-bal>On hold <?= e(dash_money($bal['pending'], $cur)) ?> · Paid out <?= e(dash_money($dash['paid_out'], $cur)) ?></p>
   <div class="hw-act"><a class="hbtn hbtn-solid" href="/seller?tab=payouts"><?= icon('wallet') ?> Withdraw</a><a class="hbtn" href="/products/edit"><?= icon('plus') ?> Add product</a></div>
 </section>
 

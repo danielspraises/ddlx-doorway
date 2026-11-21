@@ -235,7 +235,7 @@
       });
       var empty = box.querySelector('[data-fempty]'); if (empty) empty.hidden = shown !== 0;
       if (count) count.textContent = total ? (shown === total ? total + ' total' : shown + ' of ' + total) : '';
-      chips.forEach(function (c) { c.classList.toggle('btn-outline', c.getAttribute('data-fchip') !== chip); });
+      chips.forEach(function (c) { var on = c.getAttribute('data-fchip') === chip; c.classList.toggle('btn-outline', !on); c.classList.toggle('on', on); });
     }
     if (q) q.addEventListener('input', apply);
     if (sel) sel.addEventListener('change', apply);

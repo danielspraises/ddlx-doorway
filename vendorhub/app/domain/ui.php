@@ -156,6 +156,20 @@ function icon(string $name, string $class = ''): string
         'undo' => '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>',
         'mail' => '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>',
         'shield' => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
+        'home' => '<path d="m3 10.5 9-7.5 9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+        'bag' => '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+        'cog' => '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+        'chev' => '<path d="m9 6 6 6-6 6"/>',
+        'lock' => '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+        'close' => '<path d="M6 6l12 12M18 6 6 18"/>',
+        'back' => '<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>',
+        'plus' => '<path d="M12 5v14M5 12h14"/>',
+        'logout' => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+        'help' => '<circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4"/><path d="M12 17.5h.01"/>',
+        'doc' => '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/>',
+        'tag' => '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><path d="M7.5 7.5h.01"/>',
+        'download' => '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
+        'gift' => '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/>',
     ];
     return '<svg class="' . e($class) . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . ($p[$name] ?? '') . '</svg>';
 }
@@ -273,4 +287,40 @@ function case_modal(array $c, string $role, string $actions, string $history): s
         . '<section><h4>Details</h4><dl class="cd-grid">' . $grid . '</dl></section>'
         . ($actions !== '' ? '<section>' . $actions . '</section>' : '')
         . '<section><h4>History</h4>' . $history . '</section></div></dialog>';
+}
+
+
+// ---------- seller app shell ----------
+
+// The app layout (bottom tabs on phones, sidebar on desktop) is for verified sellers only. Admin and staff keep their own desk.
+function app_shell_on(?array $u): bool
+{
+    return $u !== null && empty($u['isAdmin']) && !($u['canReview'] ?? false) && empty($u['canOrders']) && empty($u['canMessages']) && ($u['stage'] ?? '') === 'verified';
+}
+
+const APP_TABS = ['home' => ['Home', '/seller?tab=overview', 'home'], 'orders' => ['Orders', '/seller?tab=sales', 'bag'], 'products' => ['Products', '/seller?tab=products', 'package'], 'insights' => ['Insights', '/seller?tab=insights', 'chart'], 'settings' => ['Settings', '/seller?tab=settings', 'cog']];
+
+// Where the current page sits: which bottom tab is lit, whether it is a tab's own page, and where the back arrow goes.
+function app_state(string $path, string $tab = ''): array
+{
+    $tab = $tab !== '' ? $tab : 'overview';
+    if ($path === '/seller' || $path === '/') {
+        $map = ['overview' => ['home', true, ''], 'insights' => ['insights', true, ''], 'sales' => ['orders', true, ''], 'returns' => ['orders', true, ''], 'products' => ['products', true, ''], 'inventory' => ['products', true, ''], 'promotions' => ['products', true, ''],
+            'settings' => ['settings', true, ''], 'payouts' => ['home', false, '/seller?tab=overview'], 'store' => ['settings', false, '/seller?tab=settings'], 'promo' => ['settings', false, '/seller?tab=settings']];
+        [$a, $root, $back] = $map[$tab] ?? ['home', true, ''];
+        return ['active' => $a, 'root' => $root, 'back' => $back];
+    }
+    if (str_starts_with($path, '/products')) return ['active' => 'products', 'root' => false, 'back' => '/seller?tab=products'];
+    if (str_starts_with($path, '/sales')) return ['active' => 'products', 'root' => false, 'back' => '/seller?tab=promotions'];
+    return ['active' => 'settings', 'root' => false, 'back' => '/seller?tab=settings'];
+}
+
+// Rounded switcher shown under a tab's title ("Items | Stock | Promotions").
+function app_pills(array $items, string $active): string
+{
+    $out = '<nav class="pills" aria-label="Sections">';
+    foreach ($items as $key => [$label, $href, $badge]) {
+        $out .= '<a href="' . e($href) . '" class="' . ($key === $active ? 'on' : '') . '"' . ($key === $active ? ' aria-current="page"' : '') . '>' . e($label) . ((int) $badge > 0 ? '<span class="badge-count">' . (int) $badge . '</span>' : '') . '</a>';
+    }
+    return $out . '</nav>';
 }

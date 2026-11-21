@@ -3,17 +3,22 @@ $user = current_user();
 $flashMsg = take_flash();
 $path = '/' . trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
 $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
+$app = app_shell_on($user);
+$as = $app ? app_state($path, (string) ($_GET['tab'] ?? '')) : ['active' => '', 'root' => true, 'back' => ''];
+$myStore = $app ? (inbox_store_name($user['id']) ?: (string) $user['email']) : '';
+$lockOn = $app && ($_COOKIE['vh_lock'] ?? '') === '1' && ($_COOKIE['vh_open'] ?? '') !== '1';
 ?><!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><?= e($pageTitle) ?> — Vendor Hub</title>
 <meta name="robots" content="noindex">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#0f1b2d">
+<meta name="theme-color" content="<?= $app && !($as['active'] === 'home' && $as['root']) ? '#f3f5f9' : '#0f1b2d' ?>">
+<meta name="color-scheme" content="light">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Vendor Hub"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vendor Hub"><meta name="apple-mobile-web-app-status-bar-style" content="<?= $app ? 'default' : 'black-translucent' ?>">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,7 +26,8 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="/assets/app.css?v=<?= (int) @filemtime(__DIR__ . "/../../public/assets/app.css") ?>">
 </head>
-<body data-csrf="<?= e(csrf_token()) ?>" <?= $user ? 'data-live="1"' : '' ?> <?= !empty($live_refresh) ? 'data-refresh="1"' : '' ?>>
+<body class="<?= $app ? 'app' . ($as['root'] ? ' app-root' : ' app-sub') . ($as['active'] === 'home' && $as['root'] ? ' app-home' : '') : '' ?>" data-csrf="<?= e(csrf_token()) ?>" <?= $app ? 'data-uid="' . e($user['id']) . '" data-who="' . e($myStore) . '"' : '' ?> <?= $user ? 'data-live="1"' : '' ?> <?= !empty($live_refresh) ? 'data-refresh="1"' : '' ?>>
+<?php if (!$app): ?>
 <header class="site-header">
   <div class="wrap bar">
     <a class="brand" href="<?= e($user ? home_path($user) : '/') ?>" aria-label="Vendor Hub home"><span class="brand-name">Vendor Hub<i>/</i></span><span class="brand-sub">for DDLX</span></a>
@@ -51,19 +57,81 @@ $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
     <?php endif; ?>
   </div>
 </header>
+<?php else: ?>
+<div class="app-wrap">
+<aside class="app-side" aria-label="Main">
+  <a class="app-logo" href="/seller?tab=overview" aria-label="Vendor Hub home"><span class="brand-name">Vendor Hub<i>/</i></span></a>
+  <nav class="app-nav">
+    <?php foreach (APP_TABS as $k => [$label, $href, $ic]): ?><a href="<?= e($href) ?>" class="<?= $as['active'] === $k ? 'on' : '' ?>"><?= icon($ic) ?><span><?= e($label) ?></span><?php if ($k === 'orders'): ?><span class="badge-count<?= ($user['pending']['returns'] ?? 0) > 0 ? '' : ' hidden' ?>" data-badge="Returns"><?= (int) ($user['pending']['returns'] ?? 0) ?></span><?php endif; ?></a><?php endforeach; ?>
+  </nav>
+  <div class="app-me"><span class="avatar"><?= e(strtoupper(substr($myStore, 0, 1))) ?></span><span class="who"><?= e($myStore) ?></span>
+    <form method="post" action="/logout"><?= csrf_field() ?><button type="submit" class="icon-btn" aria-label="Sign out" title="Sign out"><?= icon('logout') ?></button></form></div>
+</aside>
+<div class="app-col">
+<header class="app-top">
+  <?php if (!$as['root']): ?><a class="icon-btn app-back" href="<?= e($as['back']) ?>" data-back aria-label="Back"><?= icon('back') ?></a><strong class="app-ttl"><?= e($pageTitle) ?></strong>
+  <?php elseif ($as['active'] === 'home'): ?><button type="button" class="biz-chip" data-sheet="biz-sheet" aria-haspopup="dialog"><span class="avatar"><?= e(strtoupper(substr($myStore, 0, 1))) ?></span><span class="nm"><?= e($myStore) ?></span><?= icon('chev') ?></button>
+  <?php else: ?><a class="app-brand" href="/seller?tab=overview"><span class="brand-name">Vendor Hub<i>/</i></span></a><?php endif; ?>
+  <div class="app-ico">
+    <a class="icon-btn" href="/assistant" aria-label="Ask DDLX"><?= icon('spark') ?></a>
+    <a class="icon-btn" href="/messages" aria-label="Messages"><?= icon('mail') ?><span class="badge-count<?= ($user['pending']['messages'] ?? 0) > 0 ? '' : ' hidden' ?>" data-badge="Messages"><?= (int) ($user['pending']['messages'] ?? 0) ?></span></a>
+    <a class="icon-btn" href="/notifications" aria-label="Notifications"><?= icon('bell') ?><span class="badge-count<?= ($user['pending']['notifications'] ?? 0) > 0 ? '' : ' hidden' ?>" data-badge="Notifications"><?= (int) ($user['pending']['notifications'] ?? 0) ?></span></a>
+  </div>
+</header>
+<?php endif; ?>
 <?php if (!empty($user['viewAs'])): ?>
 <div class="viewas" role="status"><div class="wrap"><span><?= icon('eye') ?> Viewing <strong><?= e(inbox_store_name($user['id']) ?: $user['email']) ?></strong> as the seller sees it. Read-only.</span>
   <form method="post" action="/view-as/exit"><?= csrf_field() ?><button class="btn btn-sm" type="submit">Exit view</button></form></div></div>
 <?php endif; ?>
 <?php if ($flashMsg): ?><div class="wrap"><p class="flash <?= e($flashMsg['k'] === 'error' ? 'flash-error' : 'flash-ok') ?>" role="status"><?= e($flashMsg['m']) ?></p></div><?php endif; ?>
 <?php if (!empty($user) && empty($user['twofa']) && ($user['isAdmin'] || $user['canReview'] || $user['canOrders'] || $user['canMessages']) && ($_SERVER['REQUEST_URI'] ?? '') !== '/account/security'): ?><div class="wrap"><p class="flash flash-error" role="status">Your account can approve products and money. Protect it with <a href="/account/security">two-step sign-in</a>.</p></div><?php endif; ?>
-<main class="<?= !empty($full) ? '' : 'wrap main' ?>" id="main"><?= $content ?></main>
+<main class="<?= !empty($full) ? '' : ($app ? 'app-main' : 'wrap main') ?>" id="main"><?= $content ?></main>
+<?php if ($app): ?>
+</div>
+</div>
+<dialog class="sheet" id="biz-sheet" aria-label="Your business">
+  <div class="sheet-h"><strong>Your business</strong><button type="button" class="icon-btn" data-sheet-close aria-label="Close"><?= icon('close') ?></button></div>
+  <div class="sheet-b">
+    <div class="biz-row on"><span class="avatar"><?= e(strtoupper(substr($myStore, 0, 1))) ?></span><span class="grow"><strong><?= e($myStore) ?></strong><span class="muted small">Selling on DDLX</span></span><span class="chip-s ok">Verified</span></div>
+    <div class="biz-row off"><span class="avatar"><?= icon('plus') ?></span><span class="grow"><strong>Add another business</strong><span class="muted small">More outlets are coming</span></span><span class="chip-s">Soon</span></div>
+    <a class="srow" href="/seller?tab=store"><span class="sr-ic"><?= icon('store') ?></span><span class="grow"><strong>Store profile</strong></span><span class="sr-go"><?= icon('chev') ?></span></a>
+    <a class="srow" href="/account/security"><span class="sr-ic"><?= icon('shield') ?></span><span class="grow"><strong>Security</strong></span><span class="sr-go"><?= icon('chev') ?></span></a>
+    <button type="button" class="srow" data-lock-setup><span class="sr-ic"><?= icon('lock') ?></span><span class="grow"><strong>App lock</strong><span class="muted small" data-lock-state>Ask for a PIN when the app opens</span></span><span class="sr-go"><?= icon('chev') ?></span></button>
+    <form method="post" action="/logout"><?= csrf_field() ?><button type="submit" class="srow danger"><span class="sr-ic"><?= icon('logout') ?></span><span class="grow"><strong>Log out</strong></span></button></form>
+  </div>
+</dialog>
+<dialog class="sheet" id="lock-sheet" aria-label="App lock">
+  <div class="sheet-h"><strong>App lock</strong><button type="button" class="icon-btn" data-sheet-close aria-label="Close"><?= icon('close') ?></button></div>
+  <div class="sheet-b">
+    <p class="muted small">Asks for a 4-digit PIN each time the app opens or comes back after a minute away. It protects this phone only. Your password still signs you in.</p>
+    <label class="lk-f"><span>New PIN</span><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" data-lk-pin></label>
+    <label class="lk-f"><span>Repeat PIN</span><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" data-lk-pin2></label>
+    <label class="lk-bio hidden" data-lk-biorow><input type="checkbox" data-lk-bio> <span>Also unlock with fingerprint or face</span></label>
+    <p class="lk-err hidden" data-lk-err></p>
+    <button type="button" class="btn" data-lk-save>Turn on</button>
+    <button type="button" class="btn btn-outline hidden" data-lk-off>Turn off</button>
+  </div>
+</dialog>
+<div class="lock<?= $lockOn ? ' on' : '' ?>" id="lock" role="dialog" aria-modal="true" aria-label="Unlock" <?= $lockOn ? '' : 'hidden' ?>>
+  <span class="lock-logo"><?= e(strtoupper(substr($myStore, 0, 1))) ?></span><strong class="lock-t">Enter your PIN</strong><span class="muted lock-s"><?= e($myStore) ?></span>
+  <div class="lock-dots" data-lock-dots><i></i><i></i><i></i><i></i></div>
+  <p class="lk-err" data-lock-err></p>
+  <div class="lock-pad" data-lock-pad></div>
+  <button type="button" class="lock-alt hidden" data-lock-bio>Use fingerprint or face</button>
+  <form method="post" action="/logout" class="lock-out"><?= csrf_field() ?><button type="submit">Forgot PIN? Sign out</button></form>
+</div>
+<nav class="app-tabs" aria-label="Main">
+  <?php foreach (APP_TABS as $k => [$label, $href, $ic]): ?><a href="<?= e($href) ?>" class="<?= $as['active'] === $k ? 'on' : '' ?>"<?= $as['active'] === $k ? ' aria-current="page"' : '' ?>><span class="ti"><?= icon($ic) ?><?php if ($k === 'orders'): ?><span class="badge-count<?= ($user['pending']['returns'] ?? 0) > 0 ? '' : ' hidden' ?>" data-badge="Returns"><?= (int) ($user['pending']['returns'] ?? 0) ?></span><?php endif; ?></span><span class="tl"><?= e($label) ?></span></a><?php endforeach; ?>
+</nav>
+<?php else: ?>
 <footer class="site-footer"><div class="wrap"><strong>DDLX</strong><nav class="foot-links" aria-label="Legal"><?php foreach (LEGAL_DOCS as $k => $d): ?><a href="/<?= e($k) ?>"><?= e($d[0]) ?></a><?php endforeach; ?></nav><a href="https://ddlx.shop" target="_blank" rel="noopener">Marketplace <?= icon('arrow-up-right') ?></a></div></footer>
+<?php endif; ?>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <dialog id="preview-dialog"><div class="dlg-head"><strong data-dlg-title>Document</strong><button class="btn btn-sm btn-outline" type="button" data-dlg-close>Close</button></div><div class="dlg-body"></div></dialog>
 <script src="/assets/app.js?v=<?= (int) @filemtime(__DIR__ . "/../../public/assets/app.js") ?>" defer></script>
 <script src="/assets/pwa.js" defer></script>
 <script src="/assets/help.js?v=1" defer></script>
+<?php if ($app): ?><script src="/assets/appfeel.js?v=<?= (int) @filemtime(__DIR__ . "/../../public/assets/appfeel.js") ?>" defer></script><?php endif; ?>
 <?php if ($user): ?><script src="/assets/native.js?v=1" defer></script><?php endif; ?>
 <?php foreach (($scripts ?? []) as $src): ?><script src="/assets/<?= e($src) ?>?v=<?= (int) @filemtime(__DIR__ . "/../../public/assets/" . basename($src)) ?>" defer></script>
 <?php endforeach; ?>

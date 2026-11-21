@@ -1,21 +1,22 @@
 <?php
 declare(strict_types=1);
 
-const SELLER_TABS = ['overview' => 'Overview', 'products' => 'Products', 'inventory' => 'Inventory', 'sales' => 'Sales', 'promotions' => 'Promotions', 'returns' => 'Returns', 'payouts' => 'Payouts', 'promo' => 'Promo kit', 'store' => 'Store'];
+const SELLER_TABS = ['overview' => 'Home', 'sales' => 'Orders', 'returns' => 'Returns', 'products' => 'Products', 'inventory' => 'Stock', 'promotions' => 'Promotions', 'insights' => 'Insights', 'payouts' => 'Wallet', 'promo' => 'Promo kit', 'store' => 'Store profile', 'settings' => 'Settings'];
 
 route('GET', '/seller', function () {
     $u = require_seller();
     $tab = array_key_exists(input('tab'), SELLER_TABS) ? input('tab') : 'overview';
-    $vars = ['title' => SELLER_TABS[$tab], 'tab' => $tab, 'user' => $u, 'live_refresh' => in_array($tab, ['overview', 'sales', 'payouts', 'products', 'inventory', 'returns'], true)];
-    if (in_array($tab, ['overview', 'products', 'inventory'], true)) $vars['products'] = seller_products($u['id']);
-    if ($tab === 'overview') { $vars['level'] = level_refresh($u['id']); $vars['lm'] = jdec((string) $vars['level']['metrics'], []); $vars['rating'] = seller_rating_summary($u['id']); $vars['dash'] = dash_data($u['id'], input('range') ?: '30d', input('cur'), input('m') ?: 'net'); $vars['to_process'] = seller_to_process($u['id']); }
-    if (in_array($tab, ['overview', 'sales', 'payouts'], true)) { $vars['balances'] = wallet_balances($u['id']); $vars['month'] = sales_last_30d($u['id']); }
+    $vars = ['title' => SELLER_TABS[$tab], 'tab' => $tab, 'user' => $u, 'live_refresh' => in_array($tab, ['overview', 'insights', 'sales', 'payouts', 'products', 'inventory', 'returns'], true)];
+    if (in_array($tab, ['overview', 'insights', 'products', 'inventory'], true)) $vars['products'] = seller_products($u['id']);
+    if (in_array($tab, ['overview', 'insights'], true)) { $vars['level'] = level_refresh($u['id']); $vars['lm'] = jdec((string) $vars['level']['metrics'], []); $vars['rating'] = seller_rating_summary($u['id']); $vars['dash'] = dash_data($u['id'], input('range') ?: ($tab === 'overview' ? '7d' : '30d'), input('cur'), input('m') ?: 'net'); $vars['to_process'] = seller_to_process($u['id']); }
+    if (in_array($tab, ['overview', 'insights', 'sales', 'payouts'], true)) { $vars['balances'] = wallet_balances($u['id']); $vars['month'] = sales_last_30d($u['id']); }
     if ($tab === 'sales') { $vars['sales'] = seller_sales($u['id']); $vars['history'] = item_history(array_column($vars['sales'], 'id')); }
     if ($tab === 'store') $vars['scripts'] = ['upload.js'];
     if ($tab === 'payouts') { $vars['scripts'] = ['bank.js']; $vars['banks'] = bank_options(); $vars['verify'] = paystack_on(); $vars['accounts'] = bank_accounts($u['id']); $vars['withdrawals'] = seller_withdrawals($u['id']); }
     if ($tab === 'returns') { $vars['cases'] = seller_returns($u['id']); $vars['events'] = return_events_map(array_column($vars['cases'], 'id')); }
     if ($tab === 'promotions') { $vars['coupons'] = coupons_for_seller($u['id']); $vars['all_products'] = array_values(array_filter(seller_products($u['id']), fn ($p) => $p['status'] !== 'draft' || $p['live'])); $vars['pview'] = in_array(input('v'), ['sales', 'codes'], true) ? input('v') : (input('edit') !== '' ? 'codes' : 'sales'); $vars['edit'] = null; foreach ($vars['coupons'] as $c) if ($c['id'] === input('edit')) $vars['edit'] = $c; $vars['err'] = null; }
-    if ($tab === 'store') $vars['store'] = store_profile($u['id']);
+    if (in_array($tab, ['store', 'settings'], true)) $vars['store'] = store_profile($u['id']);
+    if ($tab === 'settings') { $vars['rating'] = seller_rating_summary($u['id']); $vars['level'] = level_refresh($u['id']); }
     if ($tab === 'promo') { $vars['share'] = share_row($u['id']); $vars['assets'] = promo_for_seller($u['id']); $vars['ref'] = referral_stats($u['id']); $vars['scripts'] = ['promo.js']; }
     render('seller', $vars);
 });

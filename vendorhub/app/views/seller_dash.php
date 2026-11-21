@@ -1,7 +1,7 @@
 <?php
 /** @var array $dash @var array $user @var array $products @var array $balances @var array $level @var array $rating */
 $cur = $dash['currency'];
-$q = fn (array $o) => '/seller?' . http_build_query(array_merge(['tab' => 'overview', 'range' => $dash['range'], 'cur' => $cur, 'm' => $dash['metric']], $o));
+$q = fn (array $o) => '/seller?' . http_build_query(array_merge(['tab' => 'insights', 'range' => $dash['range'], 'cur' => $cur, 'm' => $dash['metric']], $o));
 $n = $dash['now']; $b = $dash['before'];
 $bal = current(array_filter($balances, fn ($x) => $x['currency'] === $cur)) ?: ['available' => 0.0, 'pending' => 0.0, 'total' => 0.0];
 $balTotal = max(0.01, $bal['available'] + $bal['pending'] + $dash['paid_out']);
@@ -21,13 +21,8 @@ $catTotal = array_sum(array_column($dash['categories'], 'value'));
 $recent = array_slice(seller_sales($user['id'], 6), 0, 6);
 $pipe = $dash['pipeline'];
 ?>
-<?php if (!empty($level['below_since']) && !$level['override_level']): $pol = level_policy(); ?>
-  <p class="notice" style="margin-top:18px"><strong>Your <?= e(LEVEL_LABEL[$curLv]) ?> level is at risk.</strong> <?= $pol['mode'] === 'grace' ? 'Meet its requirements again by ' . e(human_date(db_plus('+' . $pol['grace_days'] . ' days', $level['below_since']), false)) . ' to keep it.' : 'You no longer meet its requirements.' ?></p>
-<?php endif; ?>
-<?php if (!empty($to_process)): ?><p class="notice" style="margin-top:18px"><strong><?= (int) $to_process ?> order<?= $to_process === 1 ? '' : 's' ?> to pack.</strong> <a href="/seller?tab=sales">Open Sales</a> to start processing and mark them ready for shipping.</p><?php endif; ?>
-
+<h1 class="app-h1">Insights</h1>
 <div class="dtop">
-  <p class="dhello">Howdy, <strong><?= e($store) ?></strong></p>
   <div class="row dtools">
     <nav class="tabs" aria-label="Period" style="margin:0"><?php foreach (DASH_RANGES as $k => $l): ?><a href="<?= e($q(['range' => $k])) ?>" class="<?= $k === $dash['range'] ? 'active' : '' ?>"><?= e($l) ?></a><?php endforeach; ?></nav>
     <?php if (count($dash['currencies']) > 1): ?><nav class="tabs" aria-label="Currency" style="margin:0"><?php foreach ($dash['currencies'] as $c): ?><a href="<?= e($q(['cur' => $c])) ?>" class="<?= $c === $cur ? 'active' : '' ?>"><?= e($c) ?></a><?php endforeach; ?></nav><?php endif; ?>

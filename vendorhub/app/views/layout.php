@@ -64,6 +64,7 @@ $lockOn = $app && ($_COOKIE['vh_lock'] ?? '') === '1' && ($_COOKIE['vh_open'] ??
   <nav class="app-nav">
     <?php foreach (APP_TABS as $k => [$label, $href, $ic]): ?><a href="<?= e($href) ?>" class="<?= $as['active'] === $k ? 'on' : '' ?>"><?= icon($ic) ?><span><?= e($label) ?></span><?php if ($k === 'orders'): ?><span class="badge-count<?= ($user['pending']['returns'] ?? 0) > 0 ? '' : ' hidden' ?>" data-badge="Returns"><?= (int) ($user['pending']['returns'] ?? 0) ?></span><?php endif; ?></a><?php endforeach; ?>
   </nav>
+  <?php if (app_desk_link($user) !== ''): ?><a class="app-desk" href="<?= e(app_desk_link($user)) ?>"><?= icon('cog') ?><span>Admin desk</span></a><?php endif; ?>
   <div class="app-me"><span class="avatar"><?= e(strtoupper(substr($myStore, 0, 1))) ?></span><span class="who"><?= e($myStore) ?></span>
     <form method="post" action="/logout"><?= csrf_field() ?><button type="submit" class="icon-btn" aria-label="Sign out" title="Sign out"><?= icon('logout') ?></button></form></div>
 </aside>
@@ -94,6 +95,7 @@ $lockOn = $app && ($_COOKIE['vh_lock'] ?? '') === '1' && ($_COOKIE['vh_open'] ??
   <div class="sheet-b">
     <div class="biz-row on"><span class="avatar"><?= e(strtoupper(substr($myStore, 0, 1))) ?></span><span class="grow"><strong><?= e($myStore) ?></strong><span class="muted small">Selling on DDLX</span></span><span class="chip-s ok">Verified</span></div>
     <div class="biz-row off"><span class="avatar"><?= icon('plus') ?></span><span class="grow"><strong>Add another business</strong><span class="muted small">More outlets are coming</span></span><span class="chip-s">Soon</span></div>
+    <?php if (app_desk_link($user) !== ''): ?><a class="srow" href="<?= e(app_desk_link($user)) ?>"><span class="sr-ic"><?= icon('cog') ?></span><span class="grow"><strong>Admin desk</strong></span><span class="sr-go"><?= icon('chev') ?></span></a><?php endif; ?>
     <a class="srow" href="/seller?tab=store"><span class="sr-ic"><?= icon('store') ?></span><span class="grow"><strong>Store profile</strong></span><span class="sr-go"><?= icon('chev') ?></span></a>
     <a class="srow" href="/account/security"><span class="sr-ic"><?= icon('shield') ?></span><span class="grow"><strong>Security</strong></span><span class="sr-go"><?= icon('chev') ?></span></a>
     <button type="button" class="srow" data-lock-setup><span class="sr-ic"><?= icon('lock') ?></span><span class="grow"><strong>App lock</strong><span class="muted small" data-lock-state>Ask for a PIN when the app opens</span></span><span class="sr-go"><?= icon('chev') ?></span></button>

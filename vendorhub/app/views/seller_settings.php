@@ -17,6 +17,7 @@ $row = function (string $ic, string $title, string $sub, string $href, string $e
 
 <p class="grp">Business</p>
 <div class="sgroup">
+  <?php if (app_desk_link($user) !== '') echo $row('cog', 'Admin desk', 'Back to DDLX admin', app_desk_link($user)); ?>
   <?= $row('store', 'Store profile', 'Logo, banner, about and policies', '/seller?tab=store') ?>
   <?= $row('wallet', 'Wallet and bank accounts', 'Withdraw, add a bank account, history', '/seller?tab=payouts') ?>
   <?= $row('undo', 'Returns', 'Cases that need your reply', '/seller?tab=returns', $pendRet > 0 ? '<span class="badge-count">' . $pendRet . '</span>' : '') ?>

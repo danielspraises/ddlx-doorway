@@ -292,10 +292,19 @@ function case_modal(array $c, string $role, string $actions, string $history): s
 
 // ---------- seller app shell ----------
 
-// The app layout (bottom tabs on phones, sidebar on desktop) is for verified sellers only. Admin and staff keep their own desk.
+// The app layout (bottom tabs on phones, sidebar on desktop) is for verified sellers, including admins and staff who also sell.
+// The admin desk itself keeps its own header and tabs.
 function app_shell_on(?array $u): bool
 {
-    return $u !== null && empty($u['isAdmin']) && !($u['canReview'] ?? false) && empty($u['canOrders']) && empty($u['canMessages']) && ($u['stage'] ?? '') === 'verified';
+    if ($u === null || ($u['stage'] ?? '') !== 'verified') return false;
+    $path = '/' . trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
+    return !str_starts_with($path, '/admin');
+}
+
+// Admins and staff who sell too need a way back to their desk from inside the app.
+function app_desk_link(array $u): string
+{
+    return !empty($u['isAdmin']) || !empty($u['canReview']) || !empty($u['canOrders']) || !empty($u['canMessages']) ? '/admin' : '';
 }
 
 const APP_TABS = ['home' => ['Home', '/seller?tab=overview', 'home'], 'orders' => ['Orders', '/seller?tab=sales', 'bag'], 'products' => ['Products', '/seller?tab=products', 'package'], 'insights' => ['Insights', '/seller?tab=insights', 'chart'], 'settings' => ['Settings', '/seller?tab=settings', 'cog']];

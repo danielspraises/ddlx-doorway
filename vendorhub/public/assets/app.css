@@ -1110,3 +1110,7 @@ body.bal-off [data-bal]{filter:blur(9px);user-select:none;transition:filter .15s
 .sup-card .sr-ic{background:rgba(255,255,255,.14);color:#fff}
 .sup-card .sr-go{color:#fff}
 .sup-card strong,.sup-card .grow>*{display:block}
+.app-desk{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:13px;text-decoration:none;color:var(--muted);font-weight:650}
+.app-desk svg{width:20px;height:20px}
+.app-desk:hover{background:var(--soft);color:var(--ink)}
+@media (min-width:900px){body.app .biz-chip{display:none}}

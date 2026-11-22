@@ -3,9 +3,14 @@ $user = current_user();
 $flashMsg = take_flash();
 $path = '/' . trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
 $current = $path . (isset($_GET['tab']) ? '?tab=' . $_GET['tab'] : '');
-$app = app_shell_on($user);
-$as = $app ? app_state($path, (string) ($_GET['tab'] ?? '')) : ['active' => '', 'root' => true, 'back' => ''];
-$myStore = $app ? (inbox_store_name($user['id']) ?: (string) $user['email']) : '';
+$mode = app_mode($user);
+$app = $mode !== '';
+$desk = $mode === 'desk';
+$as = $app ? app_state($path, (string) ($_GET['tab'] ?? ''), $user) : ['active' => '', 'root' => true, 'back' => ''];
+$tabsDef = $app ? app_tabs($user) : [];
+$homeHref = $desk ? desk_home($user) : '/seller?tab=overview';
+$myStore = $app ? ($desk ? (string) $user['email'] : (inbox_store_name($user['id']) ?: (string) $user['email'])) : '';
+$deskTag = $desk ? (!empty($user['isAdmin']) ? 'Admin' : 'Staff') : '';
 $lockOn = $app && ($_COOKIE['vh_lock'] ?? '') === '1' && ($_COOKIE['vh_open'] ?? '') !== '1';
 ?><!doctype html>
 <html lang="en">
@@ -26,7 +31,7 @@ $lockOn = $app && ($_COOKIE['vh_lock'] ?? '') === '1' && ($_COOKIE['vh_open'] ??
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="/assets/app.css?v=<?= (int) @filemtime(__DIR__ . "/../../public/assets/app.css") ?>">
 </head>
-<body class="<?= $app ? 'app' . ($as['root'] ? ' app-root' : ' app-sub') . ($as['active'] === 'home' && $as['root'] ? ' app-home' : '') : '' ?>" data-csrf="<?= e(csrf_token()) ?>" <?= $app ? 'data-uid="' . e($user['id']) . '" data-who="' . e($myStore) . '"' : '' ?> <?= $user ? 'data-live="1"' : '' ?> <?= !empty($live_refresh) ? 'data-refresh="1"' : '' ?>>
+<body class="<?= $app ? 'app' . ($as['root'] ? ' app-root' : ' app-sub') . ($as['active'] === 'home' && $as['root'] ? ' app-home' : '') . ($desk ? ' app-desk-mode' : '') : '' ?>" data-shell="<?= e($mode) ?>" data-csrf="<?= e(csrf_token()) ?>" <?= $app ? 'data-uid="' . e($user['id']) . '" data-who="' . e($myStore) . '"' : '' ?> <?= $user ? 'data-live="1"' : '' ?> <?= !empty($live_refresh) ? 'data-refresh="1"' : '' ?>>
 <?php if (!$app): ?>
 <header class="site-header">
   <div class="wrap bar">
@@ -60,19 +65,21 @@ $lockOn = $app && ($_COOKIE['vh_lock'] ?? '') === '1' && ($_COOKIE['vh_open'] ??
 <?php else: ?>
 <div class="app-wrap">
 <aside class="app-side" aria-label="Main">
-  <a class="app-logo" href="/seller?tab=overview" aria-label="Vendor Hub home"><span class="brand-name">Vendor Hub<i>/</i></span></a>
+  <a class="app-logo" href="<?= e($homeHref) ?>" aria-label="Vendor Hub home"><span class="brand-name">Vendor Hub<i>/</i></span></a>
   <nav class="app-nav">
-    <?php foreach (APP_TABS as $k => [$label, $href, $ic]): ?><a href="<?= e($href) ?>" class="<?= $as['active'] === $k ? 'on' : '' ?>"><?= icon($ic) ?><span><?= e($label) ?></span><?php if ($k === 'orders'): ?><span class="badge-count<?= ($user['pending']['returns'] ?? 0) > 0 ? '' : ' hidden' ?>" data-badge="Returns"><?= (int) ($user['pending']['returns'] ?? 0) ?></span><?php endif; ?></a><?php endforeach; ?>
+    <?php foreach ($tabsDef as $k => [$label, $href, $ic]): $bk = $desk ? ['reviews' => 'Reviews', 'orders' => 'Orders'][$k] ?? '' : ($k === 'orders' ? 'Returns' : '');
+        $bn = $desk ? ($k === 'reviews' ? (int) (($user['pending']['applications'] ?? 0) + ($user['pending']['verifications'] ?? 0) + ($user['pending']['products'] ?? 0)) : ($k === 'orders' ? (int) (($user['pending']['orders'] ?? 0) + ($user['pending']['returns'] ?? 0)) : 0)) : ($k === 'orders' ? (int) ($user['pending']['returns'] ?? 0) : 0);
+        if ($href === ''): ?><button type="button" class="<?= $as['active'] === $k ? 'on' : '' ?>" data-sheet="more-sheet" aria-haspopup="dialog"><?= icon($ic) ?><span><?= e($label) ?></span></button><?php else: ?><a href="<?= e($href) ?>" class="<?= $as['active'] === $k ? 'on' : '' ?>"><?= icon($ic) ?><span><?= e($label) ?></span><?php if ($bk !== ''): ?><span class="badge-count<?= $bn > 0 ? '' : ' hidden' ?>" data-badge="<?= e($bk) ?>"><?= $bn ?></span><?php endif; ?></a><?php endif; ?><?php endforeach; ?>
   </nav>
-  <?php if (app_desk_link($user) !== ''): ?><a class="app-desk" href="<?= e(app_desk_link($user)) ?>"><?= icon('cog') ?><span>Admin desk</span></a><?php endif; ?>
+  <?php if (!$desk && app_desk_link($user) !== ''): ?><a class="app-desk" href="<?= e(app_desk_link($user)) ?>"><?= icon('cog') ?><span>Admin desk</span></a><?php endif; ?>
   <div class="app-me"><span class="avatar"><?= e(strtoupper(substr($myStore, 0, 1))) ?></span><span class="who"><?= e($myStore) ?></span>
     <form method="post" action="/logout"><?= csrf_field() ?><button type="submit" class="icon-btn" aria-label="Sign out" title="Sign out"><?= icon('logout') ?></button></form></div>
 </aside>
 <div class="app-col">
 <header class="app-top">
   <?php if (!$as['root']): ?><a class="icon-btn app-back" href="<?= e($as['back']) ?>" data-back aria-label="Back"><?= icon('back') ?></a><strong class="app-ttl"><?= e($pageTitle) ?></strong>
-  <?php elseif ($as['active'] === 'home'): ?><button type="button" class="biz-chip" data-sheet="biz-sheet" aria-haspopup="dialog"><span class="avatar"><?= e(strtoupper(substr($myStore, 0, 1))) ?></span><span class="nm"><?= e($myStore) ?></span><?= icon('chev') ?></button>
-  <?php else: ?><a class="app-brand" href="/seller?tab=overview"><span class="brand-name">Vendor Hub<i>/</i></span></a><?php endif; ?>
+  <?php elseif ($as['active'] === 'home' && !$desk): ?><button type="button" class="biz-chip" data-sheet="biz-sheet" aria-haspopup="dialog"><span class="avatar"><?= e(strtoupper(substr($myStore, 0, 1))) ?></span><span class="nm"><?= e($myStore) ?></span><?= icon('chev') ?></button>
+  <?php else: ?><a class="app-brand" href="<?= e($homeHref) ?>"><span class="brand-name">Vendor Hub<i>/</i></span><?php if ($desk): ?><span class="desk-tag"><?= e($deskTag) ?></span><?php endif; ?></a><?php endif; ?>
   <div class="app-ico">
     <a class="icon-btn" href="/assistant" aria-label="Ask DDLX"><?= icon('spark') ?></a>
     <a class="icon-btn" href="/messages" aria-label="Messages"><?= icon('mail') ?><span class="badge-count<?= ($user['pending']['messages'] ?? 0) > 0 ? '' : ' hidden' ?>" data-badge="Messages"><?= (int) ($user['pending']['messages'] ?? 0) ?></span></a>
@@ -91,6 +98,19 @@ $lockOn = $app && ($_COOKIE['vh_lock'] ?? '') === '1' && ($_COOKIE['vh_open'] ??
 <?php if ($app): ?>
 </div>
 </div>
+<?php if ($desk): ?>
+<dialog class="sheet" id="more-sheet" aria-label="More">
+  <div class="sheet-h"><strong>More</strong><button type="button" class="icon-btn" data-sheet-close aria-label="Close"><?= icon('close') ?></button></div>
+  <div class="sheet-b">
+    <div class="biz-row on"><span class="avatar"><?= e(strtoupper(substr($myStore, 0, 1))) ?></span><span class="grow"><strong><?= e($myStore) ?></strong><span class="muted small"><?= e($deskTag) ?></span></span></div>
+    <?php foreach (desk_more($user) as [$ml, $mh, $mi, $mb]): $mn = $mb !== '' ? (int) ($user['pending'][$mb] ?? 0) : 0; ?><a class="srow" href="<?= e($mh) ?>"><span class="sr-ic"><?= icon($mi) ?></span><span class="grow"><strong><?= e($ml) ?></strong></span><?php if ($mn > 0): ?><span class="badge-count"><?= $mn ?></span><?php endif; ?><span class="sr-go"><?= icon('chev') ?></span></a><?php endforeach; ?>
+    <?php if (($user['stage'] ?? '') === 'verified'): ?><a class="srow" href="/seller?tab=overview" data-nonav><span class="sr-ic"><?= icon('store') ?></span><span class="grow"><strong>Seller view</strong></span><span class="sr-go"><?= icon('chev') ?></span></a><?php endif; ?>
+    <a class="srow" href="/account/security"><span class="sr-ic"><?= icon('shield') ?></span><span class="grow"><strong>Security</strong></span><span class="sr-go"><?= icon('chev') ?></span></a>
+    <button type="button" class="srow" data-lock-setup><span class="sr-ic"><?= icon('lock') ?></span><span class="grow"><strong>App lock</strong><span class="muted small" data-lock-state></span></span><span class="sr-go"><?= icon('chev') ?></span></button>
+    <form method="post" action="/logout"><?= csrf_field() ?><button type="submit" class="srow danger"><span class="sr-ic"><?= icon('logout') ?></span><span class="grow"><strong>Log out</strong></span></button></form>
+  </div>
+</dialog>
+<?php else: ?>
 <dialog class="sheet" id="biz-sheet" aria-label="Your business">
   <div class="sheet-h"><strong>Your business</strong><button type="button" class="icon-btn" data-sheet-close aria-label="Close"><?= icon('close') ?></button></div>
   <div class="sheet-b">
@@ -103,6 +123,7 @@ $lockOn = $app && ($_COOKIE['vh_lock'] ?? '') === '1' && ($_COOKIE['vh_open'] ??
     <form method="post" action="/logout"><?= csrf_field() ?><button type="submit" class="srow danger"><span class="sr-ic"><?= icon('logout') ?></span><span class="grow"><strong>Log out</strong></span></button></form>
   </div>
 </dialog>
+<?php endif; ?>
 <dialog class="sheet" id="lock-sheet" aria-label="App lock">
   <div class="sheet-h"><strong>App lock</strong><button type="button" class="icon-btn" data-sheet-close aria-label="Close"><?= icon('close') ?></button></div>
   <div class="sheet-b">
@@ -123,7 +144,10 @@ $lockOn = $app && ($_COOKIE['vh_lock'] ?? '') === '1' && ($_COOKIE['vh_open'] ??
   <form method="post" action="/logout" class="lock-out"><?= csrf_field() ?><button type="submit">Forgot PIN? Sign out</button></form>
 </div>
 <nav class="app-tabs" aria-label="Main">
-  <?php foreach (APP_TABS as $k => [$label, $href, $ic]): ?><a href="<?= e($href) ?>" class="<?= $as['active'] === $k ? 'on' : '' ?>"<?= $as['active'] === $k ? ' aria-current="page"' : '' ?>><span class="ti"><?= icon($ic) ?><?php if ($k === 'orders'): ?><span class="badge-count<?= ($user['pending']['returns'] ?? 0) > 0 ? '' : ' hidden' ?>" data-badge="Returns"><?= (int) ($user['pending']['returns'] ?? 0) ?></span><?php endif; ?></span><span class="tl"><?= e($label) ?></span></a><?php endforeach; ?>
+  <?php foreach ($tabsDef as $k => [$label, $href, $ic]): $bk = $desk ? ['reviews' => 'Reviews', 'orders' => 'Orders'][$k] ?? '' : ($k === 'orders' ? 'Returns' : '');
+      $bn = $desk ? ($k === 'reviews' ? (int) (($user['pending']['applications'] ?? 0) + ($user['pending']['verifications'] ?? 0) + ($user['pending']['products'] ?? 0)) : ($k === 'orders' ? (int) (($user['pending']['orders'] ?? 0) + ($user['pending']['returns'] ?? 0)) : 0)) : ($k === 'orders' ? (int) ($user['pending']['returns'] ?? 0) : 0);
+      $inner = '<span class="ti">' . icon($ic) . ($bk !== '' ? '<span class="badge-count' . ($bn > 0 ? '' : ' hidden') . '" data-badge="' . e($bk) . '">' . $bn . '</span>' : '') . '</span><span class="tl">' . e($label) . '</span>';
+      if ($href === ''): ?><button type="button" class="<?= $as['active'] === $k ? 'on' : '' ?>" data-sheet="more-sheet" aria-haspopup="dialog"><?= $inner ?></button><?php else: ?><a href="<?= e($href) ?>" class="<?= $as['active'] === $k ? 'on' : '' ?>"<?= $as['active'] === $k ? ' aria-current="page"' : '' ?>><?= $inner ?></a><?php endif; ?><?php endforeach; ?>
 </nav>
 <?php else: ?>
 <footer class="site-footer"><div class="wrap"><strong>DDLX</strong><nav class="foot-links" aria-label="Legal"><?php foreach (LEGAL_DOCS as $k => $d): ?><a href="/<?= e($k) ?>"><?= e($d[0]) ?></a><?php endforeach; ?></nav><a href="https://ddlx.shop" target="_blank" rel="noopener">Marketplace <?= icon('arrow-up-right') ?></a></div></footer>

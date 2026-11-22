@@ -20,14 +20,28 @@ $queue = [
 ];
 $open = array_sum(array_column($queue, 1));
 ?>
-<div class="dtop">
-  <p class="dhello">Howdy, <strong>boss</strong></p>
-  <div class="row dtools">
-    <nav class="tabs" aria-label="Period" style="margin:0"><?php foreach (DASH_RANGES as $k => $l): ?><a href="<?= e($q(['range' => $k])) ?>" class="<?= $k === $dash['range'] ? 'active' : '' ?>"><?= e($l) ?></a><?php endforeach; ?></nav>
-    <?php if (count($dash['currencies']) > 1): ?><nav class="tabs" aria-label="Currency" style="margin:0"><?php foreach ($dash['currencies'] as $c): ?><a href="<?= e($q(['cur' => $c])) ?>" class="<?= $c === $cur ? 'active' : '' ?>"><?= e($c) ?></a><?php endforeach; ?></nav><?php endif; ?>
-    <a class="btn btn-outline btn-sm" href="/admin/export?kind=commission&amp;from=<?= e($exportFrom) ?>&amp;to=<?= e($exportTo) ?>">Export commission</a>
-  </div>
-</div>
+<?php
+$todoIc = ['Applications' => 'user', 'Verifications' => 'shield', 'Products to review' => 'package', 'Orders to pick up' => 'truck', 'Withdrawals waiting' => 'wallet', 'Return cases' => 'undo'];
+$reviewN = (int) ($badges['applications'] ?? 0) + (int) ($badges['verifications'] ?? 0) + (int) ($badges['products'] ?? 0);
+$rangePills = []; foreach (DASH_RANGES as $k => $l) $rangePills[$k] = [$l, $q(['range' => $k]), 0];
+$curPills = []; foreach ($dash['currencies'] as $c) $curPills[$c] = [$c, $q(['cur' => $c]), 0];
+?>
+<section class="hero-wallet">
+  <div class="hw-top"><p class="hw-hello">Howdy, <strong>boss</strong></p><button type="button" class="hw-eye" data-hide-bal aria-label="Hide balances" aria-pressed="false"><?= icon('eye') ?></button></div>
+  <p class="hw-lab">Commission earned</p>
+  <p class="hw-amt" data-bal><?= e(dash_money($n['commission'], $cur)) ?></p>
+  <p class="hw-sub" data-bal><?= e(dash_money($n['gross'], $cur)) ?> in sales · <?= e(dash_money($dash['owed'], $cur)) ?> owed to sellers</p>
+  <div class="hw-act"><a class="hbtn hbtn-solid" href="/admin?tab=applications"><?= icon('check') ?> Review<?= $reviewN > 0 ? ' (' . $reviewN . ')' : '' ?></a><a class="hbtn" href="/admin?tab=payouts"><?= icon('wallet') ?> Payouts</a></div>
+</section>
+
+<div class="hsheet">
+  <?php foreach ($queue as [$label, $count, $href]): if ($count < 1) continue; ?>
+    <a class="todo" href="<?= e($href) ?>"><span class="todo-ic<?= in_array($label, ['Return cases', 'Withdrawals waiting'], true) ? ' warn' : '' ?>"><?= icon($todoIc[$label] ?? 'check') ?></span><span class="grow"><strong><?= $count ?> <?= e(strtolower($label)) ?></strong></span><?= icon('chev') ?></a>
+  <?php endforeach; ?>
+
+  <div class="sec-h"><h2>Analytics</h2><a href="/admin/export?kind=commission&amp;from=<?= e($exportFrom) ?>&amp;to=<?= e($exportTo) ?>" data-nonav>Export</a></div>
+  <?= app_pills($rangePills, $dash['range']) ?>
+  <?php if (count($curPills) > 1) echo app_pills($curPills, $cur); ?>
 
 <div class="dgrid">
   <section class="dcard dfeat c4">
@@ -114,4 +128,5 @@ $open = array_sum(array_column($queue, 1));
       <div><span class="k">Live products</span><strong><?= (int) $dash['live_products'] ?></strong></div>
     </div>
   </section>
+</div>
 </div>

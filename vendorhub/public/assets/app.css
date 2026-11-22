@@ -1160,3 +1160,31 @@ body.app.app-home .hero-wallet{margin-top:0}
   .hw-top{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"hello eye" "lv eye";align-items:center;justify-content:stretch;row-gap:6px}
   .hw-hello{grid-area:hello}.hw-lv{grid-area:lv;justify-self:start}.hw-eye{grid-area:eye;margin-left:0}
 }
+/* Admin desk shell: the "More" tab is a button */
+.app-tabs button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px 6px;border:0;border-radius:20px;background:transparent;font:inherit;color:#6b7a8f;font-size:.66rem;font-weight:650;cursor:pointer;transition:background .18s,color .18s,transform .12s}
+.app-tabs button:active{transform:scale(.94)}
+.app-tabs button .ti{position:relative;display:grid;place-items:center;height:24px}
+.app-tabs button svg{width:22px;height:22px}
+.app-tabs button.on{background:var(--accent-soft);color:var(--accent-text)}
+.app-tabs:has(> :nth-child(3):last-child){grid-template-columns:repeat(3,1fr)}
+.app-tabs:has(> :nth-child(4):last-child){grid-template-columns:repeat(4,1fr)}
+.app-tabs:has(> :nth-child(2):last-child){grid-template-columns:repeat(2,1fr)}
+.app-tabs:has(> :first-child:last-child){grid-template-columns:1fr}
+.desk-tag{margin-left:8px;font-size:.66rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent-text);vertical-align:middle}
+@media(min-width:900px){
+  .app-nav button{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border:0;border-radius:13px;background:transparent;font:inherit;text-align:left;color:var(--muted);font-weight:650;cursor:pointer;transition:background .15s,color .15s}
+  .app-nav button svg{width:20px;height:20px}
+  .app-nav button:hover{background:var(--soft);color:var(--ink)}
+  .app-nav button.on{background:var(--accent-soft);color:var(--accent-text)}
+  body.app .app-brand{display:none}
+  body.app-desk-mode .app-logo::after{content:"Admin";margin-left:8px;font-size:.62rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent-text);vertical-align:middle}
+}
+.srow .badge-count{margin:0 6px 0 0}
+/* Admin lists: compact rows, actions tucked under "Manage" */
+body.app-desk-mode .list .row.between{flex-wrap:wrap;gap:10px}
+body.app-desk-mode .list li{padding:14px 16px}
+.exp{margin:0 0 12px}.exp summary,.act summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;height:34px;padding:0 14px;border-radius:99px;border:1px solid var(--line);background:var(--card);font-size:.84rem;font-weight:650;color:var(--ink)}
+.exp summary::-webkit-details-marker,.act summary::-webkit-details-marker{display:none}
+.exp[open] summary,.act[open] summary{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent-text)}
+.exp .row{margin-top:10px}
+.act{margin-top:10px;width:100%}.actb{margin-top:10px;display:grid;gap:8px;min-width:0}

@@ -1187,6 +1187,22 @@ foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(APP_ROOT .
     if ($f->getExtension() !== 'php') continue;
     try { token_get_all((string) file_get_contents($f->getPathname()), TOKEN_PARSE); } catch (ParseError $e) { $parseBad[] = $f->getFilename() . ': ' . $e->getMessage(); }
 }
+// Admin desk app shell
+$adm = ['isAdmin' => true, 'canReview' => true, 'canOrders' => true, 'canMessages' => true, 'stage' => 'applying'];
+$stf = ['isAdmin' => false, 'canReview' => true, 'canOrders' => false, 'canMessages' => false, 'stage' => 'applying'];
+$_SERVER['REQUEST_URI'] = '/admin?tab=orders';
+ok(app_mode($adm) === 'desk' && app_mode($stf) === 'desk', 'desk shell on admin pages for admin and staff');
+eq(array_keys(app_tabs($adm)), ['home', 'reviews', 'orders', 'sellers', 'more'], 'admin tabs');
+eq(array_keys(app_tabs($stf)), ['reviews', 'more'], 'staff tabs follow permissions');
+eq(app_state('/admin', 'returns', $adm)['active'], 'orders', 'returns sit under Orders');
+eq(app_state('/admin', 'payouts', $adm)['root'], false, 'payouts is a sub screen of More');
+$sell = $adm; $sell['stage'] = 'verified';
+$_SERVER['REQUEST_URI'] = '/seller?tab=overview';
+eq(app_mode($sell), 'seller', 'admin who sells gets the seller shell outside /admin');
+$_SERVER['REQUEST_URI'] = '/admin?tab=overview';
+eq(app_mode($sell), 'desk', 'and the desk shell on /admin');
+$_SERVER['REQUEST_URI'] = '/';
+
 ok(!$parseBad, 'all app files parse: ' . implode('; ', $parseBad));
 
 echo "$pass passed, $fail failed\n";

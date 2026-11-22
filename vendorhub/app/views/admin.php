@@ -21,15 +21,15 @@ $docLinks = function (array $docs): string {
     return $out;
 };
 ?>
-<?php if ($tab !== 'overview'): ?><p class="eyebrow"><?= $user['isAdmin'] ? 'Admin' : 'Staff desk' ?></p><?php endif; ?>
-<?php $tabHelp = [
-  'orders' => 'Move orders from here or from WooCommerce; both places stay in step. Sellers pack their items in Vendor Hub, you collect, ship and close the order.',
-  'payouts' => $ps ?? false ? 'Press Send with Paystack to pay a seller\'s bank account automatically. The request shows as sending until the bank confirms.' : 'Pay the seller from your bank or Paystack dashboard, then enter the transfer reference here. Add your Paystack key in Settings to pay with one click.',
-  'refunds' => 'When an order is refunded or cancelled the seller\'s earnings are taken back automatically. The customer\'s money is returned here: press Refund with Paystack, or mark it done if you refunded it elsewhere. Never refund the same order twice.',
-  'categories' => 'Sellers pick the most specific category. Up to ' . MAX_CATEGORY_DEPTH . ' levels.',
-]; ?>
-<?php if ($tab !== 'overview'): ?><h1><?= e($tabs[$tab]) ?><?= isset($tabHelp[$tab]) ? ' ' . help($tabHelp[$tab]) : '' ?></h1><?php endif; ?>
-<?= tabs_nav($nav, $tab, '/admin', ['applications' => $badges['applications'], 'verifications' => $badges['verifications'], 'products' => $badges['products'], 'payouts' => $badges['payouts'], 'orders' => $badges['orders'] ?? 0, 'returns' => $badges['returns'] ?? 0]) ?>
+<?php
+$grp = ['applications' => 'reviews', 'verifications' => 'reviews', 'products' => 'reviews', 'orders' => 'orders', 'returns' => 'orders'][$tab] ?? '';
+$grpLabel = ['reviews' => 'Reviews', 'orders' => 'Orders'][$grp] ?? ($tab === 'sellers' ? 'Sellers' : '');
+if ($grpLabel !== ''): ?><div class="h1-row"><h1><?= e($grpLabel) ?></h1></div><?php endif;
+if ($grp !== ''):
+    $pl = [];
+    foreach (['reviews' => ['applications', 'verifications', 'products'], 'orders' => ['orders', 'returns']][$grp] as $k) if (isset($tabs[$k])) $pl[$k] = [$tabs[$k], '/admin?tab=' . $k, (int) ($badges[$k] ?? 0)];
+    if (count($pl) > 1) echo app_pills($pl, $tab);
+endif; ?>
 
 <?php if ($tab === 'overview') include __DIR__ . '/admin_dash.php'; ?>
 <?php if ($tab === 'sales') include __DIR__ . '/admin_sales.php'; ?>
@@ -134,8 +134,8 @@ $docLinks = function (array $docs): string {
 <?php endif; ?>
 
 <?php if ($tab === 'orders'): ?>
-  <form method="get" action="/admin/export" class="row" style="margin:8px 0" data-keep><input type="hidden" name="kind" value="orders"><label class="small muted" for="oe-from">Download as spreadsheet, from</label><input id="oe-from" type="date" name="from" style="width:auto"><label class="small muted" for="oe-to">to</label><input id="oe-to" type="date" name="to" style="width:auto"><button class="btn btn-outline btn-sm" type="submit">Download CSV</button></form>
-  <div class="row" style="margin:16px 0"><?php foreach (ADMIN_ORDER_FILTERS as $k => $l): ?><a class="btn btn-sm <?= $filter === $k ? '' : 'btn-outline' ?>" href="/admin?tab=orders&filter=<?= $k ?>"><?= e($l) ?></a><?php endforeach; ?></div>
+  <details class="exp"><summary>Export</summary><form method="get" action="/admin/export" class="row" style="margin:8px 0" data-keep><input type="hidden" name="kind" value="orders"><label class="small muted" for="oe-from">Download as spreadsheet, from</label><input id="oe-from" type="date" name="from" style="width:auto"><label class="small muted" for="oe-to">to</label><input id="oe-to" type="date" name="to" style="width:auto"><button class="btn btn-outline btn-sm" type="submit">Download CSV</button></form></details>
+  <?php $of = []; foreach (ADMIN_ORDER_FILTERS as $k => $l) $of[$k] = [$l, '/admin?tab=orders&filter=' . $k, 0]; echo app_pills($of, $filter); ?>
   <ul class="list"><?php foreach ($items as $o): $state = $o['state']; ?><li>
     <div class="row between" style="align-items:flex-start;gap:16px"><div>
       <strong><?= $o['number'] ? '#' . e($o['number']) : 'Order ' . e($o['marketplace_order_id']) ?></strong> · <?= e($m($o['total'], $o['currency'])) ?>
@@ -143,7 +143,7 @@ $docLinks = function (array $docs): string {
       <div class="muted small"><?= e(human_date($o['placed_at'], true)) ?> · <?= e($o['customer_name'] ?: 'Customer') ?> · <?= e(trim($o['ship_city'] . ', ' . $o['ship_state'], ', ')) ?></div>
       <div class="small" style="margin-top:6px"><?php foreach ($o['items'] as $it): ?><?= (int) $it['quantity'] ?> × <?= e($it['name']) ?><?= $it['status'] === 'refunded' ? ' (refunded)' : ($it['fulfilment'] !== $state && $state !== 'refunded' ? ' <span class="muted">(' . e(strtolower(FULFILMENT_LABEL[$it['fulfilment']])) . ')</span>' : '') ?><br><?php endforeach; ?></div>
       <div class="muted small">Seller<?= count($o['seller_labels']) > 1 ? 's' : '' ?>: <?= e(implode(', ', $o['seller_labels'])) ?><?= $o['carrier'] ? ' · ' . e(trim($o['carrier'] . ' ' . $o['tracking'])) : '' ?></div></div>
-    <?php if ($state !== 'refunded' && $state !== 'completed'): ?><div style="min-width:280px">
+    <?php if ($state !== 'refunded' && $state !== 'completed'): ?><details class="act"><summary>Manage</summary><div class="actb">
       <?php if (FULFILMENT_RANK[$state] < FULFILMENT_RANK['shipped']): ?>
         <form method="post" action="/admin/order" class="stack" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($o['id']) ?>"><input type="hidden" name="to" value="shipped"><input type="hidden" name="filter" value="<?= e($filter) ?>">
           <?php if ($state !== 'ready_for_shipping'): ?><span class="muted small">Not packed by every seller yet. You can still ship it.</span><?php endif; ?>
@@ -168,7 +168,7 @@ $docLinks = function (array $docs): string {
           <p class="muted small" style="margin:0">This reverses the sellers' earnings and updates WooCommerce. Returning the customer's money is still done in your payment gateway in WooCommerce.</p>
           <div class="row"><?php if (FULFILMENT_RANK[$state] < FULFILMENT_RANK['shipped']): ?><button class="btn btn-sm btn-outline" name="to" value="cancelled" type="submit" data-confirm="Cancel this order?">Cancel order</button><?php endif; ?>
           <button class="btn btn-sm btn-danger" name="to" value="refunded" type="submit" data-confirm="Mark this order as refunded and reverse the sellers' earnings?">Refund</button></div></form></details>
-    </div><?php endif; ?></div></li><?php endforeach; ?>
+    </div></details><?php endif; ?></div></li><?php endforeach; ?>
     <?php if (!$items): ?><li class="muted">No orders here.</li><?php endif; ?></ul>
 <?php endif; ?>
 
@@ -246,13 +246,13 @@ $docLinks = function (array $docs): string {
 <?php if ($tab === 'sellers'): ?>
   <div class="toolbar">
     <form method="get" action="/admin" class="tb-search" data-keep><input type="hidden" name="tab" value="sellers"><input type="search" name="q" value="<?= e($q) ?>" placeholder="Search sellers" aria-label="Search sellers"><button class="btn btn-sm btn-outline">Search</button></form>
-    <div class="tb-actions">
+    <details class="exp tb-tools"><summary>Tools</summary><div class="tb-actions">
       <form method="post" action="/admin/level" data-keep><?= csrf_field() ?><input type="hidden" name="action" value="recalculate"><button class="btn btn-sm btn-outline" type="submit">Recalculate levels</button></form>
       <form method="post" action="/admin/marketplace-sync" data-keep class="tb-sync"><?= csrf_field() ?>
         <label class="check-inline"><input type="checkbox" name="create" value="1"> Also create accounts for marketplace-only sellers</label>
         <button class="btn btn-sm" type="submit">Sync with marketplace</button><?= help('Links marketplace (Dokan) sellers to Vendor Hub sellers with the same email. With the box ticked, sellers that only exist on the marketplace also get a Vendor Hub account and an email to set a password. Products and orders are imported per seller from the Manage page. Verified Vendor Hub sellers reach the marketplace automatically on its next sync. Levels also update when orders are delivered and ratings change.') ?>
       </form>
-    </div>
+    </div></details>
   </div>
   <div class="sellers">
   <?php foreach ($items as $s): $m = $s['m']; $lk = $links[$s['id']] ?? null; ?>
@@ -261,6 +261,7 @@ $docLinks = function (array $docs): string {
         <div class="sc-id"><span class="sc-name"><strong><?= e($s['store']) ?></strong><?= verified_tick($s['id']) ?></span><span class="muted small"><?= e($s['email']) ?></span></div>
         <div class="sc-level"><?= level_badge($s['level']) ?><?= $s['override_level'] ? '<span class="muted small">pinned' . ($s['override_note'] ? ': ' . e($s['override_note']) : '') . '</span>' : '' ?><?= !empty($s['below_since']) && !$s['override_level'] ? '<span class="small" style="color:#b45309">at risk since ' . e(human_date($s['below_since'], false)) . '</span>' : '' ?></div>
       </header>
+      <details class="act"><summary>Manage</summary><div class="actb">
       <dl class="sc-metrics">
         <div><dt>Delivered (90d)</dt><dd><?= (int) ($m['delivered'] ?? 0) ?></dd></div>
         <div><dt>Returns</dt><dd><?= isset($m['return_pct']) ? e((string) $m['return_pct']) . '%' : '–' ?></dd></div>
@@ -274,6 +275,7 @@ $docLinks = function (array $docs): string {
           <input name="note" placeholder="Reason (optional)" value="<?= e($s['override_note']) ?>" maxlength="250"><button class="btn btn-sm btn-outline" type="submit">Save level</button></form>
         <div class="sc-btns"><a class="btn btn-sm btn-outline" href="/admin/link?seller=<?= e($s['id']) ?>"><?= $lk ? 'Manage marketplace' : 'Link to marketplace' ?></a><a class="btn btn-sm" href="/admin/seller?id=<?= e($s['id']) ?>">Edit details</a><form method="post" action="/admin/view-as" data-keep style="display:inline"><?= csrf_field() ?><input type="hidden" name="seller" value="<?= e($s['id']) ?>"><button class="btn btn-sm btn-outline" type="submit">View as seller</button></form></div>
       </footer>
+      </div></details>
     </article>
   <?php endforeach; if (!$items): ?><p class="muted">No verified sellers yet.</p><?php endif; ?>
   </div>

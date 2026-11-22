@@ -91,7 +91,7 @@
     var u;
     try { u = new URL(a.href, location.href); } catch (x) { return null; }
     if (u.origin !== location.origin) return null;
-    if (/^\/(files|logout|admin|api|install|health)/.test(u.pathname) || /\/(export|download)/.test(u.pathname) || /[?&]export=/.test(u.search)) return null;
+    if (/^\/(files|logout|api|install|health)/.test(u.pathname) || /^\/admin\//.test(u.pathname) || /\/(export|download)/.test(u.pathname) || /[?&]export=/.test(u.search)) return null;
     if (u.pathname === location.pathname && u.search === location.search && u.hash) return null;
     return u;
   }
@@ -118,6 +118,7 @@
     opts = opts || {};
     var doc = new DOMParser().parseFromString(res.html, 'text/html');
     if (!doc.body || !doc.body.classList.contains('app')) return false;
+    if ((doc.body.getAttribute('data-shell') || '') !== (body.getAttribute('data-shell') || '')) return false;
     var extra = Array.prototype.some.call(doc.querySelectorAll('script[src]'), function (sc) { return BASE.indexOf((sc.getAttribute('src') || '').split('?')[0].split('/').pop()) === -1; });
     if (extra) return false;
     var col = $('.app-col'), ncol = doc.querySelector('.app-col');

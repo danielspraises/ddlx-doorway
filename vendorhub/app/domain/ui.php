@@ -294,26 +294,97 @@ function case_modal(array $c, string $role, string $actions, string $history): s
 
 // ---------- seller app shell ----------
 
-// The app layout (bottom tabs on phones, sidebar on desktop) is for verified sellers, including admins and staff who also sell.
-// The admin desk itself keeps its own header and tabs.
+// The app layout (bottom tabs on phones, sidebar on desktop) has two modes.
+// "seller": verified sellers, including admins and staff who also sell, on every page outside /admin.
+// "desk": admins and staff on the admin pages (and everywhere, for staff who do not sell).
+function app_is_desk_user(array $u): bool
+{
+    return !empty($u['isAdmin']) || !empty($u['canReview']) || !empty($u['canOrders']) || !empty($u['canMessages']);
+}
+
+function app_mode(?array $u): string
+{
+    if ($u === null) return '';
+    $path = '/' . trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
+    $desk = app_is_desk_user($u);
+    $seller = ($u['stage'] ?? '') === 'verified';
+    $admin = $path === '/admin' || str_starts_with($path, '/admin/');
+    if ($desk && $admin) return 'desk';
+    if ($seller && !$admin) return 'seller';
+    if ($desk && !$seller) return 'desk';
+    return '';
+}
+
 function app_shell_on(?array $u): bool
 {
-    if ($u === null || ($u['stage'] ?? '') !== 'verified') return false;
-    $path = '/' . trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
-    return !str_starts_with($path, '/admin');
+    return app_mode($u) !== '';
 }
 
 // Admins and staff who sell too need a way back to their desk from inside the app.
 function app_desk_link(array $u): string
 {
-    return !empty($u['isAdmin']) || !empty($u['canReview']) || !empty($u['canOrders']) || !empty($u['canMessages']) ? '/admin' : '';
+    return app_is_desk_user($u) ? '/admin' : '';
 }
 
 const APP_TABS = ['home' => ['Home', '/seller?tab=overview', 'home'], 'orders' => ['Orders', '/seller?tab=sales', 'bag'], 'products' => ['Products', '/seller?tab=products', 'package'], 'insights' => ['Insights', '/seller?tab=insights', 'chart'], 'settings' => ['Settings', '/seller?tab=settings', 'cog']];
 
-// Where the current page sits: which bottom tab is lit, whether it is a tab's own page, and where the back arrow goes.
-function app_state(string $path, string $tab = ''): array
+// The desk's five tabs. "More" opens a sheet with everything else.
+function desk_home(array $u): string
 {
+    if (!empty($u['isAdmin'])) return '/admin?tab=overview';
+    if (!empty($u['canReview'])) return '/admin?tab=products';
+    if (!empty($u['canOrders'])) return '/admin?tab=orders';
+    return '/messages';
+}
+
+function app_tabs(?array $u): array
+{
+    if ($u === null || app_mode($u) !== 'desk') return APP_TABS;
+    $t = [];
+    if (!empty($u['isAdmin'])) $t['home'] = ['Home', '/admin?tab=overview', 'home'];
+    if (!empty($u['isAdmin'])) $t['reviews'] = ['Reviews', '/admin?tab=applications', 'check'];
+    elseif (!empty($u['canReview'])) $t['reviews'] = ['Reviews', '/admin?tab=products', 'check'];
+    if (!empty($u['canOrders'])) $t['orders'] = ['Orders', '/admin?tab=orders', 'bag'];
+    if (!empty($u['isAdmin'])) $t['sellers'] = ['Sellers', '/admin?tab=sellers', 'user'];
+    $t['more'] = ['More', '', 'more'];
+    return $t;
+}
+
+// Everything that is not a tab, for the More sheet: [label, href, icon, badge key].
+function desk_more(array $u): array
+{
+    $m = [];
+    if (!empty($u['canMessages'])) $m[] = ['Messages', '/messages', 'mail', 'messages'];
+    if (!empty($u['isAdmin'])) {
+        $m[] = ['Payouts', '/admin?tab=payouts', 'wallet', 'payouts'];
+        $m[] = ['Customer refunds', '/admin?tab=refunds', 'undo', ''];
+        $m[] = ['Sales', '/admin?tab=sales', 'tag', ''];
+        $m[] = ['Discount codes', '/admin?tab=codes', 'gift', ''];
+        $m[] = ['Promo and QR', '/admin?tab=promo', 'image', ''];
+        $m[] = ['Categories', '/admin?tab=categories', 'package', ''];
+        $m[] = ['Staff', '/admin?tab=staff', 'user', ''];
+        $m[] = ['Activity', '/admin?tab=activity', 'doc', ''];
+        $m[] = ['Legal pages', '/admin?tab=legal', 'file-check', ''];
+        $m[] = ['Settings', '/admin?tab=settings', 'cog', ''];
+    }
+    return $m;
+}
+
+function desk_state(string $path, string $tab, array $u): array
+{
+    $home = desk_home($u);
+    if ($path === '/admin') {
+        if ($tab === '') $tab = !empty($u['isAdmin']) ? 'overview' : (!empty($u['canReview']) ? 'products' : 'orders');
+        $map = ['overview' => ['home', true], 'applications' => ['reviews', true], 'verifications' => ['reviews', true], 'products' => ['reviews', true], 'orders' => ['orders', true], 'returns' => ['orders', true], 'sellers' => ['sellers', true]];
+        if (isset($map[$tab])) return ['active' => $map[$tab][0], 'root' => true, 'back' => ''];
+    }
+    return ['active' => 'more', 'root' => false, 'back' => $home];
+}
+
+// Where the current page sits: which bottom tab is lit, whether it is a tab's own page, and where the back arrow goes.
+function app_state(string $path, string $tab = '', ?array $u = null): array
+{
+    if ($u !== null && app_mode($u) === 'desk') return desk_state($path, $tab, $u);
     $tab = $tab !== '' ? $tab : 'overview';
     if ($path === '/seller' || $path === '/') {
         $map = ['overview' => ['home', true, ''], 'insights' => ['insights', true, ''], 'sales' => ['orders', true, ''], 'returns' => ['orders', true, ''], 'products' => ['products', true, ''], 'inventory' => ['products', true, ''], 'promotions' => ['products', true, ''],

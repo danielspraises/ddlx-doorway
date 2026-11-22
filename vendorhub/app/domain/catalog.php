@@ -520,7 +520,7 @@ function save_product(string $sellerId, array $d): array
         $db->tx(function () use ($db, $d, $sellerId, &$id, $categoryName, $tags, $variable, &$lowImages, $now, $existing) {
             $cols = [
                 'name' => $d['name'], 'sku' => $d['sku'], 'product_type' => $d['product_type'], 'brand' => $d['brand'], 'category' => $categoryName, 'category_id' => $d['category_id'],
-                'tags' => jenc($tags), 'short_description' => $d['short_description'], 'description' => $d['description'], 'currency' => $d['currency'],
+                'tags' => jenc($tags), 'short_description' => str_limit(desc_clean((string) $d['short_description']), 500), 'description' => str_limit(desc_clean((string) $d['description']), 10000), 'currency' => $d['currency'],
                 'regular_price' => $d['regular_price'], 'sale_price' => $d['sale_price'], 'sale_starts_at' => dt_or_null($d['sale_starts_at']), 'sale_ends_at' => dt_or_null($d['sale_ends_at']),
                 'manage_stock' => $d['manage_stock'] ? 1 : 0, 'stock' => $d['stock'], 'low_stock_threshold' => $d['low_stock_threshold'], 'allow_backorders' => $d['allow_backorders'] ? 1 : 0,
                 'weight_kg' => $d['weight_kg'], 'length_cm' => $d['length_cm'], 'width_cm' => $d['width_cm'], 'height_cm' => $d['height_cm'],
@@ -751,4 +751,85 @@ function category_set_commission(string $id, string $value): ?string
     db()->exec('UPDATE categories SET commission_percent = ? WHERE id = ?', [round((float) $value, 2), $id]);
     categories_all(true);
     return null;
+}
+
+// ---------------------------------------------------------------- descriptions
+// Stored as clean plain text: paragraphs separated by a blank line, bullets as "- ". Whatever arrives (marketplace HTML,
+// CSV, pasted web text) is tidied into that. The marketplace gets proper HTML from desc_html().
+
+function desc_clean(string $s): string
+{
+    $s = str_replace(["\r\n", "\r"], "\n", $s);
+    $html = (bool) preg_match('~</?[a-z][a-z0-9]*[\s/>]|&(?:[a-z]+|#\d+|#x[0-9a-f]+);~i', $s);
+    if ($html) {
+        $s = (string) preg_replace('~<(script|style)\b[^>]*>.*?</\1>~is', '', $s);
+        $s = (string) preg_replace('~<!--.*?-->~s', '', $s);
+        $s = (string) preg_replace('~\[/?[a-z_][a-z0-9_-]*(?:\s[^\]]*)?\]~i', '', $s);        // [shortcodes]
+        $s = (string) preg_replace('~<li\b[^>]*>~i', "\n- ", $s);
+        $s = (string) preg_replace('~</(p|div|h[1-6]|ul|ol|table|blockquote|section|tr)>~i', "\n\n", $s);
+        $s = (string) preg_replace('~<(br|hr)\s*/?>~i', "\n", $s);
+        $s = strip_tags($s);
+        $s = html_entity_decode(html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8'), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+    $s = str_replace("\u{00A0}", ' ', $s);
+    $lines = array_map(fn ($l) => trim((string) preg_replace('~[ \t]+~', ' ', $l)), explode("\n", $s));
+    $out = [];
+    foreach ($lines as $l) {
+        if ($l !== '' && preg_match('~^[•·▪●*–]\s+(.*)$~u', $l, $m)) $l = '- ' . $m[1];
+        $out[] = $l;
+    }
+    $s = implode("\n", $out);
+    $s = (string) preg_replace('~\n{3,}~', "\n\n", $s);
+    return trim($s);
+}
+
+function desc_html(string $s): string
+{
+    $s = desc_clean($s);
+    if ($s === '') return '';
+    $out = '';
+    foreach (preg_split('~\n{2,}~', $s) as $block) {
+        $lines = explode("\n", $block);
+        if (!array_filter($lines, fn ($l) => !str_starts_with($l, '- '))) {
+            $out .= '<ul>' . implode('', array_map(fn ($l) => '<li>' . htmlspecialchars(substr($l, 2), ENT_QUOTES, 'UTF-8') . '</li>', $lines)) . '</ul>';
+        } else {
+            $out .= '<p>' . implode('<br>', array_map(fn ($l) => htmlspecialchars($l, ENT_QUOTES, 'UTF-8'), $lines)) . '</p>';
+        }
+    }
+    return $out;
+}
+
+// Writes a short and a full description from what the seller already entered. Uses the AI helper when it is set up and
+// falls back to a plain template, so the button always gives something useful.
+function desc_generate(array $p): array
+{
+    $name = trim((string) ($p['name'] ?? ''));
+    $brand = trim((string) ($p['brand'] ?? ''));
+    $cat = !empty($p['category_id']) ? implode(' > ', category_path_names($p['category_id'])) : '';
+    $facts = array_filter([
+        'Name' => $name, 'Brand' => $brand, 'Category' => $cat,
+        'Tags' => implode(', ', (array) ($p['tags'] ?? [])),
+        'Options' => implode('; ', array_map(fn ($a) => trim((string) ($a['name'] ?? '')) . ': ' . implode(', ', (array) ($a['values'] ?? [])), array_filter((array) ($p['attributes'] ?? []), fn ($a) => trim((string) ($a['name'] ?? '')) !== ''))),
+        'Notes from the seller' => desc_clean((string) ($p['description'] ?? '')),
+    ], fn ($v) => $v !== '' && $v !== ': ');
+    if ($name === '') return ['short' => '', 'long' => '', 'ai' => false];
+    if (function_exists('assistant_ready') && assistant_ready()) {
+        $in = implode("\n", array_map(fn ($k, $v) => "$k: $v", array_keys($facts), $facts));
+        $sys = "You write product listings for a fashion marketplace. Reply with exactly two parts separated by a line containing only ---. Part 1: one short sentence under 140 characters. Part 2: 2 short paragraphs, then 3 to 5 bullet lines starting with \"- \" for features. Plain text only, no markdown, no HTML, no emojis. Use only the facts given; never invent materials, sizes or claims.";
+        $r = assistant_call($sys, [['role' => 'user', 'content' => $in]]);
+        if (is_string($r) && str_contains($r, '---')) {
+            [$a, $b] = array_map('trim', explode('---', $r, 2));
+            $a = str_limit(desc_clean($a), 500); $b = str_limit(desc_clean($b), 10000);
+            if ($a !== '' && $b !== '') return ['short' => $a, 'long' => $b, 'ai' => true];
+        }
+    }
+    $who = $brand !== '' && stripos($name, $brand) !== 0 ? $brand . ' ' : '';
+    $short = str_limit($who . $name . ($cat !== '' ? ' from our ' . strtolower(array_slice(explode(' > ', $cat), -1)[0]) . ' collection.' : '.'), 500);
+    $long = $name . ($brand !== '' && stripos($name, $brand) !== 0 ? ' by ' . $brand : '') . '.';
+    $bul = [];
+    if (!empty($facts['Options'])) foreach (explode('; ', $facts['Options']) as $o) $bul[] = '- ' . $o;
+    if (!empty($p['weight_kg'])) $bul[] = '- Weight: ' . rtrim(rtrim(number_format((float) $p['weight_kg'], 3, '.', ''), '0'), '.') . ' kg';
+    if (!empty($facts['Notes from the seller'])) $long .= "\n\n" . $facts['Notes from the seller'];
+    if ($bul) $long .= (preg_match('~(^|\n)- [^\n]*$~', $long) ? "\n" : "\n\n") . implode("\n", $bul);
+    return ['short' => $short, 'long' => $long, 'ai' => false];
 }

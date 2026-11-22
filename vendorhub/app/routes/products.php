@@ -95,6 +95,13 @@ route('POST', '/products/save', function () {
         render_editor($u, $form, null, count($form['variations']) . ' variation(s) ready. Set their prices and stock, then save.');
         return;
     }
+    if ($action === 'generate_description') {
+        if (trim($form['name']) === '') { render_editor($u, $form, 'Add a product name first.'); return; }
+        $g = desc_generate($form);
+        $form['short_description'] = $g['short']; $form['description'] = $g['long'];
+        render_editor($u, $form, null, 'Description written. Check it, then save.');
+        return;
+    }
     if ($action === 'generate_sku') {
         $form['sku'] = suggest_sku($u['id']) ?? $form['sku'];
         render_editor($u, $form, null, 'A free SKU was filled in. Save to keep it.');

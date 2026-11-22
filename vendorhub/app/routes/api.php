@@ -133,7 +133,7 @@ function marketplace_catalogue(?string $sinceDb, int $limit): array
             'seller' => $sellerCache[$sid],
             'name' => $s['name'], 'slug' => $s['slug'], 'sku' => $s['sku'], 'type' => $s['type'], 'brand' => $s['brand'], 'category' => $s['category'],
             'category_path' => $s['category_path'] ?? ($s['category'] ? [$s['category']] : []), 'tags' => $s['tags'],
-            'short_description' => $s['short_description'], 'description' => $s['description'], 'currency' => $s['currency'],
+            'short_description' => desc_html((string) $s['short_description']), 'description' => desc_html((string) $s['description']), 'currency' => $s['currency'],
             'regular_price' => $s['regular_price'], 'sale_price' => $s['sale_price'], 'sale_starts_at' => $s['sale_starts_at'], 'sale_ends_at' => $s['sale_ends_at'],
             'manage_stock' => $s['manage_stock'], 'stock' => (int) $r['stock'], 'allow_backorders' => $s['allow_backorders'],
             'weight_kg' => $s['weight_kg'], 'dimensions_cm' => ['length' => $s['length_cm'], 'width' => $s['width_cm'], 'height' => $s['height_cm']],

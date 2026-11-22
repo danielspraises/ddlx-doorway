@@ -1187,6 +1187,22 @@ foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(APP_ROOT .
     if ($f->getExtension() !== 'php') continue;
     try { token_get_all((string) file_get_contents($f->getPathname()), TOKEN_PARSE); } catch (ParseError $e) { $parseBad[] = $f->getFilename() . ': ' . $e->getMessage(); }
 }
+// Descriptions
+$raw = '<p>Soft &amp; warm hoodie&nbsp;for <strong>cold</strong> days.</p><ul><li>100% cotton</li><li>Unisex fit</li></ul>[vc_row]<p>Machine wash.</p><script>x()</script>';
+eq(desc_clean($raw), "Soft & warm hoodie for cold days.\n\n- 100% cotton\n- Unisex fit\n\nMachine wash.", 'HTML becomes clean text');
+eq(desc_clean("Line one\r\n\r\n\r\n\r\nLine two  "), "Line one\n\nLine two", 'plain text is only tidied');
+eq(desc_clean("Tom &amp;amp; Jerry"), 'Tom & Jerry', 'double-encoded entities decoded');
+eq(desc_clean('3 < 5 and 7 > 2'), '3 < 5 and 7 > 2', 'plain angle brackets kept');
+eq(desc_html("Hello\n\n- a\n- b"), '<p>Hello</p><ul><li>a</li><li>b</li></ul>', 'clean text becomes safe HTML');
+ok(!str_contains(desc_html('<b>x</b> <script>alert(1)</script>'), '<script'), 'feed HTML never carries scripts');
+$g = desc_generate(['name' => 'Cargo Pants', 'brand' => 'DDLX', 'tags' => [], 'attributes' => [['name' => 'Size', 'values' => ['S', 'M']]]]);
+ok(!$g['ai'] && str_contains($g['long'], '- Size: S, M') && $g['short'] !== '', 'generator falls back to a template');
+$GLOBALS['vh_ai_stub'] = fn () => "A relaxed pair of cargo pants.\n---\nPara one.\n\n- Roomy pockets\n- Soft cotton";
+set_setting('ai_enabled', '1'); set_setting('ai_api_key', 'sk-ant-test-key-aaaaaaaaaaaaaaaaaaaa');
+$g = desc_generate(['name' => 'Cargo Pants', 'tags' => [], 'attributes' => []]);
+ok($g['ai'] && $g['short'] === 'A relaxed pair of cargo pants.' && str_contains($g['long'], '- Roomy pockets'), 'generator uses the AI answer when available');
+$GLOBALS['vh_ai_stub'] = fn () => null; set_setting('ai_api_key', '');
+
 // Admin desk app shell
 $adm = ['isAdmin' => true, 'canReview' => true, 'canOrders' => true, 'canMessages' => true, 'stage' => 'applying'];
 $stf = ['isAdmin' => false, 'canReview' => true, 'canOrders' => false, 'canMessages' => false, 'stage' => 'applying'];

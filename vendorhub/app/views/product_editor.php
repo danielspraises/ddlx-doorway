@@ -52,8 +52,9 @@ $doneN = count(array_filter($checks, fn ($c) => $c[1]));
       <?= f_text('brand', 'Brand', $v('brand'), null, ['maxlength' => 100]) ?>
     </div>
     <?= f_text('tags', 'Tags', implode(', ', $form['tags'] ?? []), null, ['hint' => 'Separate with commas.']) ?>
-    <?= f_area('short_description', 'Short description', $v('short_description'), null, ['rows' => 2, 'maxlength' => 500]) ?>
-    <?= f_area('description', 'Description', $v('description'), null, ['rows' => 7, 'maxlength' => 10000]) ?>
+    <?= f_area('short_description', 'Short description', desc_clean($v('short_description')), null, ['rows' => 2, 'maxlength' => 500]) ?>
+    <?= f_area('description', 'Description', desc_clean($v('description')), null, ['rows' => 7, 'maxlength' => 10000, 'hint' => 'Blank line for a new paragraph. Start a line with - for a bullet.']) ?>
+    <?php if ($editable): ?><button class="btn btn-outline btn-sm" type="submit" name="action" value="generate_description" formnovalidate><?= icon('spark') ?> Write it for me</button><?php endif; ?>
   </div>
 
   <h2>Pricing</h2>

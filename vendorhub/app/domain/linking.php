@@ -230,7 +230,7 @@ function import_one_product(string $sellerId, array $m): array
     $db->tx(function () use ($db, $id, $sellerId, $m, $name, $sku, $variable, $currency, $price, $sale, $attrs, $vars, $catId, $catName, $featured, $gallery, $live, $now, $wcId, &$varIds) {
         $db->insert('products', ['id' => $id, 'seller_id' => $sellerId, 'name' => str_limit($name, 200), 'slug' => import_unique_slug($name), 'product_type' => $variable ? 'variable' : 'simple', 'sku' => str_limit($sku, 100),
             'brand' => str_limit((string) ($m['brand'] ?? ''), 100), 'category' => $catName, 'category_id' => $catId, 'tags' => jenc(array_slice(array_values(array_map('strval', (array) ($m['tags'] ?? []))), 0, 20)),
-            'short_description' => str_limit(trim(strip_tags((string) ($m['short_description'] ?? ''))), 500), 'description' => (string) ($m['description'] ?? ''), 'currency' => $currency,
+            'short_description' => str_limit(desc_clean((string) ($m['short_description'] ?? '')), 500), 'description' => str_limit(desc_clean((string) ($m['description'] ?? '')), 10000), 'currency' => $currency,
             'regular_price' => $variable ? null : $price, 'sale_price' => $variable ? null : $sale, 'manage_stock' => (!empty($m['manage_stock']) || ($variable && array_filter(array_column($vars, 'managed')))) ? 1 : 0, 'stock' => max(0, (int) ($m['stock'] ?? 0)),
             'low_stock_threshold' => max(0, (int) ($m['low_stock'] ?? 5)), 'allow_backorders' => !empty($m['backorders']) ? 1 : 0,
             'weight_kg' => isset($m['weight']) && is_numeric($m['weight']) ? (float) $m['weight'] : null, 'length_cm' => isset($m['length']) && is_numeric($m['length']) ? (float) $m['length'] : null,

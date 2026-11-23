@@ -18,4 +18,4 @@ function audit_list(int $limit = 200, string $action = ''): array
     return db()->all('SELECT * FROM audit_log' . ($action !== '' ? ' WHERE action = ?' : '') . ' ORDER BY created_at DESC LIMIT ' . (int) $limit, $action !== '' ? [$action] : []);
 }
 
-const AUDIT_LABEL = ['application' => 'Application', 'verification' => 'Verification', 'product' => 'Product review', 'payout' => 'Payout', 'order' => 'Order', 'return' => 'Return', 'category' => 'Category', 'staff' => 'Staff', 'settings' => 'Settings'];
+const AUDIT_LABEL = ['store' => 'Store', 'application' => 'Application', 'verification' => 'Verification', 'product' => 'Product review', 'payout' => 'Payout', 'order' => 'Order', 'return' => 'Return', 'category' => 'Category', 'staff' => 'Staff', 'settings' => 'Settings'];

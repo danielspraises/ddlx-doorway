@@ -1203,6 +1203,29 @@ $g = desc_generate(['name' => 'Cargo Pants', 'tags' => [], 'attributes' => []]);
 ok($g['ai'] && $g['short'] === 'A relaxed pair of cargo pants.' && str_contains($g['long'], '- Roomy pockets'), 'generator uses the AI answer when available');
 $GLOBALS['vh_ai_stub'] = fn () => null; set_setting('ai_api_key', '');
 
+// More than one store
+$own = register_user('multi@x.test', 'passw0rdpassw0rd'); $oid = $own['id'] ?? null;
+ok(!empty($oid), 'owner account created');
+$ou = ['id' => $oid, 'email' => 'multi@x.test', 'twofa' => false];
+$r1 = store_create($ou);
+ok($r1['ok'] && $r1['owner'] === $oid, 'a second store is created under the owner');
+$row = db()->one('SELECT email, owner_id FROM users WHERE id = ?', [$r1['id']]);
+ok($row['owner_id'] === $oid && str_starts_with($row['email'], 'multi+store') && str_ends_with($row['email'], '@x.test'), 'store gets a plus address that reaches the owner');
+eq(count(stores_of($oid)), 2, 'owner sees two stores');
+eq(stores_of($oid)[0]['main'], true, 'own account is listed first');
+eq(stores_of($oid)[1]['stage'], 'no_application', 'a new store starts at the beginning of the application');
+ok(!attempt_login($row['email'], 'anything12345')['ok'], 'extra stores cannot be signed into directly');
+$_COOKIE[STORE_COOKIE] = '';
+store_set($oid, $r1['id']);
+eq(store_target($oid), $r1['id'], 'active store is remembered');
+eq(store_target('someone-else'), null, 'another account cannot use that choice');
+$ctx = user_as_store($r1['id'], $ou);
+ok($ctx && $ctx['id'] === $r1['id'] && $ctx['storeOf'] === $oid && !$ctx['isAdmin'], 'working inside a store gives that store\'s data only');
+eq(user_as_store($r1['id'], ['id' => 'x', 'email' => 'x', 'twofa' => false]), null, 'a store of someone else cannot be entered');
+for ($i = 0; $i < 10; $i++) store_create($ou);
+eq(count(stores_of($oid)), MAX_STORES, 'store count is capped');
+ok(!store_create($ou)['ok'], 'no more than the cap');
+
 // Admin desk app shell
 $adm = ['isAdmin' => true, 'canReview' => true, 'canOrders' => true, 'canMessages' => true, 'stage' => 'applying'];
 $stf = ['isAdmin' => false, 'canReview' => true, 'canOrders' => false, 'canMessages' => false, 'stage' => 'applying'];

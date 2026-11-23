@@ -9,7 +9,9 @@ $desk = $mode === 'desk';
 $as = $app ? app_state($path, (string) ($_GET['tab'] ?? ''), $user) : ['active' => '', 'root' => true, 'back' => ''];
 $tabsDef = $app ? app_tabs($user) : [];
 $homeHref = $desk ? desk_home($user) : '/seller?tab=overview';
-$myStore = $app ? ($desk ? (string) $user['email'] : (inbox_store_name($user['id']) ?: (string) $user['email'])) : '';
+$myStore = $app ? ($desk ? (string) $user['email'] : (inbox_store_name($user['id']) ?: (!empty($user['storeOf']) ? 'New business' : (string) $user['email']))) : '';
+$ownerOf = $user ? (string) ($user['storeOf'] ?? $user['id']) : '';
+$myStores = $user && !$desk && empty($user['viewAs']) ? stores_of($ownerOf) : [];
 $deskTag = $desk ? (!empty($user['isAdmin']) ? 'Admin' : 'Staff') : '';
 $lockOn = $app && ($_COOKIE['vh_lock'] ?? '') === '1' && ($_COOKIE['vh_open'] ?? '') !== '1';
 ?><!doctype html>
@@ -52,6 +54,7 @@ $lockOn = $app && ($_COOKIE['vh_lock'] ?? '') === '1' && ($_COOKIE['vh_open'] ??
           <p class="muted"><?= e($user['email']) ?><br><strong style="color:var(--ink)"><?= $user['isAdmin'] ? 'Admin' : ($user['canReview'] || $user['canOrders'] || $user['canMessages'] ? 'Staff' : e(STAGE_LABEL[$user['stage']] ?? '')) ?></strong></p>
           <?php foreach (nav_items($user) as [$label, $href]): ?><a class="m-only" href="<?= e($href) ?>"><?= e($label) ?></a><?php endforeach; ?>
           <a href="/notifications">Notifications</a>
+          <?php if (!$desk && empty($user['viewAs'])): ?><a href="/stores">Your stores</a><?php endif; ?>
           <a href="/account/security">Account security</a>
           <button type="button" class="hidden" data-install>Install app</button>
           <form method="post" action="/logout"><?= csrf_field() ?><button type="submit">Sign out</button></form>
@@ -114,8 +117,10 @@ $lockOn = $app && ($_COOKIE['vh_lock'] ?? '') === '1' && ($_COOKIE['vh_open'] ??
 <dialog class="sheet" id="biz-sheet" aria-label="Your business">
   <div class="sheet-h"><strong>Your business</strong><button type="button" class="icon-btn" data-sheet-close aria-label="Close"><?= icon('close') ?></button></div>
   <div class="sheet-b">
-    <div class="biz-row on"><span class="avatar"><?= e(strtoupper(substr($myStore, 0, 1))) ?></span><span class="grow"><strong><?= e($myStore) ?></strong></span><span class="chip-s ok">Verified</span></div>
-    <div class="biz-row off"><span class="avatar"><?= icon('plus') ?></span><span class="grow"><strong>Add another business</strong></span><span class="chip-s">Soon</span></div>
+    <?php foreach ($myStores as $st): $isCur = $st['id'] === $user['id']; ?>
+    <form method="post" action="/stores/switch" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($st['id']) ?>"><button type="submit" class="biz-row<?= $isCur ? ' on' : '' ?>"><span class="avatar"><?= e(strtoupper(substr($st['name'], 0, 1))) ?></span><span class="grow"><strong><?= e($st['name']) ?></strong></span><span class="chip-s<?= $st['stage'] === 'verified' ? ' ok' : '' ?>"><?= $st['stage'] === 'verified' ? 'Verified' : 'Pending' ?></span></button></form>
+    <?php endforeach; ?>
+    <?php if (empty($user['viewAs']) && count($myStores) < MAX_STORES): ?><form method="post" action="/stores/new" data-keep><?= csrf_field() ?><button type="submit" class="biz-row"><span class="avatar"><?= icon('plus') ?></span><span class="grow"><strong>Add another business</strong></span></button></form><?php endif; ?>
     <?php if (app_desk_link($user) !== ''): ?><a class="srow" href="<?= e(app_desk_link($user)) ?>"><span class="sr-ic"><?= icon('cog') ?></span><span class="grow"><strong>Admin desk</strong></span><span class="sr-go"><?= icon('chev') ?></span></a><?php endif; ?>
     <a class="srow" href="/seller?tab=store"><span class="sr-ic"><?= icon('store') ?></span><span class="grow"><strong>Store profile</strong></span><span class="sr-go"><?= icon('chev') ?></span></a>
     <a class="srow" href="/account/security"><span class="sr-ic"><?= icon('shield') ?></span><span class="grow"><strong>Security</strong></span><span class="sr-go"><?= icon('chev') ?></span></a>

@@ -10,9 +10,11 @@ CREATE TABLE users (
   marketplace_user_id INT NULL,
   marketplace_name VARCHAR(200) NULL,
   marketplace_linked_at DATETIME(3) NULL,
+  owner_id CHAR(36) NULL,
   created_at DATETIME(3) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE UNIQUE INDEX users_email_unique ON users (email);
+CREATE INDEX users_owner_idx ON users (owner_id);
 
 CREATE TABLE sessions (
   token_hash CHAR(64) NOT NULL PRIMARY KEY,

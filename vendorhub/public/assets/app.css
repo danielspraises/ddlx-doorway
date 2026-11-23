@@ -1217,3 +1217,8 @@ body.app-desk-mode .refund-stats{display:grid;grid-template-columns:repeat(3,1fr
 @media(max-width:640px){body.app-desk-mode .refund-stats{grid-template-columns:1fr}}
 body.app-desk-mode .act .row,body.app-desk-mode .act form.row{flex-wrap:wrap}
 body.app-desk-mode .act input[style*="width:230px"]{width:100%!important}
+button.biz-row{width:100%;border:0;font:inherit;text-align:left;color:inherit;cursor:pointer}
+.biz-row .chip-s{margin-left:auto}
+.srow.on{background:var(--accent-soft)}
+form+.biz-row,.sheet-b form:has(.biz-row){margin:0 0 8px}
+.rows .srow{width:100%;border:0;background:var(--card);font:inherit;text-align:left;border-radius:16px;padding:12px 14px}

@@ -5,7 +5,7 @@ declare(strict_types=1);
 // request after the new files are uploaded. Every step checks before it changes anything, so it is safe to repeat.
 // A fresh install already has the latest tables (schema.sql) and is stamped with SCHEMA_VERSION.
 
-const SCHEMA_VERSION = 18;
+const SCHEMA_VERSION = 19;
 
 function column_exists(Db $db, string $table, string $column): bool
 {
@@ -184,6 +184,13 @@ function migration_steps(): array
                     if (is_array($j)) { $j['short_description'] = desc_clean((string) ($j['short_description'] ?? '')); $j['description'] = desc_clean((string) ($j['description'] ?? '')); $snap = jenc($j); }
                 }
                 if ($sd !== (string) $r['short_description'] || $d !== (string) $r['description'] || $snap !== $r['published_snapshot']) $db->exec('UPDATE products SET short_description = ?, description = ?, published_snapshot = ? WHERE id = ?', [$sd, $d, $snap, $r['id']]);
+            }
+        },
+        19 => function (Db $db) {
+            // A seller can run more than one store. Each extra store is its own account row that points at its owner.
+            if (!column_exists($db, 'users', 'owner_id')) {
+                $db->exec('ALTER TABLE users ADD COLUMN owner_id CHAR(36) NULL');
+                $db->exec('CREATE INDEX users_owner_idx ON users (owner_id)');
             }
         },
     ];

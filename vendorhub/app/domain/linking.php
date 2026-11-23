@@ -391,7 +391,7 @@ function marketplace_sync_run(array $admin, bool $create): array
             $email = strtolower(trim((string) ($v['email'] ?? '')));
             $name = trim((string) ($v['name'] ?? '')) ?: $email;
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { $res['skipped']++; continue; }
-            $row = $db->one('SELECT id FROM users WHERE email = ?', [$email]);
+            $row = $db->one('SELECT id FROM users WHERE email = ? AND owner_id IS NULL', [$email]);
             if ($row) {
                 if (!is_verified_seller($row['id'])) { $res['skipped']++; continue; }
                 $err = link_seller($admin, $row['id'], $uid, $name);

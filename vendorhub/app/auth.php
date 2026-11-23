@@ -64,6 +64,10 @@ function current_user(): ?array
         $as = view_as_target($user);
         if ($as) $user = user_view_as($as, $user) ?? $user;
     }
+    if ($user && empty($user['viewAs'])) {
+        $sid = store_target($user['id']);
+        if ($sid) $user = user_as_store($sid, $user) ?? $user;
+    }
     return $GLOBALS['vh_user_cache'] = $user;
 }
 
@@ -112,6 +116,80 @@ function user_view_as(string $sellerId, array $admin): ?array
     $pending['returns'] = (int) $db->val("SELECT COUNT(*) FROM return_cases WHERE seller_id = ? AND status = 'open'", [$sellerId]);
     return ['id' => $r['id'], 'email' => $r['email'], 'twofa' => true, 'isAdmin' => false, 'isStaff' => false, 'canReview' => false, 'canOrders' => false, 'canMessages' => false,
         'stage' => seller_stage($r['application_status'], $r['verification_status']), 'pending' => $pending, 'viewAs' => true, 'viewAdmin' => $admin['email']];
+}
+
+// ---------------------------------------------------------------- more than one store
+
+const STORE_COOKIE = 'vh_store';
+const MAX_STORES = 5;
+
+function store_set(string $ownerId, string $storeId): void
+{
+    $payload = base64_encode(json_encode(['o' => $ownerId, 's' => $storeId, 'x' => time() + 30 * 86400]));
+    setcookie(STORE_COOKIE, $payload . '.' . hash_hmac('sha256', $payload, viewas_secret()), cookie_opts(time() + 30 * 86400));
+    $_COOKIE[STORE_COOKIE] = $payload . '.' . hash_hmac('sha256', $payload, viewas_secret());
+    unset($GLOBALS['vh_user_cache']);
+}
+
+function store_clear(): void
+{
+    setcookie(STORE_COOKIE, '', cookie_opts(time() - 3600));
+    unset($_COOKIE[STORE_COOKIE], $GLOBALS['vh_user_cache']);
+}
+
+/** The store this owner is currently working in, or null for their own main account. */
+function store_target(string $ownerId): ?string
+{
+    $c = $_COOKIE[STORE_COOKIE] ?? '';
+    if (!is_string($c) || !str_contains($c, '.')) return null;
+    [$payload, $sig] = explode('.', $c, 2);
+    if (!hash_equals(hash_hmac('sha256', $payload, viewas_secret()), $sig)) return null;
+    $d = json_decode((string) base64_decode($payload, true), true);
+    if (!is_array($d) || ($d['o'] ?? '') !== $ownerId || (int) ($d['x'] ?? 0) < time() || !is_string($d['s'] ?? null)) return null;
+    return $d['s'];
+}
+
+/** All the stores an account runs: its own first, then the extra ones. Each: id, name, stage, main. */
+function stores_of(string $ownerId): array
+{
+    $db = db();
+    $rows = $db->all('SELECT u.id, u.owner_id, a.status AS application_status, v.status AS verification_status, a.brand FROM users u LEFT JOIN seller_applications a ON a.user_id = u.id LEFT JOIN seller_verifications v ON v.user_id = u.id WHERE u.id = ? OR u.owner_id = ? ORDER BY (u.owner_id IS NULL) DESC, u.created_at', [$ownerId, $ownerId]);
+    $out = [];
+    foreach ($rows as $r) {
+        $name = trim((string) (jdec((string) $r['brand'], [])['store_name'] ?? ''));
+        $out[] = ['id' => $r['id'], 'main' => $r['owner_id'] === null, 'name' => $name !== '' ? $name : ($r['owner_id'] === null ? 'My store' : 'New business'), 'stage' => seller_stage($r['application_status'], $r['verification_status'])];
+    }
+    return $out;
+}
+
+/** Starts another store for this account. It goes through the same application, verification and approval as the first. */
+function store_create(array $owner): array
+{
+    $ownerId = (string) ($owner['storeOf'] ?? $owner['id']);
+    $db = db();
+    if (count(stores_of($ownerId)) >= MAX_STORES) return ['ok' => false, 'error' => 'You can run up to ' . MAX_STORES . ' stores.'];
+    $email = (string) $db->val('SELECT email FROM users WHERE id = ?', [$ownerId]);
+    [$local, $domain] = array_pad(explode('@', $email, 2), 2, 'example.com');
+    $local = explode('+', $local)[0];
+    do { $alias = $local . '+store' . substr(bin2hex(random_bytes(4)), 0, 6) . '@' . $domain; } while ($db->val('SELECT 1 FROM users WHERE email = ?', [$alias]));
+    $id = uuid();
+    // The password is random and nobody knows it: stores are entered from the owner's account, never signed into directly.
+    $db->insert('users', ['id' => $id, 'email' => $alias, 'password_hash' => password_hash(bin2hex(random_bytes(24)), PASSWORD_DEFAULT), 'owner_id' => $ownerId, 'created_at' => now_db()]);
+    return ['ok' => true, 'id' => $id, 'owner' => $ownerId];
+}
+
+/** The person's screen when they are working inside one of their stores. */
+function user_as_store(string $storeId, array $owner): ?array
+{
+    $db = db();
+    $r = $db->one('SELECT u.id, u.email, a.status AS application_status, v.status AS verification_status FROM users u LEFT JOIN seller_applications a ON a.user_id = u.id LEFT JOIN seller_verifications v ON v.user_id = u.id WHERE u.id = ? AND u.owner_id = ?', [$storeId, $owner['id']]);
+    if (!$r) return null;
+    $pending = ['applications' => 0, 'verifications' => 0, 'products' => 0, 'payouts' => 0, 'orders' => 0, 'returns' => 0,
+        'notifications' => (int) $db->val('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL', [$storeId]),
+        'messages' => (int) $db->val('SELECT COUNT(*) FROM threads WHERE seller_id = ? AND seller_unread = 1', [$storeId]),
+        'returns' => (int) $db->val("SELECT COUNT(*) FROM return_cases WHERE seller_id = ? AND status = 'open'", [$storeId])];
+    return ['id' => $r['id'], 'email' => $r['email'], 'twofa' => $owner['twofa'], 'isAdmin' => false, 'isStaff' => false, 'canReview' => false, 'canOrders' => false, 'canMessages' => false,
+        'stage' => seller_stage($r['application_status'], $r['verification_status']), 'pending' => $pending, 'storeOf' => $owner['id'], 'ownerEmail' => $owner['email']];
 }
 
 function seller_stage(?string $application, ?string $verification): string
@@ -315,7 +393,7 @@ function attempt_login(string $email, string $password): array
     if (login_blocked($email)) {
         return ['ok' => false, 'error' => 'Too many attempts. Wait 15 minutes, or reset your password.'];
     }
-    $u = db()->one('SELECT id, password_hash FROM users WHERE email = ?', [$email]);
+    $u = db()->one('SELECT id, password_hash FROM users WHERE email = ? AND owner_id IS NULL', [$email]);
     static $dummy = null;
     $hash = $u['password_hash'] ?? ($dummy ??= password_hash('not-a-real-password', PASSWORD_DEFAULT));
     $valid = password_verify($password, $hash);

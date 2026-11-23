@@ -42,6 +42,7 @@ route('POST', '/login/2fa', function () {
 
 route('GET', '/account/security', function () {
     $u = require_user();
+    if (!empty($u['storeOf'])) { store_clear(); redirect('/account/security'); }
     $on = twofa_enabled($u['id']);
     $secret = $on ? null : ((string) (twofa_row($u['id'])['totp_secret'] ?? '') ?: twofa_begin($u['id']));
     render('security', ['title' => 'Account security', 'user' => $u, 'on' => $on, 'secret' => $secret, 'uri' => $secret ? totp_uri($u['email'], $secret) : '', 'codes' => null, 'left' => $on ? twofa_codes_left($u['id']) : 0, 'error' => null]);
@@ -49,6 +50,7 @@ route('GET', '/account/security', function () {
 
 route('POST', '/account/security', function () {
     $u = require_user();
+    if (!empty($u['storeOf'])) { store_clear(); redirect('/account/security'); }
     $act = input('action');
     $show = function (?string $error = null, ?array $codes = null) use ($u) {
         $on = twofa_enabled($u['id']);
@@ -73,13 +75,14 @@ route('POST', '/register', function () {
 
 route('POST', '/logout', function () {
     destroy_session();
+    store_clear();
     redirect('/auth');
 });
 
 route('POST', '/forgot', function () {
     $email = strtolower(input('email'));
     if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $u = db()->one('SELECT id FROM users WHERE email = ?', [$email]);
+        $u = db()->one('SELECT id FROM users WHERE email = ? AND owner_id IS NULL', [$email]);
         $recent = (int) db()->val('SELECT COUNT(*) FROM password_resets WHERE user_id = ? AND created_at > ?', [$u['id'] ?? '', db_plus('-10 minutes')]);
         if ($u && $recent < 3) {
             $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');

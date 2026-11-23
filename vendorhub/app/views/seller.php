@@ -79,26 +79,27 @@ $grp = ['sales' => 'orders', 'returns' => 'orders', 'products' => 'products', 'i
 <?php endif; ?>
 
 <?php if ($tab === 'inventory'): ?>
-  <?php if ($products): ?><details class="card" style="margin:12px 0"><summary><strong>Update many at once (CSV)</strong></summary>
+  <?php if ($products): ?><details class="exp"><summary>Bulk update (CSV)</summary>
     <form method="post" action="/inventory/import" enctype="multipart/form-data" class="row" data-keep><?= csrf_field() ?><a class="btn btn-outline btn-sm" href="/inventory/export">Download stock list</a><input type="file" name="file" accept=".csv,text/csv" required style="max-width:240px"><button class="btn btn-sm" type="submit">Upload</button></form></details><?php endif; ?>
   <?php if (!$products): ?><p class="muted">No products yet</p><?php endif; ?>
   <?php if ($products): ?><div class="filterbar" data-fbar="stock">
     <input type="search" data-fq placeholder="Search by product, option or SKU" aria-label="Search stock">
     <select data-fs aria-label="Filter stock"><option value="">All stock</option><option value="low">Low stock</option><option value="out">Out of stock</option><option value="ok">In stock</option></select>
     <span class="muted small" data-fcount></span></div><?php endif; ?>
-  <div class="table-wrap"><table class="rtable"><thead><tr><th>Product</th><th>SKU</th><th class="t-right">In stock</th><th>Change</th></tr></thead><tbody data-fbox="stock">
+  <ul class="stk" data-fbox="stock">
   <?php foreach ($products as $p):
       $rows = $p['product_type'] === 'variable' ? $p['variations'] : [['id' => null, 'sku' => $p['sku'], 'options' => [], 'stock' => $p['stock']]];
-      foreach ($rows as $r): $state = $p['product_type'] === 'variable' ? ($r['stock'] <= 0 ? 'out' : ($r['stock'] <= $p['low_stock_threshold'] ? 'low' : 'ok')) : stock_state($p); ?>
-    <tr data-fitem data-tags="<?= e($state) ?>" data-text="<?= e(mb_strtolower($p['name'] . ' ' . $r['sku'] . ' ' . implode(' ', $r['options']))) ?>"><td><a href="/products/edit?id=<?= e($p['id']) ?>"><strong><?= e($p['name']) ?></strong></a><?= $r['options'] ? '<br><span class="muted small">' . e(implode(' / ', $r['options'])) . '</span>' : '' ?></td>
-      <td><?= e($r['sku']) ?></td>
-      <td class="t-right"><?= !$p['manage_stock'] && $p['product_type'] === 'simple' ? '<span class="muted">Not tracked</span>' : (int) $r['stock'] . ' ' . ($state !== 'ok' ? pill($state) : '') ?></td>
-      <td><form method="post" action="/inventory/adjust" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><input type="hidden" name="variation_id" value="<?= e((string) $r['id']) ?>">
-        <input type="number" name="value" min="0" max="1000000" style="width:90px" aria-label="Quantity" required>
-        <button class="btn btn-outline btn-sm" name="op" value="add" type="submit">Add</button>
-        <button class="btn btn-outline btn-sm" name="op" value="remove" type="submit">Remove</button>
-        <button class="btn btn-sm" name="op" value="set" type="submit">Set to</button></form></td></tr>
-  <?php endforeach; endforeach; ?><tr data-fempty hidden><td colspan="4" class="muted">No stock matches your search.</td></tr></tbody></table></div>
+      foreach ($rows as $r): $tracked = $p['manage_stock'] || $p['product_type'] === 'variable'; $state = $p['product_type'] === 'variable' ? ($r['stock'] <= 0 ? 'out' : ($r['stock'] <= $p['low_stock_threshold'] ? 'low' : 'ok')) : stock_state($p); ?>
+    <li data-fitem data-tags="<?= e($state) ?>" data-text="<?= e(mb_strtolower($p['name'] . ' ' . $r['sku'] . ' ' . implode(' ', $r['options']))) ?>"><details>
+      <summary><?php if ($p['featured_image']): ?><img class="thumb" src="<?= e(product_image_url($p['featured_image'])) ?>" alt=""><?php else: ?><span class="thumb"></span><?php endif; ?>
+        <span class="grow"><strong><?= e($p['name']) ?></strong><?php if ($r['options']): ?><span class="muted small"><?= e(implode(' / ', $r['options'])) ?></span><?php endif; ?></span>
+        <span class="stk-n <?= $tracked ? e($state) : 'na' ?>"><?= $tracked ? (int) $r['stock'] : '–' ?></span></summary>
+      <form method="post" action="/inventory/adjust" class="stk-f" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($p['id']) ?>"><input type="hidden" name="variation_id" value="<?= e((string) $r['id']) ?>">
+        <input type="number" name="value" min="0" max="1000000" inputmode="numeric" placeholder="Quantity" aria-label="Quantity" required>
+        <div class="stk-b"><button class="btn btn-outline btn-sm" name="op" value="add" type="submit">Add</button><button class="btn btn-outline btn-sm" name="op" value="remove" type="submit">Remove</button><button class="btn btn-sm" name="op" value="set" type="submit">Set to</button></div>
+        <span class="muted small stk-sku"><?= e($r['sku']) ?><?= !$tracked ? ' · Stock is not tracked' : '' ?> · <a href="/products/edit?id=<?= e($p['id']) ?>">Open product</a></span></form>
+    </details></li>
+  <?php endforeach; endforeach; ?><li data-fempty hidden class="muted">No stock matches your search.</li></ul>
 <?php endif; ?>
 
 <?php if ($tab === 'promotions'): $pv = ($pview ?? '') ?: ((!empty($edit) || !empty($err)) ? 'codes' : 'sales'); ?>

@@ -1188,3 +1188,18 @@ body.app-desk-mode .list li{padding:14px 16px}
 .exp[open] summary,.act[open] summary{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent-text)}
 .exp .row{margin-top:10px}
 .act{margin-top:10px;width:100%}.actb{margin-top:10px;display:grid;gap:8px;min-width:0}
+/* Stock: one clean row per item, adjust on tap */
+.stk{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.stk>li{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.stk>li.muted{padding:14px;text-align:center}
+.stk summary{list-style:none;display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer}
+.stk summary::-webkit-details-marker{display:none}
+.stk .grow{min-width:0}.stk .grow strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stk .thumb{width:44px;height:44px;border-radius:12px;object-fit:cover;flex:0 0 auto;background:var(--soft)}
+.stk-n{min-width:44px;text-align:center;font-weight:700;padding:6px 10px;border-radius:99px;background:var(--soft);color:var(--ink);font-variant-numeric:tabular-nums}
+.stk-n.low{background:#fff3d6;color:#8a5a00}.stk-n.out{background:#fde4e4;color:#a12626}.stk-n.na{color:var(--muted)}
+.stk-f{padding:0 14px 14px;display:grid;gap:10px}
+.stk-f input[type=number]{width:100%}
+.stk-b{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stk-sku{overflow-wrap:anywhere}
+.stk details[open] summary{border-bottom:1px solid var(--line);margin-bottom:12px}

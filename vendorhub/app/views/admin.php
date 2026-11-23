@@ -47,7 +47,7 @@ endif; ?>
     <?php if ($a['admin_comment']): ?><div class="notice"><h3>Previous feedback</h3><p><?= nl2br(e($a['admin_comment'])) ?></p></div><?php endif; ?>
     <?php if ($a['status'] === 'submitted') echo $decision('/admin/application', $a['id'], $a['updated_at'], [['status', 'approved', 'Approve', ''], ['status', 'needs_corrections', 'Request corrections', 'btn-outline'], ['status', 'rejected', 'Reject', 'btn-danger']]); ?>
   <?php else: ?>
-    <div class="row" style="margin:16px 0"><?php foreach ($filters as $k => $l): ?><a class="btn btn-sm <?= $f === $k ? '' : 'btn-outline' ?>" href="/admin?tab=applications&filter=<?= $k ?>"><?= $l ?></a><?php endforeach; ?></div>
+    <?php $fp = []; foreach ($filters as $k => $l) $fp[$k] = [$l, '/admin?tab=applications&filter=' . $k, 0]; echo app_pills($fp, $f); ?>
     <ul class="list"><?php foreach ($list as $a): ?><li class="row between"><div><a href="/admin?tab=applications&id=<?= e($a['id']) ?>"><strong><?= e(($a['personal']['first_name'] ?? '') . ' ' . ($a['personal']['last_name'] ?? '')) ?></strong></a><div class="muted small"><?= e((string) $a['applicant_email']) ?> · <?= e($a['brand']['store_name'] ?? '') ?> · <?= e(human_date($a['submitted_at'])) ?></div></div><?= pill($a['status'], APP_STATUS_LABEL) ?></li><?php endforeach; ?>
       <?php if (!$list): ?><li class="muted">Nothing here.</li><?php endif; ?></ul>
   <?php endif; ?>
@@ -67,7 +67,7 @@ endif; ?>
     <?php if ($v['admin_comment']): ?><div class="notice"><h3>Previous feedback</h3><p><?= nl2br(e($v['admin_comment'])) ?></p></div><?php endif; ?>
     <?php if ($v['status'] === 'submitted') echo $decision('/admin/verification', $v['id'], $v['updated_at'], [['status', 'approved', 'Approve', ''], ['status', 'needs_corrections', 'Request corrections', 'btn-outline'], ['status', 'rejected', 'Reject', 'btn-danger']]); ?>
   <?php else: ?>
-    <div class="row" style="margin:16px 0"><?php foreach (['pending' => 'Under review', 'all' => 'All'] as $k => $l): ?><a class="btn btn-sm <?= $f === $k ? '' : 'btn-outline' ?>" href="/admin?tab=verifications&filter=<?= $k ?>"><?= $l ?></a><?php endforeach; ?></div>
+    <?php $fp = []; foreach (['pending' => 'Under review', 'all' => 'All'] as $k => $l) $fp[$k] = [$l, '/admin?tab=verifications&filter=' . $k, 0]; echo app_pills($fp, $f); ?>
     <ul class="list"><?php foreach ($list as $v): ?><li class="row between"><div><a href="/admin?tab=verifications&id=<?= e($v['id']) ?>"><strong><?= e($v['app_brand']['store_name'] ?? 'Seller') ?></strong></a><div class="muted small"><?= e((string) $v['applicant_email']) ?> · <?= e(human_date($v['submitted_at'])) ?></div></div><?= pill($v['status'], APP_STATUS_LABEL) ?></li><?php endforeach; ?>
       <?php if (!$list): ?><li class="muted">Nothing here.</li><?php endif; ?></ul>
   <?php endif; ?>
@@ -110,7 +110,6 @@ endif; ?>
 <?php endif; ?>
 
 <?php if ($tab === 'returns'): ?>
-  <p class="muted">Every return request is a case with its own number and history. Customers ask from their account on the marketplace, you can also open one from the Orders tab. Earnings for the item stay frozen while a case is open.</p>
   <form method="get" action="/admin" class="case-filters" data-keep><input type="hidden" name="tab" value="returns">
     <select name="filter" aria-label="Status"><?php foreach (['open' => 'Open cases', 'done' => 'Closed cases', 'all' => 'All cases'] as $k => $l): ?><option value="<?= $k ?>" <?= $filter === $k ? 'selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select>
     <select name="seller" aria-label="Seller"><option value="">All sellers</option><?php foreach ($sellers as $sid => $nm): ?><option value="<?= e($sid) ?>" <?= $sellerFilter === $sid ? 'selected' : '' ?>><?= e($nm) ?></option><?php endforeach; ?></select>
@@ -173,17 +172,17 @@ endif; ?>
 <?php endif; ?>
 
 <?php if ($tab === 'payouts'): ?>
-  <p class="small"><a href="/admin/export?kind=payouts">Download all withdrawals (CSV)</a></p>
+  <details class="exp"><summary>Export</summary><a class="btn btn-outline btn-sm" href="/admin/export?kind=payouts" data-nonav>Download withdrawals (CSV)</a></details>
   <ul class="list"><?php foreach ($items as $w): ?><li>
     <div class="row between"><div><strong><?= e($w['store_name']) ?></strong><?= verified_tick($w['seller_id'] ?? '') ?> <span class="muted">· <?= e($w['seller_email']) ?></span>
       <div>Pay <strong><?= e($m((float) $w['amount'] - (float) $w['fee'], $w['currency'])) ?></strong><?= (float) $w['fee'] > 0 ? ' <span class="muted small">(' . e($m($w['amount'], $w['currency'])) . ' less ' . e($m($w['fee'], $w['currency'])) . ' fee)</span>' : '' ?></div>
       <div class="muted small"><?= e($w['bank_name']) ?> · <?= e($w['account_number']) ?> · <?= e($w['account_name']) ?></div>
       <div class="muted small">Requested <?= e(human_date($w['requested_at'], true)) ?><?= $w['reference'] ? ' · Ref ' . e($w['reference']) : '' ?><?= $w['admin_note'] ? ' · ' . e($w['admin_note']) : '' ?></div></div>
       <?php if ($w['status'] === 'requested'): ?>
-      <div>
+      <details class="act"><summary>Pay or reject</summary><div class="actb">
       <?php if ($ps && $w['currency'] === 'NGN'): ?><form method="post" action="/admin/payout/paystack" data-keep style="margin-bottom:8px"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($w['id']) ?>"><button class="btn btn-sm btn-accent" name="action" value="send" data-confirm="Send <?= e($m((float) $w['amount'] - (float) $w['fee'], $w['currency'])) ?> to <?= e($w['account_name']) ?> with Paystack? This moves real money from your Paystack balance.">Send with Paystack</button></form><?php endif; ?>
       <form method="post" action="/admin/payout" class="row" data-keep><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($w['id']) ?>"><input name="text" placeholder="Transfer reference or reason" maxlength="500" style="width:230px" aria-label="Transfer reference or reason">
-        <button class="btn btn-sm btn-outline" name="decision" value="paid" data-confirm="Mark as paid?">Mark paid</button><button class="btn btn-sm btn-danger" name="decision" value="rejected" data-confirm="Reject and return the money to the seller's wallet?">Reject</button></form></div>
+        <button class="btn btn-sm btn-outline" name="decision" value="paid" data-confirm="Mark as paid?">Mark paid</button><button class="btn btn-sm btn-danger" name="decision" value="rejected" data-confirm="Reject and return the money to the seller's wallet?">Reject</button></form></div></details>
       <?php elseif ($w['status'] === 'processing'): ?>
       <form method="post" action="/admin/payout/paystack" data-keep class="row"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($w['id']) ?>"><?= pill('processing', WITHDRAWAL_LABEL, ['processing' => 'warn']) ?><button class="btn btn-sm btn-outline" name="action" value="check">Check status</button></form>
       <?php else: echo pill($w['status'], WITHDRAWAL_LABEL, ['failed' => 'bad']); endif; ?></div></li><?php endforeach; ?>
@@ -194,12 +193,11 @@ endif; ?>
 <?php if ($tab === 'legal') require __DIR__ . '/admin_legal.php'; ?>
 
 <?php if ($tab === 'refunds'): ?>
-  <p class="muted">Money going back to customers. A refund appears here when a return is approved or an order is cancelled or refunded; the seller's earnings are taken back at the same moment. Your job is only to send the money: use Paystack, or mark it done if you paid it back another way.</p>
   <div class="refund-stats">
     <div><strong><?= (int) $summary['to_pay']['n'] ?> · <?= e($m($summary['to_pay']['amount'])) ?></strong><span>To send</span></div>
     <div><strong><?= (int) $summary['sending']['n'] ?> · <?= e($m($summary['sending']['amount'])) ?></strong><span>With Paystack</span></div>
     <div><strong><?= (int) $summary['failed']['n'] ?> · <?= e($m($summary['failed']['amount'])) ?></strong><span>Failed, need attention</span></div></div>
-  <div class="row" style="margin:12px 0"><?php foreach (['open' => 'To do', 'done' => 'Done', 'all' => 'All'] as $k => $l): ?><a class="chip" style="<?= $filter === $k ? 'border-color:var(--ink);font-weight:700' : '' ?>" href="/admin?tab=refunds&amp;filter=<?= e($k) ?>"><?= e($l) ?></a><?php endforeach; ?></div>
+  <?php $fp = []; foreach (['open' => 'To do', 'done' => 'Done', 'all' => 'All'] as $k => $l) $fp[$k] = [$l, '/admin?tab=refunds&filter=' . $k, 0]; echo app_pills($fp, $filter); ?>
   <ul class="cases"><?php foreach ($items as $r): ?><li><article class="case">
     <header class="case-head"><div><div class="case-ref"><?= $r['case_ref'] ? 'Return ' . e($r['case_ref']) : 'Order refund' ?> · Order <?= e($r['number'] ?: $r['marketplace_order_id']) ?></div>
       <h3 class="case-title"><span class="refund-amount"><?= e($m((float) $r['amount'], $r['currency'])) ?></span> to <?= e($r['customer_name'] ?: 'the customer') ?></h3></div>
@@ -234,7 +232,6 @@ endif; ?>
 <?php endif; ?>
 
 <?php if ($tab === 'codes'): ?>
-  <p class="muted">Codes created by sellers. The seller funds each discount. Switch a code off if it is being misused.</p>
   <div class="table-wrap"><table><thead><tr><th>Code</th><th>Seller</th><th>Discount</th><th>Status</th><th class="t-right">Used</th><th class="t-right">Given away</th><th></th></tr></thead><tbody>
   <?php foreach ($items as $c): ?><tr><td><strong><?= e($c['code']) ?></strong></td><td><?= e($c['store']) ?><?= verified_tick($c['seller_id'] ?? '') ?></td>
     <td><?= $c['kind'] === 'percent' ? e((string) $c['amount']) . '%' : e($c['currency'] . ' ' . number_format($c['amount'], 2)) . ' each' ?></td>
@@ -282,7 +279,6 @@ endif; ?>
 <?php endif; ?>
 
 <?php if ($tab === 'staff'): ?>
-  <p class="muted">Staff are created by you. They can sign in to review and publish seller products, nothing else.</p>
   <form method="post" action="/admin/staff" class="card" style="max-width:520px" data-keep><?= csrf_field() ?><input type="hidden" name="action" value="create"><h3 style="margin-top:0">Add a staff account</h3>
     <?= f_text('email', 'Email', '', null, ['type' => 'email', 'required' => 1]) ?>
     <div class="field"><label for="f-staffpw">Temporary password</label><div class="pw"><input id="f-staffpw" name="password" type="password" minlength="8" required autocomplete="new-password"><button type="button" data-pw="f-staffpw">Show</button></div></div>

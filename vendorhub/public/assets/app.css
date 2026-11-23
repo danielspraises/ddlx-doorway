@@ -1213,3 +1213,7 @@ body.app .notice{border-radius:14px}
 body.app .savebar{margin:16px -16px 0;padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
 body.app .savebar .btn{flex:1 1 auto}
 body.app .split-side .card.tip{box-shadow:none}
+body.app-desk-mode .refund-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media(max-width:640px){body.app-desk-mode .refund-stats{grid-template-columns:1fr}}
+body.app-desk-mode .act .row,body.app-desk-mode .act form.row{flex-wrap:wrap}
+body.app-desk-mode .act input[style*="width:230px"]{width:100%!important}

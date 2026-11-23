@@ -1203,3 +1203,13 @@ body.app-desk-mode .list li{padding:14px 16px}
 .stk-b{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .stk-sku{overflow-wrap:anywhere}
 .stk details[open] summary{border-bottom:1px solid var(--line);margin-bottom:12px}
+/* Product editor in the app: calmer */
+body.app .ed-back,body.app .ed-head h1{display:none}
+body.app .ed-head{margin:4px 0 12px}
+body.app .editor h2{font-size:.78rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:22px 4px 8px}
+body.app .editor h2::before{display:none}
+body.app .editor .card,body.app .split-main>.card{border-radius:18px;box-shadow:none}
+body.app .notice{border-radius:14px}
+body.app .savebar{margin:16px -16px 0;padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+body.app .savebar .btn{flex:1 1 auto}
+body.app .split-side .card.tip{box-shadow:none}

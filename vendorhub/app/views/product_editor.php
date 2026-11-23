@@ -14,8 +14,8 @@ $img = function (string $path, string $remove) use ($id, $editable): string {
         . ($editable ? '<form method="post" action="/products/image/remove" data-keep>' . csrf_field() . '<input type="hidden" name="id" value="' . e($id) . '"><input type="hidden" name="path" value="' . e($path) . '"><button type="submit" aria-label="Remove photo">×</button></form>' : '') . '</div>';
 };
 ?>
-<p><a href="/seller?tab=products" class="small">← Products</a></p>
-<div class="row between"><h1><?= $saved ? e($saved['name'] ?: 'Product') : 'New product' ?></h1><?= pill($visKind, [], ['live' => 'ok', 'hidden' => 'warn']) ?> <?php if ($saved): ?><span class="muted small"><?= e($visLabel) ?></span><?php endif; ?></div>
+<p class="ed-back"><a href="/seller?tab=products" class="small">← Products</a></p>
+<div class="row between ed-head"><h1><?= $saved ? e($saved['name'] ?: 'Product') : 'New product' ?></h1><?= pill($visKind, [], ['live' => 'ok', 'hidden' => 'warn']) ?> <?php if ($saved): ?><span class="muted small"><?= e($visLabel) ?></span><?php endif; ?></div>
 
 <?php if ($error): ?><p class="flash flash-error" role="alert"><?= e($error) ?></p><?php endif; ?>
 <?php if ($notice): ?><p class="flash flash-ok" role="status"><?= e($notice) ?></p><?php endif; ?>
